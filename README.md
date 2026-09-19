@@ -1,1 +1,58 @@
 # SottoLink
+
+SottoLink is an experimental, browser-only acoustic link. A sender mixes a short
+private message into an uploaded WAV recording using ggwave's ultrasonic FSK
+protocol. A nearby receiver listens through its microphone and displays only a
+message that passes SottoLink's integrity check.
+
+No message relay or application backend is used. After the static app loads,
+the data path is acoustic only.
+
+## MVP scope
+
+- Mac sender to iPhone receiver, about one metre apart in a quiet room
+- Safari as the initial browser target
+- WAV cover audio and private messages up to 32 UTF-8 bytes
+- ggwave Ultrasound Normal with manually matched 15, 16, 17, or 18 kHz presets
+- Adjustable carrier level from -30 to -12 dB relative to the speech in the overlay window
+- Raw microphone constraints and a live high-frequency spectrum display
+- Plaintext, session-only data
+
+The 18 kHz preset spans approximately 18–22.45 kHz and assumes a 48 kHz audio
+pipeline. Device speakers, microphones, browser processing, room acoustics, and
+listener hearing all affect reliability and audibility. The app does not claim
+that its signal is universally inaudible or secure.
+
+## Develop
+
+```sh
+npm install
+npm run dev
+```
+
+Microphone capture requires HTTPS outside `localhost`. Deploy the static Vite
+build to Vercel for testing on an iPhone.
+
+```sh
+npm test
+npm run build
+```
+
+## Test procedure
+
+1. Deploy to Vercel and open the same URL in Safari on the Mac and iPhone.
+2. On the iPhone, select Receiver, choose 15 kHz, and tap Start listening.
+3. On the Mac, select Sender and choose the same frequency.
+4. Upload a sufficiently long speech WAV, enter a message, and begin at -30 dB.
+5. Tap Mix & transmit with the devices stationary and about one metre apart.
+6. Raise strength toward -12 dB only if decoding fails, then repeat at higher
+   frequency presets to compare audibility and reliability.
+
+The target first milestone is at least 9 successful decodes out of 10 trials on
+the reference devices while the carrier is not consciously noticeable.
+
+## Third-party code
+
+The current ggwave Emscripten build is vendored under `src/vendor` because the
+published npm package does not expose the upstream frequency-start API. ggwave
+is MIT licensed; its license is included beside the vendored build.

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08110f" />
+    <meta
+      name="description"
+      content="Experimental acoustic data link using speech and ggwave ultrasound."
+    />
+    <title>SottoLink — acoustic private channel</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <a class="brand" href="#sender" aria-label="SottoLink home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>SottoLink</span>
+        </a>
+        <span class="experiment-badge">Experimental prototype</span>
+      </header>
+
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Data over sound · local only</p>
+        <h1 id="page-title">A private channel<br />inside ordinary audio.</h1>
+        <p class="lede">
+          Layer a short ggwave message over a WAV recording, then decode it on a nearby
+          device. Nothing is relayed through the network.
+        </p>
+      </section>
+
+      <nav class="mode-tabs" aria-label="Device role">
+        <button id="sender-tab" class="mode-tab is-active" type="button" aria-selected="true">
+          <span class="step-number">01</span>
+          Sender
+        </button>
+        <button id="receiver-tab" class="mode-tab" type="button" aria-selected="false">
+          <span class="step-number">02</span>
+          Receiver
+        </button>
+      </nav>
+
+      <section id="sender-panel" class="workspace" aria-labelledby="sender-heading">
+        <div class="workspace-heading">
+          <div>
+            <p class="section-kicker">Mac · transmit</p>
+            <h2 id="sender-heading">Prepare the signal</h2>
+          </div>
+          <span class="role-status"><i></i> Ready</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="field field-wide">
+            <label for="cover-file">Cover audio</label>
+            <label class="file-drop" for="cover-file">
+              <span class="file-icon" aria-hidden="true">WAV</span>
+              <span>
+                <strong id="file-label">Choose a speech recording</strong>
+                <small>Lossless .wav only · long enough to contain the transmission</small>
+              </span>
+              <span class="file-action">Browse</span>
+            </label>
+            <input id="cover-file" class="visually-hidden" type="file" accept=".wav,audio/wav" />
+          </div>
+
+          <div class="field field-wide">
+            <div class="label-row">
+              <label for="private-message">Private message</label>
+              <output id="byte-count" for="private-message">0 / 32 bytes</output>
+            </div>
+            <textarea
+              id="private-message"
+              rows="3"
+              placeholder="confirm booking room 204"
+              spellcheck="false"
+            ></textarea>
+            <p id="message-error" class="field-error" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="sender-frequency">Base frequency</label>
+            <select id="sender-frequency"></select>
+            <small id="sender-band" class="field-note"></small>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="signal-strength">Signal strength</label>
+              <output id="strength-output" for="signal-strength">−30 dB</output>
+            </div>
+            <input id="signal-strength" type="range" min="-30" max="-12" step="1" value="-30" />
+            <div class="range-labels"><span>Subtle</span><span>Stronger</span></div>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button id="transmit-button" class="primary-action" type="button">
+            <span>Mix &amp; transmit</span>
+            <span aria-hidden="true">→</span>
+          </button>
+          <p id="sender-status" class="action-status" role="status">
+            Select a WAV and enter a message.
+          </p>
+        </div>
+      </section>
+
+      <section id="receiver-panel" class="workspace" aria-labelledby="receiver-heading" hidden>
+        <div class="workspace-heading">
+          <div>
+            <p class="section-kicker">iPhone · receive</p>
+            <h2 id="receiver-heading">Listen for a message</h2>
+          </div>
+          <span id="receiver-role-status" class="role-status"><i></i> Idle</span>
+        </div>
+
+        <div class="receiver-grid">
+          <div class="receiver-controls">
+            <div class="field">
+              <label for="receiver-frequency">Base frequency</label>
+              <select id="receiver-frequency"></select>
+              <small id="receiver-band" class="field-note"></small>
+            </div>
+
+            <div class="capture-card">
+              <div class="capture-dot" aria-hidden="true"><span></span></div>
+              <div>
+                <strong id="capture-title">Microphone is off</strong>
+                <p id="capture-description">Choose the matching frequency, then start listening.</p>
+              </div>
+            </div>
+
+            <button id="listen-button" class="primary-action" type="button">
+              <span>Start listening</span>
+              <span aria-hidden="true">●</span>
+            </button>
+            <button id="stop-button" class="secondary-action" type="button" hidden>Stop listening</button>
+
+            <dl id="capture-settings" class="capture-settings" aria-label="Audio capture settings">
+              <div><dt>Audio context</dt><dd>—</dd></div>
+              <div><dt>Echo cancellation</dt><dd>—</dd></div>
+              <div><dt>Noise suppression</dt><dd>—</dd></div>
+              <div><dt>Auto gain</dt><dd>—</dd></div>
+            </dl>
+          </div>
+
+          <div class="monitor-column">
+            <div class="spectrum-card">
+              <div class="card-heading">
+                <div>
+                  <span>Live spectrum</span>
+                  <small>10–24 kHz</small>
+                </div>
+                <span id="frame-count">0 frames</span>
+              </div>
+              <canvas id="spectrum" aria-label="Live microphone frequency spectrum"></canvas>
+            </div>
+
+            <div class="message-card" aria-live="polite">
+              <span class="message-label">Verified private message</span>
+              <p id="received-message">Waiting for a valid transmission…</p>
+              <small id="received-meta">Only integrity-checked messages appear here.</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span>Plaintext research prototype</span>
+        <span>Audio never leaves your devices</span>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
