@@ -1,4 +1,5 @@
 import "./styles.css";
+import { inject } from "@vercel/analytics";
 import { startAcousticReceiver, type AcousticReceiver, type CaptureSettings } from "./audio/capture";
 import { findAudioOnset, mixCarrierIntoCover } from "./audio/mix";
 import {
@@ -13,6 +14,8 @@ import { loadCoverAudio } from "./core/cover";
 import { decodePrivateFrame, encodePrivateFrame } from "./core/frame";
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
+
+inject();
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
