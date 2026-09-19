@@ -9,6 +9,7 @@ import {
   getFrequencyPreset,
   utf8ByteLength,
 } from "./core/config";
+import { loadCoverAudio } from "./core/cover";
 import { decodePrivateFrame, encodePrivateFrame } from "./core/frame";
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
@@ -25,6 +26,8 @@ const senderPanel = element<HTMLElement>("sender-panel");
 const receiverPanel = element<HTMLElement>("receiver-panel");
 const coverInput = element<HTMLInputElement>("cover-file");
 const fileLabel = element<HTMLElement>("file-label");
+const fileDescription = element<HTMLElement>("file-description");
+const useExampleButton = element<HTMLButtonElement>("use-example");
 const privateMessage = element<HTMLTextAreaElement>("private-message");
 const byteCount = element<HTMLOutputElement>("byte-count");
 const messageError = element<HTMLElement>("message-error");
@@ -110,9 +113,25 @@ window.addEventListener("hashchange", () => void setMode(modeFromHash()));
 
 coverInput.addEventListener("change", () => {
   const file = coverInput.files?.[0];
-  fileLabel.textContent = file?.name ?? "Choose a speech recording";
-  setSenderStatus(file ? "WAV selected. Ready when the message is valid." : "Select a WAV and enter a message.");
+  if (file) {
+    fileLabel.textContent = file.name;
+    fileDescription.textContent = "Custom lossless WAV · selected for this session";
+    useExampleButton.hidden = false;
+    setSenderStatus("Custom WAV selected. Ready when the message is valid.");
+  } else {
+    showExampleCover();
+  }
 });
+
+function showExampleCover(): void {
+  coverInput.value = "";
+  fileLabel.textContent = "Included example speech";
+  fileDescription.textContent = "8.8 seconds · 48 kHz mono · ready to transmit";
+  useExampleButton.hidden = true;
+  setSenderStatus("Included example ready. Enter a private message.");
+}
+
+useExampleButton.addEventListener("click", showExampleCover);
 privateMessage.addEventListener("input", updateMessageCount);
 senderFrequency.addEventListener("change", updateBandLabels);
 receiverFrequency.addEventListener("change", updateBandLabels);
@@ -127,10 +146,6 @@ function getSenderContext(): AudioContext {
 
 async function transmit(): Promise<void> {
   const file = coverInput.files?.[0];
-  if (!file) {
-    setSenderStatus("Choose a WAV speech recording first.", "error");
-    return;
-  }
   if (!updateMessageCount()) {
     setSenderStatus("Enter a private message between 1 and 32 UTF-8 bytes.", "error");
     return;
@@ -140,7 +155,7 @@ async function transmit(): Promise<void> {
   setSenderStatus("Preparing the ggwave signal…");
 
   try {
-    const fileBytes = await file.arrayBuffer();
+    const fileBytes = await loadCoverAudio(file);
     if (!isWavFile(fileBytes)) throw new Error("The selected file is not a valid RIFF/WAVE file.");
 
     const audioContext = getSenderContext();

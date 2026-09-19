@@ -51,14 +51,17 @@
 
         <div class="form-grid">
           <div class="field field-wide">
-            <label for="cover-file">Cover audio</label>
+            <div class="label-row cover-label-row">
+              <label for="cover-file">Cover audio</label>
+              <button id="use-example" class="text-action" type="button" hidden>Use included example</button>
+            </div>
             <label class="file-drop" for="cover-file">
               <span class="file-icon" aria-hidden="true">WAV</span>
               <span>
-                <strong id="file-label">Choose a speech recording</strong>
-                <small>Lossless .wav only · long enough to contain the transmission</small>
+                <strong id="file-label">Included example speech</strong>
+                <small id="file-description">8.8 seconds · 48 kHz mono · ready to transmit</small>
               </span>
-              <span class="file-action">Browse</span>
+              <span class="file-action">Replace</span>
             </label>
             <input id="cover-file" class="visually-hidden" type="file" accept=".wav,audio/wav" />
           </div>
@@ -99,7 +102,7 @@
             <span aria-hidden="true">→</span>
           </button>
           <p id="sender-status" class="action-status" role="status">
-            Select a WAV and enter a message.
+            Included example ready. Enter a private message.
           </p>
         </div>
       </section>

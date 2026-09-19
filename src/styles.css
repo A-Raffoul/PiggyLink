@@ -258,6 +258,24 @@ h2 {
   color: #ff9c8e;
 }
 
+.cover-label-row label {
+  margin-bottom: 9px;
+}
+
+.text-action {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  color: #77e8aa;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.text-action:hover {
+  color: #a3f8c9;
+}
+
 textarea,
 select {
   width: 100%;

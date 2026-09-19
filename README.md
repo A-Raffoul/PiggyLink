@@ -12,7 +12,7 @@ the data path is acoustic only.
 
 - Mac sender to iPhone receiver, about one metre apart in a quiet room
 - Safari as the initial browser target
-- WAV cover audio and private messages up to 32 UTF-8 bytes
+- Included example speech or custom WAV cover audio, with private messages up to 32 UTF-8 bytes
 - ggwave Ultrasound Normal with manually matched 15, 16, 17, or 18 kHz presets
 - Adjustable carrier level from -30 to -12 dB relative to the speech in the overlay window
 - Raw microphone constraints and a live high-frequency spectrum display
@@ -43,7 +43,7 @@ npm run build
 1. Deploy to Vercel and open the same URL in Safari on the Mac and iPhone.
 2. On the iPhone, select Receiver, choose 15 kHz, and tap Start listening.
 3. On the Mac, select Sender and choose the same frequency.
-4. Upload a sufficiently long speech WAV, enter a message, and begin at -30 dB.
+4. Use the included speech example—or upload your own WAV—enter a message, and begin at -30 dB.
 5. Tap Mix & transmit with the devices stationary and about one metre apart.
 6. Raise strength toward -12 dB only if decoding fails, then repeat at higher
    frequency presets to compare audibility and reliability.
