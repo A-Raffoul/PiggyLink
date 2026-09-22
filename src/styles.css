@@ -278,7 +278,8 @@ h2 {
 
 textarea,
 select,
-input[type="number"] {
+input[type="number"],
+input[type="text"] {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 9px;
@@ -305,6 +306,11 @@ select {
 input[type="number"] {
   height: 48px;
   padding: 0 14px;
+}
+
+input[type="text"] {
+  height: 44px;
+  padding: 0 12px;
 }
 
 select:disabled {
@@ -628,6 +634,33 @@ input[type="range"] {
   background: rgba(5, 14, 11, 0.48);
 }
 
+.trial-plan-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.trial-plan-controls .field > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #84948b;
+  font-size: 9px;
+}
+
+.trial-plan-controls .field-wide {
+  grid-column: 1 / -1;
+}
+
+.trial-plan-controls .secondary-action {
+  align-self: end;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 11px;
+}
+
 .trial-log-heading {
   align-items: flex-start;
 }
@@ -801,7 +834,8 @@ footer {
 
   .form-grid,
   .receiver-grid,
-  .trial-controls {
+  .trial-controls,
+  .trial-plan-controls {
     grid-template-columns: 1fr;
   }
 

@@ -60,10 +60,12 @@ only a compact window around the speech onset and modem carrier (with a short
 lead-in and tail), then starts the pause and next trial. Manual transmissions
 continue to play the full cover clip.
 
-On the Receiver, every valid four-digit payload is recorded for the current
-browser session with its receipt time, frequency preset, and duplicate status.
-Use **Export CSV** before changing test conditions or clearing the log. The CSV
-is a local download; no trial telemetry leaves either device.
+On the Receiver, set a condition label and expected ID range, then choose
+**Start new trial log** before listening. The report includes every expected
+trial as `received` or `missed`, plus duplicate and unexpected payloads with
+their receipt time and frequency preset. Use **Export CSV** before changing
+conditions or clearing the log. The CSV is a local download; no trial telemetry
+leaves either device.
 
 ## Third-party code
 

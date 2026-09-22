@@ -13,11 +13,14 @@ import {
 import { loadCoverAudio } from "./core/cover";
 import { decodePrivateFrame, encodePrivateFrame } from "./core/frame";
 import {
-  exportTrialEventsCsv,
+  buildTrialReport,
+  createTrialPlan,
+  exportTrialReportCsv,
   formatTrialMessage,
   isTrialMessage,
   recordTrialEvent,
   type TrialEvent,
+  type TrialPlan,
 } from "./core/trials";
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
@@ -68,6 +71,10 @@ const receivedMeta = element<HTMLElement>("received-meta");
 const trialLogSummary = element<HTMLElement>("trial-log-summary");
 const trialLogCount = element<HTMLElement>("trial-log-count");
 const trialLogList = element<HTMLOListElement>("trial-log-list");
+const trialCondition = element<HTMLInputElement>("trial-condition");
+const expectedFirst = element<HTMLInputElement>("expected-first");
+const expectedCount = element<HTMLInputElement>("expected-count");
+const startTrialLogButton = element<HTMLButtonElement>("start-trial-log");
 const exportTrialsButton = element<HTMLButtonElement>("export-trials");
 const clearTrialsButton = element<HTMLButtonElement>("clear-trials");
 
@@ -78,6 +85,7 @@ let playingSource: AudioBufferSourceNode | undefined;
 let batchCancelled = false;
 let cancelBatchPause: (() => void) | undefined;
 let trialEvents: TrialEvent[] = [];
+let trialPlan: TrialPlan | undefined;
 
 function frequencyOptionMarkup(select: HTMLSelectElement): void {
   for (const preset of FREQUENCY_PRESETS) {
@@ -349,35 +357,53 @@ function stopTrialBatch(): void {
 }
 
 function renderTrialLog(): void {
-  const duplicates = trialEvents.filter((event) => event.duplicate).length;
-  const unique = trialEvents.length - duplicates;
-  trialLogCount.textContent = String(trialEvents.length);
-  trialLogSummary.textContent =
-    trialEvents.length === 0
-      ? "No numbered trials decoded this session."
-      : `${unique} unique · ${duplicates} duplicate${duplicates === 1 ? "" : "s"}`;
+  if (!trialPlan) {
+    trialLogCount.textContent = "—";
+    trialLogSummary.textContent = "Set the expected ID range, then start a new trial log.";
+    trialLogList.replaceChildren();
+    exportTrialsButton.disabled = true;
+    clearTrialsButton.disabled = true;
+    return;
+  }
+
+  const report = buildTrialReport(trialPlan, trialEvents);
+  const received = report.filter((row) => row.result === "received").length;
+  const missed = report.filter((row) => row.result === "missed").length;
+  const duplicates = report.filter((row) => row.result === "duplicate").length;
+  const unexpected = report.filter((row) => row.result === "unexpected").length;
+  trialLogCount.textContent = `${received}/${trialPlan.count}`;
+  trialLogSummary.textContent = `${received} received · ${missed} missed · ${duplicates} duplicate${duplicates === 1 ? "" : "s"}${unexpected ? ` · ${unexpected} unexpected` : ""}`;
   trialLogList.replaceChildren(
-    ...trialEvents
-      .slice(-8)
-      .reverse()
-      .map((event) => {
-        const item = document.createElement("li");
-        item.textContent = `${event.message} · ${event.duplicate ? "duplicate" : "unique"} · ${new Date(event.receivedAt).toLocaleTimeString()}`;
-        return item;
-      }),
+    ...report.map((row) => {
+      const item = document.createElement("li");
+      const time = row.receivedAt ? ` · ${new Date(row.receivedAt).toLocaleTimeString()}` : "";
+      item.textContent = `${row.expectedMessage || row.receivedMessage} · ${row.result}${time}`;
+      return item;
+    }),
   );
-  exportTrialsButton.disabled = trialEvents.length === 0;
+  exportTrialsButton.disabled = false;
   clearTrialsButton.disabled = trialEvents.length === 0;
 }
 
 function downloadTrialLog(): void {
-  const blob = new Blob([exportTrialEventsCsv(trialEvents)], { type: "text/csv;charset=utf-8" });
+  if (!trialPlan) return;
+  const blob = new Blob([exportTrialReportCsv(trialPlan, trialEvents)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = `sottolink-baseline-${new Date().toISOString().replaceAll(":", "-")}.csv`;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function startTrialLog(): void {
+  try {
+    trialPlan = createTrialPlan(Number(expectedFirst.value), Number(expectedCount.value), trialCondition.value);
+    trialEvents = [];
+    renderTrialLog();
+  } catch (error) {
+    trialLogSummary.textContent = error instanceof Error ? error.message : "Invalid expected trial range.";
+  }
 }
 
 function showCaptureSettings(settings: CaptureSettings): void {
@@ -465,6 +491,7 @@ stopTrialsButton.addEventListener("click", stopTrialBatch);
 listenButton.addEventListener("click", () => void startListening());
 stopButton.addEventListener("click", () => void stopListening());
 exportTrialsButton.addEventListener("click", downloadTrialLog);
+startTrialLogButton.addEventListener("click", startTrialLog);
 clearTrialsButton.addEventListener("click", () => {
   trialEvents = [];
   renderTrialLog();

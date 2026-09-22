@@ -185,6 +185,21 @@
             </dl>
 
             <section class="trial-log" aria-labelledby="trial-log-heading">
+              <div class="trial-plan-controls">
+                <label class="field field-wide">
+                  <span>Condition label</span>
+                  <input id="trial-condition" type="text" placeholder="iPhone → Mac · 17 kHz · −30 dB" maxlength="80" />
+                </label>
+                <label class="field">
+                  <span>First expected ID</span>
+                  <input id="expected-first" type="number" min="1" max="9999" step="1" value="1" inputmode="numeric" />
+                </label>
+                <label class="field">
+                  <span>Expected trials</span>
+                  <input id="expected-count" type="number" min="1" max="100" step="1" value="10" inputmode="numeric" />
+                </label>
+                <button id="start-trial-log" class="secondary-action" type="button">Start new trial log</button>
+              </div>
               <div class="trial-log-heading">
                 <div>
                   <span class="message-label" id="trial-log-heading">Baseline log</span>
