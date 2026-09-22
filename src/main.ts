@@ -22,7 +22,7 @@ import {
   type TrialEvent,
   type TrialPlan,
 } from "./core/trials";
-import { isWavFile } from "./core/wav";
+import { encodeWav, isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
 
 inject();
@@ -52,6 +52,7 @@ const signalStrength = element<HTMLInputElement>("signal-strength");
 const strengthOutput = element<HTMLOutputElement>("strength-output");
 const transmitButton = element<HTMLButtonElement>("transmit-button");
 const senderStatus = element<HTMLElement>("sender-status");
+const downloadReferenceButton = element<HTMLButtonElement>("download-reference");
 const trialFirst = element<HTMLInputElement>("trial-first");
 const trialCount = element<HTMLInputElement>("trial-count");
 const trialPause = element<HTMLSelectElement>("trial-pause");
@@ -60,6 +61,8 @@ const stopTrialsButton = element<HTMLButtonElement>("stop-trials");
 const trialStatus = element<HTMLElement>("trial-status");
 const listenButton = element<HTMLButtonElement>("listen-button");
 const stopButton = element<HTMLButtonElement>("stop-button");
+const startRawCaptureButton = element<HTMLButtonElement>("start-raw-capture");
+const stopRawCaptureButton = element<HTMLButtonElement>("stop-raw-capture");
 const receiverRoleStatus = element<HTMLElement>("receiver-role-status");
 const captureTitle = element<HTMLElement>("capture-title");
 const captureDescription = element<HTMLElement>("capture-description");
@@ -86,6 +89,7 @@ let batchCancelled = false;
 let cancelBatchPause: (() => void) | undefined;
 let trialEvents: TrialEvent[] = [];
 let trialPlan: TrialPlan | undefined;
+let lastReference: { readonly bytes: Uint8Array; readonly name: string } | undefined;
 
 function frequencyOptionMarkup(select: HTMLSelectElement): void {
   for (const preset of FREQUENCY_PRESETS) {
@@ -229,6 +233,7 @@ async function playTransmission(message: string, compact = false): Promise<{ pre
         resolve();
       };
     });
+    let referenceChannels = mixed.channels;
     if (compact) {
       const window = transmissionPlaybackWindow(
         cover.length,
@@ -237,15 +242,47 @@ async function playTransmission(message: string, compact = false): Promise<{ pre
         carrier.length,
         audioContext.sampleRate,
       );
+      referenceChannels = mixed.channels.map((channel) => channel.slice(window.start, window.end));
       source.start(0, window.start / audioContext.sampleRate, (window.end - window.start) / audioContext.sampleRate);
     } else {
       source.start();
     }
+    lastReference = {
+      bytes: encodeWav(referenceChannels, audioContext.sampleRate),
+      name: `sottolink-reference-${message}-${preset.id}-${Math.abs(Number(signalStrength.value))}db.wav`,
+    };
+    downloadReferenceButton.disabled = false;
     await playbackComplete;
     return { presetLabel: preset.label };
   } catch (error) {
     throw error instanceof Error ? error : new Error("Transmission failed.");
   }
+}
+
+function downloadWav(bytes: Uint8Array, name: string): void {
+  const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: "audio/wav" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function startRawCapture(): void {
+  if (!receiver) return;
+  receiver.startRawCapture();
+  startRawCaptureButton.hidden = true;
+  stopRawCaptureButton.hidden = false;
+  receivedMeta.textContent = "Recording raw microphone samples for diagnostics…";
+}
+
+function stopRawCapture(): void {
+  const samples = receiver?.stopRawCapture();
+  startRawCaptureButton.hidden = false;
+  stopRawCaptureButton.hidden = true;
+  if (!samples?.length) return;
+  downloadWav(encodeWav([samples], 48_000), `sottolink-microphone-${new Date().toISOString().replaceAll(":", "-")}.wav`);
+  receivedMeta.textContent = `Downloaded ${(samples.length / 48_000).toFixed(1)} s of raw microphone audio.`;
 }
 
 async function transmit(): Promise<void> {
@@ -422,6 +459,8 @@ function showCaptureSettings(settings: CaptureSettings): void {
 function setReceiverActive(active: boolean): void {
   listenButton.hidden = active;
   stopButton.hidden = !active;
+  startRawCaptureButton.hidden = !active;
+  stopRawCaptureButton.hidden = true;
   receiverFrequency.disabled = active;
   receiverRoleStatus.classList.toggle("is-listening", active);
   receiverRoleStatus.innerHTML = `<i></i> ${active ? "Listening" : "Idle"}`;
@@ -486,10 +525,15 @@ async function stopListening(): Promise<void> {
 }
 
 transmitButton.addEventListener("click", () => void transmit());
+downloadReferenceButton.addEventListener("click", () => {
+  if (lastReference) downloadWav(lastReference.bytes, lastReference.name);
+});
 startTrialsButton.addEventListener("click", () => void runTrialBatch());
 stopTrialsButton.addEventListener("click", stopTrialBatch);
 listenButton.addEventListener("click", () => void startListening());
 stopButton.addEventListener("click", () => void stopListening());
+startRawCaptureButton.addEventListener("click", startRawCapture);
+stopRawCaptureButton.addEventListener("click", stopRawCapture);
 exportTrialsButton.addEventListener("click", downloadTrialLog);
 startTrialLogButton.addEventListener("click", startTrialLog);
 clearTrialsButton.addEventListener("click", () => {

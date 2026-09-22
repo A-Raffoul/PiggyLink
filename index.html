@@ -104,6 +104,7 @@
           <p id="sender-status" class="action-status" role="status">
             Included example ready. Enter a private message.
           </p>
+          <button id="download-reference" class="text-action" type="button" disabled>Download last transmitted reference WAV</button>
         </div>
 
         <section class="trial-console" aria-labelledby="trial-heading">
@@ -176,6 +177,8 @@
               <span aria-hidden="true">●</span>
             </button>
             <button id="stop-button" class="secondary-action" type="button" hidden>Stop listening</button>
+            <button id="start-raw-capture" class="secondary-action" type="button" hidden>Start raw diagnostic capture</button>
+            <button id="stop-raw-capture" class="secondary-action danger-action" type="button" hidden>Stop &amp; download raw WAV</button>
 
             <dl id="capture-settings" class="capture-settings" aria-label="Audio capture settings">
               <div><dt>Audio context</dt><dd>—</dd></div>

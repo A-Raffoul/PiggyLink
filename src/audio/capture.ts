@@ -11,6 +11,8 @@ export interface CaptureSettings {
 
 export interface AcousticReceiver {
   stop(): Promise<void>;
+  startRawCapture(): void;
+  stopRawCapture(): Float32Array | undefined;
 }
 
 function reportedBoolean(value: string | boolean | undefined): boolean | undefined {
@@ -59,6 +61,7 @@ export async function startAcousticReceiver(options: ReceiverOptions): Promise<A
     silentOutput.gain.value = 0;
     let frames = 0;
     let closed = false;
+    let rawChunks: Float32Array[] | undefined;
 
     source.connect(analyser);
     analyser.connect(processor);
@@ -68,6 +71,7 @@ export async function startAcousticReceiver(options: ReceiverOptions): Promise<A
     processor.onaudioprocess = (event): void => {
       if (closed) return;
       const samples = new Float32Array(event.inputBuffer.getChannelData(0));
+      rawChunks?.push(samples);
       const decoded = activeDecoder.decode(samples);
       frames += 1;
       if (frames % 10 === 0) options.onFrame(frames);
@@ -84,6 +88,22 @@ export async function startAcousticReceiver(options: ReceiverOptions): Promise<A
     spectrum = renderSpectrum(options.canvas, analyser, options.preset);
 
     return {
+      startRawCapture() {
+        rawChunks = [];
+      },
+      stopRawCapture() {
+        const chunks = rawChunks;
+        rawChunks = undefined;
+        if (!chunks) return undefined;
+        const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+        const output = new Float32Array(length);
+        let offset = 0;
+        for (const chunk of chunks) {
+          output.set(chunk, offset);
+          offset += chunk.length;
+        }
+        return output;
+      },
       async stop() {
         if (closed) return;
         closed = true;
