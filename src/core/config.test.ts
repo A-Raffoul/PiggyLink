@@ -3,7 +3,8 @@ import { FREQUENCY_PRESETS, getFrequencyPreset, utf8ByteLength } from "./config"
 
 describe("frequency presets", () => {
   it("quantizes requested frequencies to ggwave FFT bins", () => {
-    expect(FREQUENCY_PRESETS.map((preset) => preset.startBin)).toEqual([320, 341, 363, 384]);
+    expect(FREQUENCY_PRESETS.map((preset) => preset.startBin)).toEqual([235, 256, 320, 341, 363, 384]);
+    expect(getFrequencyPreset("12000").endHz).toBe(16_453.125);
     expect(getFrequencyPreset("18000").actualHz).toBe(18_000);
     expect(getFrequencyPreset("18000").endHz).toBe(22_453.125);
   });
