@@ -28,8 +28,7 @@ function makePreset(requestedHz: number): FrequencyPreset {
   };
 }
 
-// 11/12 kHz are calibration probes for asymmetric hardware paths; they may be audible.
-export const FREQUENCY_PRESETS = [11_000, 12_000, 15_000, 16_000, 17_000, 18_000].map(makePreset);
+export const FREQUENCY_PRESETS = [15_000, 16_000, 17_000, 18_000].map(makePreset);
 
 export function getFrequencyPreset(id: string): FrequencyPreset {
   const preset = FREQUENCY_PRESETS.find((candidate) => candidate.id === id);

@@ -13,7 +13,7 @@ the data path is acoustic only.
 - Mac sender to iPhone receiver, about one metre apart in a quiet room
 - Safari as the initial browser target
 - Included example speech or custom WAV cover audio, with private messages up to 32 UTF-8 bytes
-- ggwave Ultrasound Normal with manually matched presets; calibration adds 11 and 12 kHz probes
+- ggwave Ultrasound Normal with manually matched 15, 16, 17, or 18 kHz presets
 - Adjustable carrier level from -30 to -12 dB relative to the speech in the overlay window
 - Raw microphone constraints and a live high-frequency spectrum display
 - Plaintext, session-only data
@@ -22,9 +22,6 @@ The 18 kHz preset spans approximately 18–22.45 kHz and assumes a 48 kHz audio
 pipeline. Device speakers, microphones, browser processing, room acoustics, and
 listener hearing all affect reliability and audibility. The app does not claim
 that its signal is universally inaudible or secure.
-
-The 11 and 12 kHz options exist only on the calibration branch to test the
-asymmetric iPhone → Mac path. They are more likely to be audible.
 
 ## Develop
 
