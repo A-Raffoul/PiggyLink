@@ -145,6 +145,12 @@
             <p id="trial-status" class="action-status" role="status">Uses the current cover, frequency, and strength.</p>
           </div>
         </section>
+
+        <section class="trial-console" aria-labelledby="sweep-heading">
+          <div class="trial-console-heading"><div><p class="section-kicker">Calibration only</p><h3 id="sweep-heading">Channel sweep</h3></div><span class="trial-chip">15–22 kHz</span></div>
+          <p class="trial-intro">Plays known stepped tones (250 Hz spacing). Start raw capture on the receiving device first; this is not a message transmission.</p>
+          <div class="trial-actions"><button id="play-sweep" class="secondary-action" type="button">Play diagnostic sweep</button><p id="sweep-status" class="action-status" role="status">Exports as the last transmitted reference WAV.</p></div>
+        </section>
       </section>
 
       <section id="receiver-panel" class="workspace" aria-labelledby="receiver-heading" hidden>

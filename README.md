@@ -78,9 +78,13 @@ lossless 48 kHz WAVs. Compare them locally with:
 node tools/analyze-channel.mjs sender-reference.wav receiver-microphone.wav
 ```
 
-The report estimates time alignment and relative energy across the 17–21.5 kHz
+The report estimates time alignment and relative energy across the 15–22 kHz
 range. It characterizes the complete speaker-to-microphone path; it is not a
 calibrated laboratory frequency-response measurement.
+
+The Sender's **Channel sweep** produces a 15–22 kHz stepped probe at 250 Hz
+spacing. Capture it on the receiver and use the same analyzer command to map
+the complete directional response.
 
 ## Third-party code
 

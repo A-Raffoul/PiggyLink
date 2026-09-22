@@ -62,7 +62,7 @@ const hop = Math.round(reference.sampleRate / 100);
 const aligned = bestOffset(reference.samples, recording.samples, hop, reference.sampleRate);
 const offset = Math.round(aligned.seconds * reference.sampleRate);
 const length = Math.min(reference.samples.length, recording.samples.length - offset);
-const frequencies = Array.from({ length: 10 }, (_, index) => 17_000 + index * 500);
+const frequencies = Array.from({ length: 29 }, (_, index) => 15_000 + index * 250);
 const response = frequencies.map((frequency) => {
   const sent = goertzelPower(reference.samples, 0, length, reference.sampleRate, frequency);
   const received = goertzelPower(recording.samples, offset, length, recording.sampleRate, frequency);

@@ -24,6 +24,7 @@ import {
 } from "./core/trials";
 import { encodeWav, isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
+import { createSteppedSweep } from "./core/sweep";
 
 inject();
 
@@ -53,6 +54,8 @@ const strengthOutput = element<HTMLOutputElement>("strength-output");
 const transmitButton = element<HTMLButtonElement>("transmit-button");
 const senderStatus = element<HTMLElement>("sender-status");
 const downloadReferenceButton = element<HTMLButtonElement>("download-reference");
+const playSweepButton = element<HTMLButtonElement>("play-sweep");
+const sweepStatus = element<HTMLElement>("sweep-status");
 const trialFirst = element<HTMLInputElement>("trial-first");
 const trialCount = element<HTMLInputElement>("trial-count");
 const trialPause = element<HTMLSelectElement>("trial-pause");
@@ -266,6 +269,25 @@ function downloadWav(bytes: Uint8Array, name: string): void {
   link.download = name;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+async function playDiagnosticSweep(): Promise<void> {
+  if (playingSource) return;
+  playSweepButton.disabled = true;
+  sweepStatus.textContent = "Playing 15–22 kHz diagnostic sweep…";
+  const audioContext = getSenderContext();
+  await audioContext.resume();
+  const samples = createSteppedSweep(audioContext.sampleRate);
+  const buffer = audioContext.createBuffer(1, samples.length, audioContext.sampleRate);
+  buffer.getChannelData(0).set(samples);
+  const source = audioContext.createBufferSource();
+  playingSource = source;
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  lastReference = { bytes: encodeWav([samples], audioContext.sampleRate), name: "sottolink-sweep-15-22khz.wav" };
+  downloadReferenceButton.disabled = false;
+  source.onended = () => { if (playingSource === source) playingSource = undefined; playSweepButton.disabled = false; sweepStatus.textContent = "Sweep complete. Download the reference WAV."; };
+  source.start();
 }
 
 function startRawCapture(): void {
@@ -528,6 +550,7 @@ transmitButton.addEventListener("click", () => void transmit());
 downloadReferenceButton.addEventListener("click", () => {
   if (lastReference) downloadWav(lastReference.bytes, lastReference.name);
 });
+playSweepButton.addEventListener("click", () => void playDiagnosticSweep());
 startTrialsButton.addEventListener("click", () => void runTrialBatch());
 stopTrialsButton.addEventListener("click", stopTrialBatch);
 listenButton.addEventListener("click", () => void startListening());
