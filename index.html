@@ -105,6 +105,44 @@
             Included example ready. Enter a private message.
           </p>
         </div>
+
+        <section class="trial-console" aria-labelledby="trial-heading">
+          <div class="trial-console-heading">
+            <div>
+              <p class="section-kicker">Measurement mode</p>
+              <h3 id="trial-heading">Baseline batch</h3>
+            </div>
+            <span class="trial-chip">0001 → 0010</span>
+          </div>
+          <p class="trial-intro">
+            Sends numbered test messages one at a time. The next trial begins only after the
+            current cover clip finishes and the selected pause has elapsed.
+          </p>
+          <div class="trial-controls">
+            <label class="field">
+              <span>First message</span>
+              <input id="trial-first" type="number" min="1" max="9999" step="1" value="1" inputmode="numeric" />
+            </label>
+            <label class="field">
+              <span>Trials</span>
+              <input id="trial-count" type="number" min="1" max="100" step="1" value="10" inputmode="numeric" />
+            </label>
+            <label class="field">
+              <span>Pause after clip</span>
+              <select id="trial-pause">
+                <option value="1">1 second</option>
+                <option value="2">2 seconds</option>
+                <option value="3" selected>3 seconds</option>
+                <option value="5">5 seconds</option>
+              </select>
+            </label>
+          </div>
+          <div class="trial-actions">
+            <button id="start-trials" class="secondary-action" type="button">Run 10 numbered trials</button>
+            <button id="stop-trials" class="secondary-action danger-action" type="button" hidden>Stop batch</button>
+            <p id="trial-status" class="action-status" role="status">Uses the current cover, frequency, and strength.</p>
+          </div>
+        </section>
       </section>
 
       <section id="receiver-panel" class="workspace" aria-labelledby="receiver-heading" hidden>
@@ -144,6 +182,21 @@
               <div><dt>Noise suppression</dt><dd>—</dd></div>
               <div><dt>Auto gain</dt><dd>—</dd></div>
             </dl>
+
+            <section class="trial-log" aria-labelledby="trial-log-heading">
+              <div class="trial-log-heading">
+                <div>
+                  <span class="message-label" id="trial-log-heading">Baseline log</span>
+                  <p id="trial-log-summary">No numbered trials decoded this session.</p>
+                </div>
+                <span id="trial-log-count" class="trial-log-count">0</span>
+              </div>
+              <ol id="trial-log-list" class="trial-log-list" aria-live="polite"></ol>
+              <div class="trial-log-actions">
+                <button id="export-trials" class="text-action" type="button" disabled>Export CSV</button>
+                <button id="clear-trials" class="text-action" type="button" disabled>Clear log</button>
+              </div>
+            </section>
           </div>
 
           <div class="monitor-column">

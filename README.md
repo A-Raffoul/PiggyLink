@@ -51,6 +51,18 @@ npm run build
 The target first milestone is at least 9 successful decodes out of 10 trials on
 the reference devices while the carrier is not consciously noticeable.
 
+### Repeatable baseline batches
+
+The Sender includes a **Baseline batch** control for repeatable physical trials.
+Set the first number, trial count, and pause, then run the batch. It sends
+zero-padded payloads such as `0001`, `0002`, and `0003`, waiting for each cover
+clip to end before starting the pause and next trial.
+
+On the Receiver, every valid four-digit payload is recorded for the current
+browser session with its receipt time, frequency preset, and duplicate status.
+Use **Export CSV** before changing test conditions or clearing the log. The CSV
+is a local download; no trial telemetry leaves either device.
+
 ## Third-party code
 
 The current ggwave Emscripten build is vendored under `src/vendor` because the

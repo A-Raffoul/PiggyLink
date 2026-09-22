@@ -277,7 +277,8 @@ h2 {
 }
 
 textarea,
-select {
+select,
+input[type="number"] {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 9px;
@@ -299,6 +300,11 @@ textarea::placeholder {
 select {
   height: 48px;
   padding: 0 42px 0 14px;
+}
+
+input[type="number"] {
+  height: 48px;
+  padding: 0 14px;
 }
 
 select:disabled {
@@ -448,6 +454,83 @@ input[type="range"] {
   color: #8df0ba;
 }
 
+.trial-console {
+  margin-top: 42px;
+  padding: 24px;
+  border: 1px solid rgba(117, 240, 174, 0.25);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(117, 240, 174, 0.045) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(rgba(117, 240, 174, 0.045) 1px, transparent 1px) 0 0 / 24px 24px,
+    rgba(4, 15, 10, 0.66);
+}
+
+.trial-console-heading,
+.trial-log-heading,
+.trial-actions,
+.trial-log-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.trial-console h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 620;
+  letter-spacing: -0.025em;
+}
+
+.trial-chip,
+.trial-log-count {
+  padding: 6px 8px;
+  border: 1px solid rgba(117, 240, 174, 0.2);
+  border-radius: 5px;
+  color: #9df7c5;
+  background: rgba(117, 240, 174, 0.07);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.trial-intro {
+  max-width: 650px;
+  margin: 15px 0 20px;
+  color: #94a49c;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.trial-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr;
+  gap: 14px;
+}
+
+.trial-controls .field > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #b5c3bc;
+  font-size: 11px;
+  font-weight: 570;
+}
+
+.trial-actions {
+  align-items: flex-start;
+  margin-top: 20px;
+}
+
+.trial-actions .secondary-action {
+  width: auto;
+  min-width: 210px;
+}
+
+.danger-action {
+  border-color: rgba(255, 156, 142, 0.46);
+  color: #ffb3a9;
+}
+
 .receiver-grid {
   display: grid;
   grid-template-columns: minmax(240px, 0.72fr) minmax(360px, 1.28fr);
@@ -536,6 +619,57 @@ input[type="range"] {
 .capture-settings dd {
   margin: 0;
   color: #c3cec8;
+}
+
+.trial-log {
+  padding: 15px;
+  border: 1px solid rgba(117, 240, 174, 0.18);
+  border-radius: 10px;
+  background: rgba(5, 14, 11, 0.48);
+}
+
+.trial-log-heading {
+  align-items: flex-start;
+}
+
+.trial-log-heading .message-label {
+  margin: 0 0 5px;
+}
+
+#trial-log-summary {
+  margin: 0;
+  color: #82928a;
+  font-size: 10px;
+}
+
+.trial-log-list {
+  display: grid;
+  gap: 5px;
+  min-height: 4px;
+  max-height: 168px;
+  margin: 14px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.trial-log-list li {
+  padding: 7px 8px;
+  border-left: 2px solid #75f0ae;
+  color: #b8c7bf;
+  background: rgba(255, 255, 255, 0.035);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 9px;
+}
+
+.trial-log-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.trial-log-actions .text-action:disabled {
+  cursor: not-allowed;
+  color: #52615a;
 }
 
 .spectrum-card {
@@ -666,7 +800,8 @@ footer {
   }
 
   .form-grid,
-  .receiver-grid {
+  .receiver-grid,
+  .trial-controls {
     grid-template-columns: 1fr;
   }
 
@@ -688,6 +823,15 @@ footer {
   }
 
   .primary-action {
+    width: 100%;
+  }
+
+  .trial-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .trial-actions .secondary-action {
     width: 100%;
   }
 

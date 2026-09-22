@@ -12,6 +12,13 @@ import {
 } from "./core/config";
 import { loadCoverAudio } from "./core/cover";
 import { decodePrivateFrame, encodePrivateFrame } from "./core/frame";
+import {
+  exportTrialEventsCsv,
+  formatTrialMessage,
+  isTrialMessage,
+  recordTrialEvent,
+  type TrialEvent,
+} from "./core/trials";
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
 
@@ -42,6 +49,12 @@ const signalStrength = element<HTMLInputElement>("signal-strength");
 const strengthOutput = element<HTMLOutputElement>("strength-output");
 const transmitButton = element<HTMLButtonElement>("transmit-button");
 const senderStatus = element<HTMLElement>("sender-status");
+const trialFirst = element<HTMLInputElement>("trial-first");
+const trialCount = element<HTMLInputElement>("trial-count");
+const trialPause = element<HTMLSelectElement>("trial-pause");
+const startTrialsButton = element<HTMLButtonElement>("start-trials");
+const stopTrialsButton = element<HTMLButtonElement>("stop-trials");
+const trialStatus = element<HTMLElement>("trial-status");
 const listenButton = element<HTMLButtonElement>("listen-button");
 const stopButton = element<HTMLButtonElement>("stop-button");
 const receiverRoleStatus = element<HTMLElement>("receiver-role-status");
@@ -52,11 +65,19 @@ const frameCount = element<HTMLElement>("frame-count");
 const spectrumCanvas = element<HTMLCanvasElement>("spectrum");
 const receivedMessage = element<HTMLElement>("received-message");
 const receivedMeta = element<HTMLElement>("received-meta");
+const trialLogSummary = element<HTMLElement>("trial-log-summary");
+const trialLogCount = element<HTMLElement>("trial-log-count");
+const trialLogList = element<HTMLOListElement>("trial-log-list");
+const exportTrialsButton = element<HTMLButtonElement>("export-trials");
+const clearTrialsButton = element<HTMLButtonElement>("clear-trials");
 
 let receiver: AcousticReceiver | undefined;
 let receiverStartGeneration = 0;
 let senderContext: AudioContext | undefined;
 let playingSource: AudioBufferSourceNode | undefined;
+let batchCancelled = false;
+let cancelBatchPause: (() => void) | undefined;
+let trialEvents: TrialEvent[] = [];
 
 function frequencyOptionMarkup(select: HTMLSelectElement): void {
   for (const preset of FREQUENCY_PRESETS) {
@@ -89,6 +110,11 @@ function updateMessageCount(): boolean {
 function setSenderStatus(message: string, state: "normal" | "error" | "success" = "normal"): void {
   senderStatus.textContent = message;
   senderStatus.dataset.state = state;
+}
+
+function setTrialStatus(message: string, state: "normal" | "error" | "success" = "normal"): void {
+  trialStatus.textContent = message;
+  trialStatus.dataset.state = state;
 }
 
 function modeFromHash(): "sender" | "receiver" {
@@ -147,16 +173,8 @@ function getSenderContext(): AudioContext {
   return senderContext;
 }
 
-async function transmit(): Promise<void> {
+async function playTransmission(message: string): Promise<{ presetLabel: string }> {
   const file = coverInput.files?.[0];
-  if (!updateMessageCount()) {
-    setSenderStatus("Enter a private message between 1 and 32 UTF-8 bytes.", "error");
-    return;
-  }
-
-  transmitButton.disabled = true;
-  setSenderStatus("Preparing the ggwave signal…");
-
   try {
     const fileBytes = await loadCoverAudio(file);
     if (!isWavFile(fileBytes)) throw new Error("The selected file is not a valid RIFF/WAVE file.");
@@ -165,7 +183,7 @@ async function transmit(): Promise<void> {
     await audioContext.resume();
     const cover = await audioContext.decodeAudioData(fileBytes.slice(0));
     const preset = getFrequencyPreset(senderFrequency.value);
-    const framedMessage = encodePrivateFrame(privateMessage.value);
+    const framedMessage = encodePrivateFrame(message);
     const carrier = await encodeUltrasound(framedMessage, preset, audioContext.sampleRate);
     const channels = Array.from({ length: cover.numberOfChannels }, (_, index) => cover.getChannelData(index));
     const speechOnset = findAudioOnset(channels, audioContext.sampleRate);
@@ -197,18 +215,158 @@ async function transmit(): Promise<void> {
     playingSource = source;
     source.buffer = output;
     source.connect(audioContext.destination);
-    source.onended = () => {
-      if (playingSource !== source) return;
-      playingSource = undefined;
-      transmitButton.disabled = false;
-      setSenderStatus(`Transmission complete · ${preset.label} · ${signalStrength.value} dB`, "success");
-    };
+    const playbackComplete = new Promise<void>((resolve) => {
+      source.onended = () => {
+        if (playingSource === source) playingSource = undefined;
+        resolve();
+      };
+    });
     source.start();
-    setSenderStatus(`Transmitting ${framedMessage.length} modem bytes inside ${cover.duration.toFixed(1)} s of speech…`);
+    await playbackComplete;
+    return { presetLabel: preset.label };
   } catch (error) {
-    transmitButton.disabled = false;
-    setSenderStatus(error instanceof Error ? error.message : "Transmission failed.", "error");
+    throw error instanceof Error ? error : new Error("Transmission failed.");
   }
+}
+
+async function transmit(): Promise<void> {
+  if (!updateMessageCount()) {
+    setSenderStatus("Enter a private message between 1 and 32 UTF-8 bytes.", "error");
+    return;
+  }
+
+  transmitButton.disabled = true;
+  setSenderStatus("Preparing the ggwave signal…");
+  try {
+    const result = await playTransmission(privateMessage.value);
+    setSenderStatus(`Transmission complete · ${result.presetLabel} · ${signalStrength.value} dB`, "success");
+  } catch (error) {
+    setSenderStatus(error instanceof Error ? error.message : "Transmission failed.", "error");
+  } finally {
+    transmitButton.disabled = false;
+  }
+}
+
+function parseTrialSettings(): { first: number; count: number; pauseMilliseconds: number } {
+  const first = Number(trialFirst.value);
+  const count = Number(trialCount.value);
+  const pauseMilliseconds = Number(trialPause.value) * 1_000;
+  formatTrialMessage(first);
+  if (!Number.isInteger(count) || count < 1 || count > 100 || first + count - 1 > 9_999) {
+    throw new Error("Choose 1–100 trials that stay within message 9999.");
+  }
+  return { first, count, pauseMilliseconds };
+}
+
+function setBatchActive(active: boolean): void {
+  transmitButton.disabled = active;
+  coverInput.disabled = active;
+  privateMessage.disabled = active;
+  senderFrequency.disabled = active;
+  signalStrength.disabled = active;
+  trialFirst.disabled = active;
+  trialCount.disabled = active;
+  trialPause.disabled = active;
+  startTrialsButton.hidden = active;
+  stopTrialsButton.hidden = !active;
+}
+
+function waitForBatchPause(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      cancelBatchPause = undefined;
+      resolve();
+    }, milliseconds);
+    cancelBatchPause = () => {
+      window.clearTimeout(timer);
+      cancelBatchPause = undefined;
+      resolve();
+    };
+  });
+}
+
+async function runTrialBatch(): Promise<void> {
+  if (playingSource) {
+    setTrialStatus("Wait for the current transmission to finish before starting a batch.", "error");
+    return;
+  }
+
+  let settings: { first: number; count: number; pauseMilliseconds: number };
+  try {
+    settings = parseTrialSettings();
+  } catch (error) {
+    setTrialStatus(error instanceof Error ? error.message : "Invalid trial settings.", "error");
+    return;
+  }
+
+  batchCancelled = false;
+  setBatchActive(true);
+  try {
+    for (let offset = 0; offset < settings.count; offset += 1) {
+      if (batchCancelled) break;
+      const message = formatTrialMessage(settings.first + offset);
+      setTrialStatus(`Trial ${offset + 1}/${settings.count}: sending ${message}…`);
+      setSenderStatus(`Baseline trial ${message} is transmitting…`);
+      await playTransmission(message);
+      if (batchCancelled) break;
+
+      if (offset < settings.count - 1) {
+        setTrialStatus(`Trial ${offset + 1}/${settings.count}: ${message} complete · pausing before next send…`);
+        await waitForBatchPause(settings.pauseMilliseconds);
+      }
+    }
+    setTrialStatus(
+      batchCancelled ? "Batch stopped. Received numbered trials remain in the receiver log." : "Batch complete. Export the receiver log before the next condition.",
+      batchCancelled ? "normal" : "success",
+    );
+  } catch (error) {
+    setTrialStatus(error instanceof Error ? error.message : "Batch transmission failed.", "error");
+  } finally {
+    cancelBatchPause = undefined;
+    setBatchActive(false);
+  }
+}
+
+function stopTrialBatch(): void {
+  batchCancelled = true;
+  cancelBatchPause?.();
+  try {
+    playingSource?.stop();
+  } catch {
+    // A source can already have ended between the button tap and this call.
+  }
+}
+
+function renderTrialLog(): void {
+  const duplicates = trialEvents.filter((event) => event.duplicate).length;
+  const unique = trialEvents.length - duplicates;
+  trialLogCount.textContent = String(trialEvents.length);
+  trialLogSummary.textContent =
+    trialEvents.length === 0
+      ? "No numbered trials decoded this session."
+      : `${unique} unique · ${duplicates} duplicate${duplicates === 1 ? "" : "s"}`;
+  trialLogList.replaceChildren(
+    ...trialEvents
+      .slice(-8)
+      .reverse()
+      .map((event) => {
+        const item = document.createElement("li");
+        item.textContent = `${event.message} · ${event.duplicate ? "duplicate" : "unique"} · ${new Date(event.receivedAt).toLocaleTimeString()}`;
+        return item;
+      }),
+  );
+  exportTrialsButton.disabled = trialEvents.length === 0;
+  clearTrialsButton.disabled = trialEvents.length === 0;
+}
+
+function downloadTrialLog(): void {
+  const blob = new Blob([exportTrialEventsCsv(trialEvents)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `sottolink-baseline-${new Date().toISOString().replaceAll(":", "-")}.csv`;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function showCaptureSettings(settings: CaptureSettings): void {
@@ -257,6 +415,10 @@ async function startListening(): Promise<void> {
         }
         receivedMessage.textContent = message;
         receivedMeta.textContent = `Verified · ${utf8ByteLength(message)} bytes · ${preset.label}`;
+        if (isTrialMessage(message)) {
+          trialEvents = [...trialEvents, recordTrialEvent(trialEvents, message, preset.label)];
+          renderTrialLog();
+        }
       },
       onFrame(count) {
         frameCount.textContent = `${count.toLocaleString()} frames`;
@@ -287,13 +449,22 @@ async function stopListening(): Promise<void> {
 }
 
 transmitButton.addEventListener("click", () => void transmit());
+startTrialsButton.addEventListener("click", () => void runTrialBatch());
+stopTrialsButton.addEventListener("click", stopTrialBatch);
 listenButton.addEventListener("click", () => void startListening());
 stopButton.addEventListener("click", () => void stopListening());
+exportTrialsButton.addEventListener("click", downloadTrialLog);
+clearTrialsButton.addEventListener("click", () => {
+  trialEvents = [];
+  renderTrialLog();
+});
 window.addEventListener("pagehide", () => {
+  stopTrialBatch();
   playingSource?.stop();
   void stopListening();
 });
 
 updateBandLabels();
 updateMessageCount();
+renderTrialLog();
 void setMode(modeFromHash());
