@@ -53,7 +53,9 @@ function goertzelPower(samples, start, length, sampleRate, frequency) {
   return previousPrevious ** 2 + previous ** 2 - coefficient * previous * previousPrevious;
 }
 
-const [referencePath, recordingPath] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const sweepMode = args[0] === "--sweep";
+const [referencePath, recordingPath] = sweepMode ? args.slice(1) : args;
 if (!referencePath || !recordingPath) throw new Error("Usage: node tools/analyze-channel.mjs reference.wav recording.wav");
 const reference = readWav(referencePath);
 const recording = readWav(recordingPath);
@@ -63,10 +65,26 @@ const aligned = bestOffset(reference.samples, recording.samples, hop, reference.
 const offset = Math.round(aligned.seconds * reference.sampleRate);
 const length = Math.min(reference.samples.length, recording.samples.length - offset);
 const frequencies = Array.from({ length: 29 }, (_, index) => 15_000 + index * 250);
-const response = frequencies.map((frequency) => {
-  const sent = goertzelPower(reference.samples, 0, length, reference.sampleRate, frequency);
-  const received = goertzelPower(recording.samples, offset, length, recording.sampleRate, frequency);
-  return { hz: frequency, relativeDb: Number((10 * Math.log10((received + 1e-20) / (sent + 1e-20))).toFixed(1)) };
+const sweepWindow = Math.round(reference.sampleRate * 0.2);
+const sweepHop = Math.round(reference.sampleRate * 0.05);
+const response = frequencies.map((frequency, index) => {
+  if (!sweepMode) {
+    const sent = goertzelPower(reference.samples, 0, length, reference.sampleRate, frequency);
+    const received = goertzelPower(recording.samples, offset, length, recording.sampleRate, frequency);
+    return { hz: frequency, relativeDb: Number((10 * Math.log10((received + 1e-20) / (sent + 1e-20))).toFixed(1)) };
+  }
+  const expectedStart = Math.round(index * reference.sampleRate * 0.4);
+  const sent = goertzelPower(reference.samples, expectedStart, sweepWindow, reference.sampleRate, frequency);
+  let best = { start: 0, power: 0 };
+  for (let start = 0; start + sweepWindow <= recording.samples.length; start += sweepHop) {
+    const power = goertzelPower(recording.samples, start, sweepWindow, recording.sampleRate, frequency);
+    if (power > best.power) best = { start, power };
+  }
+  return {
+    hz: frequency,
+    detectedAtSeconds: Number((best.start / recording.sampleRate).toFixed(2)),
+    relativeDb: Number((10 * Math.log10((best.power + 1e-20) / (sent + 1e-20))).toFixed(1)),
+  };
 });
 console.log(JSON.stringify({
   referenceSeconds: Number((reference.samples.length / reference.sampleRate).toFixed(3)),

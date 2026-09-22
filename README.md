@@ -84,7 +84,7 @@ calibrated laboratory frequency-response measurement.
 
 The Sender's **Channel sweep** produces a 15–22 kHz stepped probe at 250 Hz
 spacing. Capture it on the receiver and use the same analyzer command to map
-the complete directional response.
+the complete directional response, adding `--sweep` before the file paths.
 
 ## Third-party code
 
