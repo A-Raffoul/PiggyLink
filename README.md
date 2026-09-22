@@ -67,6 +67,21 @@ their receipt time and frequency preset. Use **Export CSV** before changing
 conditions or clearing the log. The CSV is a local download; no trial telemetry
 leaves either device.
 
+### Channel calibration capture
+
+For one-way channel diagnosis, start the receiver, choose **Start raw diagnostic
+capture**, send one message, then choose **Stop & download raw WAV**. On the
+sender, download the matching **last transmitted reference WAV**. Both files are
+lossless 48 kHz WAVs. Compare them locally with:
+
+```sh
+node tools/analyze-channel.mjs sender-reference.wav receiver-microphone.wav
+```
+
+The report estimates time alignment and relative energy across the 17–21.5 kHz
+range. It characterizes the complete speaker-to-microphone path; it is not a
+calibrated laboratory frequency-response measurement.
+
 ## Third-party code
 
 The current ggwave Emscripten build is vendored under `src/vendor` because the
