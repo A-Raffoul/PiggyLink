@@ -170,6 +170,16 @@
               <small id="receiver-band" class="field-note"></small>
             </div>
 
+            <div class="field">
+              <label for="decoder-gain">Decoder input boost</label>
+              <select id="decoder-gain">
+                <option value="0">0 dB · normal</option>
+                <option value="12">+12 dB · calibration</option>
+                <option value="24">+24 dB · calibration</option>
+              </select>
+              <small class="field-note">Applied only before decoding; the saved raw WAV is unchanged.</small>
+            </div>
+
             <div class="capture-card">
               <div class="capture-dot" aria-hidden="true"><span></span></div>
               <div>

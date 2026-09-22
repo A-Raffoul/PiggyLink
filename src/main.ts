@@ -47,6 +47,7 @@ const byteCount = element<HTMLOutputElement>("byte-count");
 const messageError = element<HTMLElement>("message-error");
 const senderFrequency = element<HTMLSelectElement>("sender-frequency");
 const receiverFrequency = element<HTMLSelectElement>("receiver-frequency");
+const decoderGain = element<HTMLSelectElement>("decoder-gain");
 const senderBand = element<HTMLElement>("sender-band");
 const receiverBand = element<HTMLElement>("receiver-band");
 const signalStrength = element<HTMLInputElement>("signal-strength");
@@ -484,6 +485,7 @@ function setReceiverActive(active: boolean): void {
   startRawCaptureButton.hidden = !active;
   stopRawCaptureButton.hidden = true;
   receiverFrequency.disabled = active;
+  decoderGain.disabled = active;
   receiverRoleStatus.classList.toggle("is-listening", active);
   receiverRoleStatus.innerHTML = `<i></i> ${active ? "Listening" : "Idle"}`;
   captureTitle.textContent = active ? "Microphone is listening" : "Microphone is off";
@@ -503,6 +505,7 @@ async function startListening(): Promise<void> {
     const preset = getFrequencyPreset(receiverFrequency.value);
     const startedReceiver = await startAcousticReceiver({
       preset,
+      decoderGain: 10 ** (Number(decoderGain.value) / 20),
       canvas: spectrumCanvas,
       onData(data) {
         const rawFrame = new TextDecoder().decode(data);

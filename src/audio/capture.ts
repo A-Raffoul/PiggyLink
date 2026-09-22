@@ -25,6 +25,7 @@ interface ReceiverOptions {
   readonly onData: (data: Uint8Array) => void;
   readonly onFrame: (count: number) => void;
   readonly onSettings: (settings: CaptureSettings) => void;
+  readonly decoderGain: number;
 }
 
 export async function startAcousticReceiver(options: ReceiverOptions): Promise<AcousticReceiver> {
@@ -71,7 +72,12 @@ export async function startAcousticReceiver(options: ReceiverOptions): Promise<A
     processor.onaudioprocess = (event): void => {
       if (closed) return;
       const samples = new Float32Array(event.inputBuffer.getChannelData(0));
-      rawChunks?.push(samples);
+      rawChunks?.push(new Float32Array(samples));
+      if (options.decoderGain !== 1) {
+        for (let index = 0; index < samples.length; index += 1) {
+          samples[index] = Math.max(-1, Math.min(1, (samples[index] ?? 0) * options.decoderGain));
+        }
+      }
       const decoded = activeDecoder.decode(samples);
       frames += 1;
       if (frames % 10 === 0) options.onFrame(frames);
