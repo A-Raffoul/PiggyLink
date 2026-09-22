@@ -1,7 +1,7 @@
 import "./styles.css";
 import { inject } from "@vercel/analytics";
 import { startAcousticReceiver, type AcousticReceiver, type CaptureSettings } from "./audio/capture";
-import { findAudioOnset, mixCarrierIntoCover } from "./audio/mix";
+import { findAudioOnset, mixCarrierIntoCover, transmissionPlaybackWindow } from "./audio/mix";
 import {
   FREQUENCY_PRESETS,
   MAX_MESSAGE_BYTES,
@@ -173,7 +173,7 @@ function getSenderContext(): AudioContext {
   return senderContext;
 }
 
-async function playTransmission(message: string): Promise<{ presetLabel: string }> {
+async function playTransmission(message: string, compact = false): Promise<{ presetLabel: string }> {
   const file = coverInput.files?.[0];
   try {
     const fileBytes = await loadCoverAudio(file);
@@ -221,7 +221,18 @@ async function playTransmission(message: string): Promise<{ presetLabel: string 
         resolve();
       };
     });
-    source.start();
+    if (compact) {
+      const window = transmissionPlaybackWindow(
+        cover.length,
+        speechOnset,
+        delaySamples,
+        carrier.length,
+        audioContext.sampleRate,
+      );
+      source.start(0, window.start / audioContext.sampleRate, (window.end - window.start) / audioContext.sampleRate);
+    } else {
+      source.start();
+    }
     await playbackComplete;
     return { presetLabel: preset.label };
   } catch (error) {
@@ -307,7 +318,7 @@ async function runTrialBatch(): Promise<void> {
       const message = formatTrialMessage(settings.first + offset);
       setTrialStatus(`Trial ${offset + 1}/${settings.count}: sending ${message}…`);
       setSenderStatus(`Baseline trial ${message} is transmitting…`);
-      await playTransmission(message);
+      await playTransmission(message, true);
       if (batchCancelled) break;
 
       if (offset < settings.count - 1) {

@@ -5,6 +5,26 @@ export interface MixResult {
   readonly peak: number;
 }
 
+export interface PlaybackWindow {
+  readonly start: number;
+  readonly end: number;
+}
+
+export function transmissionPlaybackWindow(
+  coverLength: number,
+  speechOnset: number,
+  overlayStart: number,
+  carrierLength: number,
+  sampleRate: number,
+): PlaybackWindow {
+  const leadInSamples = Math.round(sampleRate * 0.1);
+  const tailSamples = Math.round(sampleRate * 0.25);
+  const start = Math.max(0, speechOnset - leadInSamples);
+  const end = Math.min(coverLength, overlayStart + carrierLength + tailSamples);
+  if (end <= start) throw new Error("The compact playback window is invalid.");
+  return { start, end };
+}
+
 function peakOf(channels: readonly Float32Array[]): number {
   let peak = 0;
   for (const channel of channels) {

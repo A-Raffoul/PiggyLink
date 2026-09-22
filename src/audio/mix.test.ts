@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decibelsToGain, findAudioOnset, mixCarrierIntoCover } from "./mix";
+import { decibelsToGain, findAudioOnset, mixCarrierIntoCover, transmissionPlaybackWindow } from "./mix";
 
 describe("audio onset detection", () => {
   it("locates the first non-silent 20 ms frame", () => {
@@ -62,5 +62,21 @@ describe("audio mixing", () => {
     expect(() => mixCarrierIntoCover([new Float32Array(2)], new Float32Array([1]), 0, -20, 10)).toThrow(
       "silent",
     );
+  });
+});
+
+describe("compact transmission playback", () => {
+  it("keeps a short speech lead-in and tail around the carrier", () => {
+    expect(transmissionPlaybackWindow(96_000, 24_000, 36_000, 24_000, 48_000)).toEqual({
+      start: 19_200,
+      end: 72_000,
+    });
+  });
+
+  it("clamps the compact window to the available cover audio", () => {
+    expect(transmissionPlaybackWindow(20_000, 1_000, 13_000, 6_000, 48_000)).toEqual({
+      start: 0,
+      end: 20_000,
+    });
   });
 });

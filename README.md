@@ -55,8 +55,10 @@ the reference devices while the carrier is not consciously noticeable.
 
 The Sender includes a **Baseline batch** control for repeatable physical trials.
 Set the first number, trial count, and pause, then run the batch. It sends
-zero-padded payloads such as `0001`, `0002`, and `0003`, waiting for each cover
-clip to end before starting the pause and next trial.
+zero-padded payloads such as `0001`, `0002`, and `0003`. Batch playback uses
+only a compact window around the speech onset and modem carrier (with a short
+lead-in and tail), then starts the pause and next trial. Manual transmissions
+continue to play the full cover clip.
 
 On the Receiver, every valid four-digit payload is recorded for the current
 browser session with its receipt time, frequency preset, and duplicate status.
