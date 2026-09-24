@@ -9,7 +9,7 @@ import {
   type VoiceOption,
   type Writer,
 } from "./ai/client";
-import { PERSONAS, captureFields, pickVoice, type AgentMode, type Role } from "./ai/personas";
+import { PERSONAS, captureFields, isInjection, pickVoice, type AgentMode, type Role } from "./ai/personas";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import {
   extendCover,
@@ -330,11 +330,13 @@ function appendBubble(turn: ThreadTurn, meta: string, spokenPlaceholder?: string
     item.append(spoken);
   }
 
+  const injection = isInjection(turn.hidden);
+  if (injection) item.classList.add("is-injection");
   const hidden = document.createElement("p");
   hidden.className = "bubble-hidden";
   const tag = document.createElement("span");
   tag.className = "hidden-tag";
-  tag.textContent = "Hidden";
+  tag.textContent = injection ? "⚠ Injection" : "Hidden";
   hidden.append(tag, document.createTextNode(turn.hidden));
 
   const status = document.createElement("small");

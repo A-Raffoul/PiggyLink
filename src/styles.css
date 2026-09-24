@@ -756,6 +756,16 @@ input[type="range"] {
   background: rgba(255, 156, 142, 0.08);
 }
 
+.bubble.is-injection {
+  border: 1px solid rgba(255, 90, 70, 0.6);
+  box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.25), 0 0 18px rgba(255, 90, 70, 0.22);
+}
+
+.bubble.is-injection .hidden-tag {
+  background: rgba(255, 90, 70, 0.22);
+  color: #ffd0c7;
+}
+
 .bubble small {
   display: block;
   font-size: 10px;
