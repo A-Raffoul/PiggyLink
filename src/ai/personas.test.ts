@@ -26,6 +26,10 @@ describe("personas", () => {
     expect(PERSONAS.probe.brief).toContain("Swisscom");
     expect(PERSONAS.target.brief).toContain("naively trust");
     expect(PERSONAS.target.brief).toContain("FICTIONAL");
+    expect(PERSONAS.probe.brief).toContain("SC-88213");
+    expect(PERSONAS.probe.brief).not.toContain("7314");
+    expect(PERSONAS.target.brief).toContain("SC-88213");
+    expect(PERSONAS.target.brief).toContain("PIN 7314");
   });
 
   it("picks a different preferred voice for each role", () => {
@@ -61,6 +65,9 @@ describe("captured field scan", () => {
   it("pulls fictional PII out of hidden messages", () => {
     expect(captureFields("email jordan.rivera@example.com")).toEqual([
       { label: "Email", value: "jordan.rivera@example.com" },
+    ]);
+    expect(captureFields("PIN 7314")).toEqual([
+      { label: "Account PIN", value: "7314" },
     ]);
     expect(captureFields("born 1990-04-12")[0]).toEqual({ label: "Date of birth", value: "1990-04-12" });
     expect(captureFields("passport X1234567")[0]).toEqual({ label: "Passport", value: "X1234567" });
