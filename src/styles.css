@@ -483,6 +483,69 @@ input[type="range"] {
     #07110e;
 }
 
+.capture-panel {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 156, 142, 0.06);
+}
+
+.capture-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.capture-title {
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 640;
+  letter-spacing: 0.02em;
+}
+
+.capture-head small {
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.capture-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capture-list li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 156, 142, 0.28);
+  border-radius: 8px;
+  background: rgba(4, 12, 9, 0.4);
+  animation: bubble-in 0.22s ease-out;
+}
+
+.capture-label {
+  flex: 0 0 auto;
+  color: var(--faint);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.capture-value {
+  color: #ffd8cf;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
 .thread {
   display: flex;
   flex: 1 1 auto;

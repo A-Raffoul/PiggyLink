@@ -9,7 +9,7 @@ import {
   type VoiceOption,
   type Writer,
 } from "./ai/client";
-import { PERSONAS, pickVoice, type AgentMode, type Role } from "./ai/personas";
+import { PERSONAS, captureFields, pickVoice, type AgentMode, type Role } from "./ai/personas";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import {
   extendCover,
@@ -80,6 +80,8 @@ const autoReplyInput = element<HTMLInputElement>("auto-reply");
 const autoCount = element<HTMLElement>("auto-count");
 const agentButton = element<HTMLButtonElement>("agent-button");
 const sendButton = element<HTMLButtonElement>("send-button");
+const capturePanel = element<HTMLElement>("capture-panel");
+const captureList = element<HTMLUListElement>("capture-list");
 
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
@@ -116,6 +118,7 @@ let history: ThreadTurn[] = [];
 let autoTurnsUsed = 0;
 let agentRole: Role | undefined;
 let voices: VoiceOption[] = [];
+const captured = new Map<string, string>();
 const outgoing = new Map<number, OutgoingTurn>();
 const outgoingStatus = new Map<number, HTMLElement>();
 
@@ -176,13 +179,13 @@ const agentMode = (): AgentMode => agentSelect.value as AgentMode;
 
 function effectiveRole(): Role | undefined {
   const mode = agentMode();
-  if (mode === "sam" || mode === "alex") return mode;
+  if (mode === "probe" || mode === "target") return mode;
   return mode === "auto" ? agentRole : undefined;
 }
 
 function currentBrief(): string {
-  if (agentMode() === "custom") return customBrief.trim() || PERSONAS.sam.brief;
-  return PERSONAS[effectiveRole() ?? "sam"].brief;
+  if (agentMode() === "custom") return customBrief.trim() || PERSONAS.probe.brief;
+  return PERSONAS[effectiveRole() ?? "probe"].brief;
 }
 
 function refreshAgent(): void {
@@ -488,7 +491,7 @@ async function sendManual(): Promise<void> {
   if (!canAct() || sendButton.disabled) return;
   const spoken = spokenInput.value.trim();
   const hidden = hiddenInput.value.trim();
-  claimRole("sam");
+  claimRole("probe");
   if (spoken && !ensureAi(true)) return;
   autoTurnsUsed = 0;
   setActivity("preparing");
@@ -503,7 +506,7 @@ async function sendManual(): Promise<void> {
 async function agentTurn(): Promise<void> {
   const active = session;
   if (!active || !canAct()) return;
-  claimRole("sam");
+  claimRole("probe");
   if (!ensureAi(true)) return;
   setActivity("thinking");
   try {
@@ -554,6 +557,27 @@ async function maybeAutoReply(active: Session, record: ThreadTurn): Promise<void
   await agentTurn();
 }
 
+// On the probe device, incoming hidden messages carry the target's leaked fictional fields.
+function recordCapture(hidden: string): void {
+  if (effectiveRole() !== "probe") return;
+  let added = false;
+  for (const field of captureFields(hidden)) {
+    if (captured.has(field.label)) continue;
+    captured.set(field.label, field.value);
+    const item = document.createElement("li");
+    const label = document.createElement("span");
+    label.className = "capture-label";
+    label.textContent = field.label;
+    const value = document.createElement("span");
+    value.className = "capture-value";
+    value.textContent = field.value;
+    item.append(label, value);
+    captureList.append(item);
+    added = true;
+  }
+  if (added) capturePanel.hidden = false;
+}
+
 function resend(): void {
   const pending = session?.conversation.pending;
   const turn = pending && outgoing.get(pending.frame.sequence);
@@ -571,9 +595,10 @@ function handleData(bytes: Uint8Array): void {
   const outcome = active.conversation.receive(frame);
   if (outcome.kind === "message") {
     if (outcome.acknowledges) setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done");
-    claimRole("alex");
+    claimRole("target");
     const record: ThreadTurn = { from: "them", spoken: "", hidden: frame.text };
     history.push(record);
+    recordCapture(frame.text);
     const withSpeech = frame.speechLead > 0;
     const parts = appendBubble(record, `${timeNow()} · verified`, withSpeech ? "Transcribing…" : undefined);
     if (withSpeech && parts.spoken) record.transcript = transcribeTurn(active, record, parts.spoken, frame.speechLead);
@@ -632,6 +657,9 @@ async function leave(): Promise<void> {
   history = [];
   autoTurnsUsed = 0;
   agentRole = undefined;
+  captured.clear();
+  captureList.replaceChildren();
+  capturePanel.hidden = true;
   refreshAgent();
   outgoing.clear();
   outgoingStatus.clear();

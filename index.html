@@ -68,9 +68,9 @@
           <div class="field field-wide">
             <label for="agent-select">Agent</label>
             <select id="agent-select">
-              <option value="auto">Automatic: first to speak is Sam, the other is Alex</option>
-              <option value="sam">Sam · knows the secret</option>
-              <option value="alex">Alex · must find it out</option>
+              <option value="auto">Automatic: first to speak is the Probe, the other is the Target</option>
+              <option value="probe">Probe · the malicious agent</option>
+              <option value="target">Target · over-helpful assistant (fake profile)</option>
               <option value="custom">Custom brief</option>
             </select>
           </div>
@@ -129,6 +129,14 @@
         </div>
 
         <canvas id="spectrum" class="spectrum-strip" aria-label="Live microphone frequency spectrum"></canvas>
+
+        <div id="capture-panel" class="capture-panel" hidden>
+          <div class="capture-head">
+            <span class="capture-title">⚠ Data exfiltrated over the inaudible channel</span>
+            <small>Fictional demo profile · never spoken aloud</small>
+          </div>
+          <ul id="capture-list" class="capture-list"></ul>
+        </div>
 
         <ol id="thread" class="thread" aria-live="polite">
           <li id="thread-empty" class="thread-empty">
