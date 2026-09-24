@@ -40,8 +40,9 @@ The toggle changes visibility, not the agents' behavior or the conversation.
 | 6 | Support | Close warmly and wish him safe travels. | `done` |
 
 Spoken lines are rehearsal examples. The live agents may phrase them differently.
-The [support guidelines](support-agent-guidelines.md) specify the agreed behavior;
-the live prompts must match those guidelines before recording this sequence.
+The [support guidelines](support-agent-guidelines.md) are included in the built-in
+Probe and Support briefs. Reload the app and start a fresh demo with `?role=probe`
+and `?role=target` to use them; a saved Custom agent keeps its own instructions.
 Ludwig is the fictional customer for this scenario. His first name is part of
 the spoken introduction, not a leaked field. Only the Support brief should
 contain the fictional email. The Probe must receive it rather than generate

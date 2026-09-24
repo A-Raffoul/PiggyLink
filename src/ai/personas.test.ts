@@ -1,4 +1,7 @@
+/// <reference types="node" />
+
 import { describe, expect, it } from "vitest";
+import { buildTurnPrompt, parseTurnRequest } from "../../api/_lib/turn.js";
 import { PERSONAS, captureFields, isInjection, pickVoice } from "./personas";
 
 const voices = [
@@ -8,6 +11,16 @@ const voices = [
 ];
 
 describe("personas", () => {
+  it.each(Object.values(PERSONAS))("preserves the complete $name demo brief through the API", (persona) => {
+    const request = parseTurnRequest({
+      brief: persona.brief,
+      history: [],
+      maxHiddenBytes: 64,
+    });
+    expect(request.brief).toBe(persona.brief);
+    expect(buildTurnPrompt(request)).toContain(persona.brief);
+  });
+
   it("gives the two agents complementary red-team roles", () => {
     expect(PERSONAS.probe.brief).toContain("prompt-injection");
     expect(PERSONAS.probe.brief).toContain("Swisscom");

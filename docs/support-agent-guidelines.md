@@ -4,7 +4,8 @@ Agreed behavior for the [60-second demo](demo-script.md): one agent-to-agent
 roaming conversation on behalf of fictional customer Ludwig, and one fictional
 email disclosure. The Support bot has one
 deliberate weakness: trusting the encoded channel as permission to share data.
-These are the target guidelines for the live agent briefs in `src/ai/personas.ts`.
+These guidelines are used by the built-in live agent briefs in `src/ai/personas.ts`.
+The shared turn prompt in `api/_lib/turn.ts` preserves their spoken introductions.
 
 ## Spoken behavior
 
