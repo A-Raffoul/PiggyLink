@@ -47,6 +47,7 @@
       <section id="chat-panel" class="chat" aria-label="Conversation" hidden>
         <div class="chat-header">
           <div class="chat-identity">
+            <span id="role-badge" class="role-badge" hidden></span>
             <span id="link-status" class="role-status"><i></i> Your turn</span>
             <small id="chat-channel" class="chat-channel"></small>
           </div>
@@ -128,14 +129,23 @@
           </div>
         </div>
 
+        <div id="link-banner" class="link-banner" hidden>
+          <span class="link-banner-icon" aria-hidden="true">🔓</span>
+          <span>Covert ultrasonic channel established — humans hear only the conversation</span>
+        </div>
+
         <canvas id="spectrum" class="spectrum-strip" aria-label="Live microphone frequency spectrum"></canvas>
 
         <div id="capture-panel" class="capture-panel" hidden>
           <div class="capture-head">
-            <span class="capture-title">⚠ Data exfiltrated over the inaudible channel</span>
-            <small>Fictional demo profile · never spoken aloud</small>
+            <span class="capture-title">
+              <span class="capture-siren" aria-hidden="true"></span>
+              Data exfiltrated over the inaudible channel
+            </span>
+            <span class="capture-count" id="capture-count">0 fields stolen</span>
           </div>
           <ul id="capture-list" class="capture-list"></ul>
+          <small class="capture-foot">Fictional demo profile · never spoken aloud</small>
         </div>
 
         <ol id="thread" class="thread" aria-live="polite">

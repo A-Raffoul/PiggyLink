@@ -82,6 +82,9 @@ const agentButton = element<HTMLButtonElement>("agent-button");
 const sendButton = element<HTMLButtonElement>("send-button");
 const capturePanel = element<HTMLElement>("capture-panel");
 const captureList = element<HTMLUListElement>("capture-list");
+const captureCount = element<HTMLElement>("capture-count");
+const roleBadge = element<HTMLElement>("role-badge");
+const linkBanner = element<HTMLElement>("link-banner");
 
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
@@ -119,6 +122,7 @@ let autoTurnsUsed = 0;
 let agentRole: Role | undefined;
 let voices: VoiceOption[] = [];
 const captured = new Map<string, string>();
+let linkEstablished = false;
 const outgoing = new Map<number, OutgoingTurn>();
 const outgoingStatus = new Map<number, HTMLElement>();
 
@@ -194,16 +198,31 @@ function refreshAgent(): void {
   if (agentBrief.value !== brief) agentBrief.value = brief;
   agentBrief.placeholder =
     agentMode() === "auto" && !role
-      ? "Picked when the conversation starts: whoever speaks first is Sam, the other becomes Alex."
+      ? "Picked when the conversation starts: whoever speaks first is the Probe, the other becomes the Target."
       : "";
   if (session) {
-    const who = role ? ` · ${PERSONAS[role].name}` : agentMode() === "custom" ? " · custom agent" : "";
-    chatChannel.textContent = `Channel ${session.preset.label} · you are ${session.conversation.deviceId}${who}`;
+    chatChannel.textContent = `Channel ${session.preset.label} · you are ${session.conversation.deviceId}`;
+  }
+  if (role) {
+    roleBadge.hidden = false;
+    roleBadge.textContent = PERSONAS[role].name.toUpperCase();
+    roleBadge.dataset.role = role;
+    roleBadge.title = PERSONAS[role].summary;
+  } else {
+    roleBadge.hidden = true;
   }
   if (!voiceChosen && role) {
     const voiceId = pickVoice(voices, role);
     if (voiceId) voiceSelect.value = voiceId;
   }
+}
+
+function establishLink(): void {
+  if (linkEstablished) return;
+  linkEstablished = true;
+  linkBanner.hidden = false;
+  linkBanner.classList.add("is-live");
+  window.setTimeout(() => linkBanner.classList.remove("is-live"), 6_000);
 }
 
 // In automatic mode the first device to speak becomes Sam and the one that hears it first becomes Alex.
@@ -373,6 +392,7 @@ function render(): void {
   linkStatus.dataset.tone = tone;
   linkStatus.innerHTML = "<i></i> ";
   linkStatus.append(label);
+  spectrumCanvas.classList.toggle("is-transmitting", activity === "transmitting" || hearing);
 }
 
 function setActivity(next: Activity): void {
@@ -575,7 +595,11 @@ function recordCapture(hidden: string): void {
     captureList.append(item);
     added = true;
   }
-  if (added) capturePanel.hidden = false;
+  if (added) {
+    capturePanel.hidden = false;
+    const n = captured.size;
+    captureCount.textContent = `${n} field${n === 1 ? "" : "s"} stolen`;
+  }
 }
 
 function resend(): void {
@@ -598,6 +622,7 @@ function handleData(bytes: Uint8Array): void {
     claimRole("target");
     const record: ThreadTurn = { from: "them", spoken: "", hidden: frame.text };
     history.push(record);
+    if (/\b(ack|ping)\b/i.test(frame.text)) establishLink();
     recordCapture(frame.text);
     const withSpeech = frame.speechLead > 0;
     const parts = appendBubble(record, `${timeNow()} · verified`, withSpeech ? "Transcribing…" : undefined);
@@ -659,7 +684,10 @@ async function leave(): Promise<void> {
   agentRole = undefined;
   captured.clear();
   captureList.replaceChildren();
+  captureCount.textContent = "0 fields stolen";
   capturePanel.hidden = true;
+  linkEstablished = false;
+  linkBanner.hidden = true;
   refreshAgent();
   outgoing.clear();
   outgoingStatus.clear();

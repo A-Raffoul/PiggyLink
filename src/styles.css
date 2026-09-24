@@ -472,15 +472,69 @@ input[type="range"] {
   color: #8df0ba;
 }
 
+.role-badge {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.role-badge[data-role="probe"] {
+  color: #ffd8cf;
+  background: rgba(255, 90, 70, 0.18);
+  border: 1px solid rgba(255, 90, 70, 0.55);
+}
+
+.role-badge[data-role="target"] {
+  color: #bfe9ff;
+  background: rgba(96, 178, 255, 0.16);
+  border: 1px solid rgba(96, 178, 255, 0.5);
+}
+
+.link-banner {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(121, 242, 178, 0.3);
+  color: #bff6d8;
+  background: rgba(121, 242, 178, 0.1);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.link-banner-icon {
+  font-size: 16px;
+}
+
+.link-banner.is-live {
+  animation: link-flash 1s ease-in-out 3;
+}
+
+@keyframes link-flash {
+  50% {
+    background: rgba(121, 242, 178, 0.26);
+  }
+}
+
 .spectrum-strip {
   display: block;
   flex: 0 0 auto;
   width: 100%;
-  height: 64px;
+  height: 80px;
   border-bottom: 1px solid var(--line);
   background:
     linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px) 0 0 / 100% 25%,
     #07110e;
+  transition: box-shadow 0.25s ease;
+}
+
+.spectrum-strip.is-transmitting {
+  box-shadow: inset 0 0 40px rgba(121, 242, 178, 0.35);
 }
 
 .capture-panel {
@@ -500,13 +554,48 @@ input[type="range"] {
 }
 
 .capture-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--danger);
-  font-size: 12px;
-  font-weight: 640;
+  font-size: 12.5px;
+  font-weight: 680;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.capture-head small {
+.capture-siren {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 0 rgba(255, 90, 70, 0.6);
+  animation: siren 1.2s ease-out infinite;
+}
+
+@keyframes siren {
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 90, 70, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 90, 70, 0);
+  }
+}
+
+.capture-count {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 90, 70, 0.18);
+  border: 1px solid rgba(255, 90, 70, 0.45);
+  color: #ffd8cf;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.capture-foot {
+  display: block;
+  margin-top: 8px;
   color: var(--faint);
   font-size: 10px;
 }
