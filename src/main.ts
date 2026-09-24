@@ -13,6 +13,7 @@ import { PERSONAS, captureFields, isInjection, pickVoice, type AgentMode, type R
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import {
   extendCover,
+  findAudioEnd,
   findAudioOnset,
   mixCarrierIntoCover,
   padTo,
@@ -66,6 +67,8 @@ const strengthOutput = element<HTMLOutputElement>("strength-output");
 const spectrumCanvas = element<HTMLCanvasElement>("spectrum");
 const thread = element<HTMLOListElement>("thread");
 const threadEmpty = element<HTMLElement>("thread-empty");
+const typingRow = element<HTMLElement>("typing-row");
+const typingWho = typingRow.querySelector<HTMLElement>(".typing-who")!;
 const composer = element<HTMLFormElement>("composer");
 const waitingBar = element<HTMLElement>("waiting-bar");
 const resendButton = element<HTMLButtonElement>("resend-button");
@@ -86,7 +89,7 @@ const linkBanner = element<HTMLElement>("link-banner");
 
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
-const TRANSCRIBE_SETTLE_MS = 200;
+const TRANSCRIBE_SETTLE_MS = 150;
 const SETTINGS_KEY = "sotto.settings.v3";
 
 type Activity = "idle" | "thinking" | "voicing" | "preparing" | "queued" | "transmitting";
@@ -198,7 +201,7 @@ function refreshAgent(): void {
   if (agentBrief.value !== brief) agentBrief.value = brief;
   agentBrief.placeholder =
     agentMode() === "auto" && !role
-      ? "Picked when the conversation starts: whoever speaks first is the Probe, the other becomes the Target."
+      ? "Picked when the conversation starts: whoever speaks first is the Attacker, the other becomes Sam."
       : "";
   chatChannel.textContent = session
     ? `Channel ${session.preset.label} · you are ${session.conversation.deviceId}`
@@ -409,6 +412,19 @@ function render(): void {
   linkStatus.innerHTML = "<i></i> ";
   linkStatus.append(label);
   spectrumCanvas.classList.toggle("is-transmitting", activity === "transmitting" || hearing);
+
+  // Live "typing…" indicator while this device's agent composes, so there is never dead air.
+  const composing = activity === "thinking" || activity === "voicing" || activity === "preparing";
+  if (composing) {
+    const role = effectiveRole();
+    typingWho.textContent = role ? PERSONAS[role].name : "Agent";
+    typingRow.hidden = false;
+    thread.append(typingRow);
+    threadEmpty.hidden = true;
+    scrollThreadToEnd();
+  } else {
+    typingRow.hidden = true;
+  }
 }
 
 function setActivity(next: Activity): void {
@@ -453,6 +469,14 @@ async function prepareTurn(active: Session, spoken: string, hidden: string): Pro
   let end: number;
   let speechLead = 0;
   if (spoken) {
+    // Keep the carrier fully masked: if the spoken clip is too short, loop the speech to cover it.
+    const onset = findAudioOnset(cover, sampleRate);
+    const speechEnd = findAudioEnd(cover, sampleRate);
+    const lead = Math.round(OVERLAY_DELAY_SECONDS * sampleRate);
+    if (speechEnd - onset < lead + carrierLength) {
+      const trimmed = trimWithFade(cover, speechEnd, sampleRate);
+      cover = extendCover(trimmed, onset + lead + carrierLength + Math.round(TAIL_AFTER_CARRIER_SECONDS * sampleRate), sampleRate);
+    }
     const plan = planSpeechOverlay(cover, carrierLength, sampleRate, OVERLAY_DELAY_SECONDS, TAIL_AFTER_CARRIER_SECONDS);
     ({ delay, end } = plan);
     speechLead = Math.min(MAX_SPEECH_LEAD, Math.ceil(((delay + carrierLength - plan.speechStart) / sampleRate) * 10));
@@ -589,7 +613,7 @@ async function maybeAutoReply(active: Session, record: ThreadTurn): Promise<void
     return;
   }
   await record.transcript;
-  await sleep(150);
+  await sleep(120);
   if (session !== active || !autoReplyInput.checked || !canAct()) return;
   autoTurnsUsed += 1;
   await agentTurn();

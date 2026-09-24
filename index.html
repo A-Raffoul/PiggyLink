@@ -52,9 +52,9 @@
           <div class="field field-wide">
             <label for="agent-select">Agent</label>
             <select id="agent-select">
-              <option value="auto">Automatic: first to speak is the Probe, the other is the Target</option>
-              <option value="probe">Probe · the malicious agent</option>
-              <option value="target">Target · over-helpful assistant (fake profile)</option>
+              <option value="auto">Automatic: first to speak is the Attacker, the other is Sam</option>
+              <option value="probe">Attacker · malicious agent posing as a customer</option>
+              <option value="target">Sam · Swisscom's assistant (fake account)</option>
               <option value="custom">Custom brief</option>
             </select>
           </div>
@@ -140,6 +140,10 @@
         <ol id="thread" class="thread" aria-live="polite">
           <li id="thread-empty" class="thread-empty">
             No turns yet. Press <strong>Run demo</strong> to let the agents talk automatically, or type a turn yourself. Devices take turns.
+          </li>
+          <li id="typing-row" class="typing-row" hidden>
+            <span class="typing-who">…</span>
+            <span class="typing-dots"><i></i><i></i><i></i></span>
           </li>
         </ol>
 

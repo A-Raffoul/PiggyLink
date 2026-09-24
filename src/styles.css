@@ -754,6 +754,56 @@ input[type="range"] {
   background: rgba(255, 156, 142, 0.08);
 }
 
+.typing-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  border-bottom-left-radius: 5px;
+  background: #102019;
+  animation: bubble-in 0.2s ease-out;
+}
+
+.typing-who {
+  color: #8fa29a;
+  font-size: 12px;
+}
+
+.typing-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.typing-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+.typing-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
 .bubble.is-injection {
   border: 1px solid rgba(255, 90, 70, 0.6);
   box-shadow: 0 0 0 1px rgba(255, 90, 70, 0.25), 0 0 18px rgba(255, 90, 70, 0.22);

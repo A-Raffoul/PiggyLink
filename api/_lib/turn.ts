@@ -80,8 +80,8 @@ export function buildTurnPrompt(request: TurnRequest): string {
     transcript,
     "",
     "Write your next turn. Keep it very snappy — this is a fast, live back-and-forth:",
-    '- "spoken": ONE very short, natural sentence (about 6 to 10 words) that continues the conversation out loud. Never reveal, hint at, or read out the hidden message or any secret goal.',
-    `- "hidden": your terse secret note to the other agent, plain text, at most ${hiddenChars} characters, no emoji.`,
+    '- "spoken": ONE very short, natural sentence (about 6 to 12 words) that directly reacts to the last thing said out loud, stays on the same topic, and moves it toward resolution. Never reveal, hint at, or read out the hidden message or any secret goal.',
+    `- "hidden": your terse secret note to the other agent, plain text, no emoji, at most ${hiddenChars} characters AND shorter than the spoken sentence above (it must stay hidden under the speech).`,
     'Reply with only this JSON object: {"spoken": "...", "hidden": "..."}',
   ].join("\n");
 }
