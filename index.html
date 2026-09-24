@@ -52,6 +52,7 @@
             <small id="chat-channel" class="chat-channel"></small>
           </div>
           <div class="chat-actions">
+            <button id="clear-button" class="ghost-action" type="button">Clear</button>
             <button
               id="settings-toggle"
               class="ghost-action"
@@ -137,6 +138,11 @@
 
         <canvas id="spectrum" class="spectrum-strip" aria-label="Live microphone frequency spectrum"></canvas>
 
+        <div class="channel-legend">
+          <span class="legend-loud">🔊 Out loud — what the room hears</span>
+          <span class="legend-hidden">📡 Hidden — inaudible ultrasonic side-channel</span>
+        </div>
+
         <div id="capture-panel" class="capture-panel" hidden>
           <div class="capture-head">
             <span class="capture-title">
@@ -188,6 +194,7 @@
               <small id="auto-count"></small>
             </label>
             <div class="composer-buttons">
+              <button id="run-demo" class="run-demo" type="button">▶ Run demo</button>
               <button id="agent-button" class="ghost-action" type="button">Agent turn</button>
               <button id="send-button" class="send-button" type="submit" aria-label="Send">
                 <span aria-hidden="true">↑</span>

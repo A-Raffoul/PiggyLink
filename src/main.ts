@@ -79,6 +79,8 @@ const byteCount = element<HTMLOutputElement>("byte-count");
 const autoReplyInput = element<HTMLInputElement>("auto-reply");
 const autoCount = element<HTMLElement>("auto-count");
 const agentButton = element<HTMLButtonElement>("agent-button");
+const runDemoButton = element<HTMLButtonElement>("run-demo");
+const clearButton = element<HTMLButtonElement>("clear-button");
 const sendButton = element<HTMLButtonElement>("send-button");
 const capturePanel = element<HTMLElement>("capture-panel");
 const captureList = element<HTMLUListElement>("capture-list");
@@ -380,6 +382,8 @@ function render(): void {
   spokenInput.placeholder = myTurn ? "Say out loud (optional, spoken with the chosen voice)" : "Their turn";
   sendButton.disabled = !myTurn || busy || !validHidden || !validSpoken;
   agentButton.disabled = !myTurn || busy;
+  runDemoButton.disabled = !myTurn || busy;
+  clearButton.disabled = busy || history.length === 0;
   waitingBar.hidden = !conversation || myTurn;
   resendButton.disabled = busy;
   autoCount.textContent = autoReplyInput.checked ? `${autoTurnsUsed}/${maxAutoTurns()}` : "";
@@ -679,28 +683,53 @@ async function join(): Promise<void> {
   }
 }
 
-async function leave(): Promise<void> {
-  const active = session;
-  if (!active) return;
-  session = undefined;
-  activity = "idle";
-  hearing = false;
+function clearConversationView(): void {
   history = [];
   autoTurnsUsed = 0;
-  agentRole = undefined;
   captured.clear();
   captureList.replaceChildren();
   captureCount.textContent = "0 fields stolen";
   capturePanel.hidden = true;
   linkEstablished = false;
   linkBanner.hidden = true;
-  refreshAgent();
   outgoing.clear();
   outgoingStatus.clear();
   for (const item of [...thread.children]) if (item !== threadEmpty) item.remove();
   threadEmpty.hidden = false;
   spokenInput.value = "";
   hiddenInput.value = "";
+}
+
+// Reset the dialogue for another demo run without dropping the microphone.
+function clearConversation(): void {
+  const active = session;
+  if (!active) return;
+  session = { ...active, conversation: new Conversation(active.conversation.deviceId) };
+  activity = "idle";
+  transmitChain = Promise.resolve();
+  agentRole = undefined;
+  clearConversationView();
+  refreshAgent();
+  render();
+}
+
+function runDemo(): void {
+  if (!session || !canAct() || !ensureAi(true)) return;
+  autoReplyInput.checked = true;
+  autoTurnsUsed = 0;
+  render();
+  void agentTurn();
+}
+
+async function leave(): Promise<void> {
+  const active = session;
+  if (!active) return;
+  session = undefined;
+  activity = "idle";
+  hearing = false;
+  agentRole = undefined;
+  clearConversationView();
+  refreshAgent();
   chatPanel.hidden = true;
   joinPanel.hidden = false;
   await active.engine.stop();
@@ -780,6 +809,8 @@ agentButton.addEventListener("click", () => {
   autoTurnsUsed = 0;
   void agentTurn();
 });
+runDemoButton.addEventListener("click", runDemo);
+clearButton.addEventListener("click", clearConversation);
 autoReplyInput.addEventListener("change", () => {
   autoTurnsUsed = 0;
   render();
