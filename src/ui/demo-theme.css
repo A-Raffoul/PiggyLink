@@ -262,7 +262,7 @@ select:focus-visible {
 }
 .signal-stage {
   display: grid;
-  grid-template-rows: 220px 180px;
+  grid-template-rows: 220px 220px;
   min-height: 0;
   gap: 16px;
 }
@@ -280,8 +280,8 @@ select:focus-visible {
   font-size: var(--type-log);
 }
 .signal-panel {
-  width: min(100%, 760px);
-  height: 180px;
+  width: min(100%, 880px);
+  height: 220px;
   justify-self: center;
   align-self: center;
   background: transparent;
@@ -469,7 +469,7 @@ input[type="range"] {
 @media (max-width: 700px) {
   .signal-panel {
     padding: 12px 0;
-    height: 180px;
+    height: 220px;
   }
   .spectral-orb {
     height: clamp(280px, 44svh, 400px);
@@ -706,11 +706,11 @@ input[type="range"] {
     gap: 20px;
   }
   .signal-stage {
-    grid-template-rows: 180px 120px;
+    grid-template-rows: 180px 160px;
     gap: 12px;
   }
   .signal-panel {
-    height: 120px;
+    height: 160px;
     padding: 4px 0;
     gap: 8px;
   }
@@ -735,7 +735,7 @@ input[type="range"] {
     margin: 16px 0;
   }
   .signal-stage {
-    grid-template-rows: auto 180px;
+    grid-template-rows: auto 220px;
   }
   .current-content {
     overflow: visible;
@@ -838,12 +838,12 @@ input[type="range"] {
   .signal-stage {
     position: relative;
     display: block;
-    flex: 0 0 180px;
-    min-height: 180px;
+    flex: 0 0 220px;
+    min-height: 220px;
   }
   .signal-panel {
     width: 100%;
-    height: 180px;
+    height: 220px;
     padding: 8px 0;
   }
   .current-message {
