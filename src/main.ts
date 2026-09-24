@@ -91,7 +91,7 @@ const linkBanner = element<HTMLElement>("link-banner");
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
 const TRANSCRIBE_SETTLE_MS = 200;
-const SETTINGS_KEY = "sotto.settings.v2";
+const SETTINGS_KEY = "sotto.settings.v3";
 
 type Activity = "idle" | "thinking" | "voicing" | "preparing" | "queued" | "transmitting";
 
@@ -137,6 +137,7 @@ for (const preset of FREQUENCY_PRESETS) {
   option.textContent = `${preset.label} · ${formatKhz(preset.actualHz)}–${formatKhz(preset.endHz)}`;
   channelSelect.append(option);
 }
+channelSelect.value = "18000";
 
 function updateChannelBand(): void {
   const preset = getFrequencyPreset(channelSelect.value);
@@ -234,7 +235,7 @@ function claimRole(role: Role): void {
   refreshAgent();
 }
 
-const maxAutoTurns = (): number => Math.max(1, Math.min(50, Math.round(Number(maxAutoTurnsInput.value) || 6)));
+const maxAutoTurns = (): number => Math.max(1, Math.min(50, Math.round(Number(maxAutoTurnsInput.value) || 4)));
 
 function setSetupStatus(text: string, state?: "error" | "done"): void {
   setupStatus.textContent = text;
