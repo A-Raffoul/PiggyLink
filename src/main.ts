@@ -259,12 +259,18 @@ async function loadSetup(): Promise<void> {
   try {
     const info = await fetchSetup();
     if (request !== setupRequest) return;
-    const labels: Record<Writer, string> = { elevenlabs: "ElevenLabs agent", apertus: "Apertus" };
+    const labels: Record<Writer, string> = {
+      elevenlabs: "ElevenLabs agent (Gemini)",
+      apertus: "Apertus (Swiss AI, 70B)",
+    };
     fillSelect(
       writerSelect,
       info.writers.map((writer) => ({ value: writer, label: labels[writer] })),
       readSettings().writer ?? stored.writer,
     );
+    element<HTMLElement>("writer-note").textContent = info.writers.includes("apertus")
+      ? "Which model writes each turn. Voice and transcription always use ElevenLabs."
+      : "Apertus not detected on the server — set APERTUS_API_KEY, APERTUS_BASE_URL and APERTUS_MODEL, then redeploy.";
     voices = info.voices;
     fillSelect(
       voiceSelect,
