@@ -4,28 +4,15 @@ import { inject } from "@vercel/analytics";
 type Role = "a" | "b";
 type PerformanceState = "idle" | "preparing" | "ready" | "playing" | "complete" | "error";
 
-interface ScriptLine {
-  speaker: Role;
-  text: string;
-}
-
 interface RoomConfig {
   voiceAId: string;
   voiceBId: string;
   voiceAName: string;
   voiceBName: string;
   roomId: string;
-  script: ScriptLine[];
+  topic: string;
+  maxTurns: number;
 }
-
-const DEFAULT_SCRIPT: ScriptLine[] = [
-  { speaker: "a", text: "Hi Drew. The connection is live. Can you hear me clearly?" },
-  { speaker: "b", text: "Loud and clear, Rachel. I can hear you perfectly." },
-  { speaker: "a", text: "Great. Let's confirm the studio handoff for tomorrow morning." },
-  { speaker: "b", text: "Confirmed. I'll be there at nine with the final recording." },
-  { speaker: "a", text: "Perfect. That's everything from me." },
-  { speaker: "b", text: "Same here. Talk to you tomorrow." },
-];
 
 const DEFAULT_CONFIG: RoomConfig = {
   voiceAId: "21m00Tcm4TlvDq8ikWAM",
@@ -33,7 +20,8 @@ const DEFAULT_CONFIG: RoomConfig = {
   voiceAName: "Rachel",
   voiceBName: "Drew",
   roomId: crypto.randomUUID(),
-  script: DEFAULT_SCRIPT,
+  topic: "Discuss whether AI voices make remote collaboration feel more human.",
+  maxTurns: 8,
 };
 
 inject();
@@ -64,44 +52,21 @@ function decodeConfig(encoded: string | null): RoomConfig | null {
     const binary = atob(base64);
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<RoomConfig>;
-    if (!Array.isArray(parsed.script)) return null;
-    const script = parsed.script.filter(
-      (line): line is ScriptLine =>
-        (line?.speaker === "a" || line?.speaker === "b") &&
-        typeof line.text === "string" &&
-        line.text.trim().length > 0,
-    );
-    if (!script.length) return null;
+    const requestedTurns = Number(parsed.maxTurns);
     return {
       voiceAId: parsed.voiceAId?.trim() || DEFAULT_CONFIG.voiceAId,
       voiceBId: parsed.voiceBId?.trim() || DEFAULT_CONFIG.voiceBId,
       voiceAName: parsed.voiceAName?.trim() || DEFAULT_CONFIG.voiceAName,
       voiceBName: parsed.voiceBName?.trim() || DEFAULT_CONFIG.voiceBName,
       roomId: parsed.roomId?.trim() || crypto.randomUUID(),
-      script,
+      topic: parsed.topic?.trim() || DEFAULT_CONFIG.topic,
+      maxTurns: Number.isFinite(requestedTurns)
+        ? Math.max(2, Math.min(20, Math.round(requestedTurns)))
+        : DEFAULT_CONFIG.maxTurns,
     };
   } catch {
     return null;
   }
-}
-
-function parseScript(value: string): ScriptLine[] {
-  const lines = value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const match = line.match(/^([AB]):\s*(.+)$/i);
-      if (!match) return null;
-      return { speaker: match[1]?.toLowerCase() as Role, text: match[2]?.trim() ?? "" };
-    })
-    .filter((line): line is ScriptLine => Boolean(line?.text));
-  if (!lines.length) throw new Error("Add at least one line using “A: text” or “B: text”.");
-  return lines;
-}
-
-function scriptToText(script: ScriptLine[]): string {
-  return script.map((line) => `${line.speaker.toUpperCase()}: ${line.text}`).join("\n");
 }
 
 function roleFromUrl(): Role | null {
@@ -122,20 +87,20 @@ function renderDirector(): void {
           <span class="wordmark-signal" aria-hidden="true"><i></i><i></i><i></i></span>
           CrossTalk
         </a>
-        <span class="lab-badge">ElevenLabs two-voice lab</span>
+        <span class="lab-badge">ElevenLabs agent-to-agent lab</span>
       </header>
 
       <section class="director-hero">
-        <p class="kicker">Two voices · two windows · one script</p>
-        <h1>Put a conversation<br>on <em>the air.</em></h1>
-        <p class="hero-copy">Give each window one ElevenLabs voice. CrossTalk synthesizes the known lines, coordinates each turn, and reveals the dialogue as it plays.</p>
+        <p class="kicker">Two agents · two windows · no script</p>
+        <h1>Let the conversation<br><em>write itself.</em></h1>
+        <p class="hero-copy">Each window hears the other, decodes the speech with Scribe, generates a fresh response with ElevenAgents, and speaks it through its own voice.</p>
       </section>
 
       <section class="setup-grid" aria-labelledby="setup-heading">
         <div class="setup-intro">
           <span class="section-index">01 / SETUP</span>
           <h2 id="setup-heading">Cast the two voices</h2>
-          <p>Rachel and Drew are ready by default. Open both roles near each other, prepare the non-opening speaker first, then start the opening voice.</p>
+          <p>Rachel opens the conversation by default. Open both roles near each other, prepare Speaker B first, then prepare and start Speaker A.</p>
         </div>
 
         <form id="room-form" class="setup-form">
@@ -166,12 +131,12 @@ function renderDirector(): void {
           <div class="script-field">
             <div class="field-heading">
               <div>
-                <label for="script">Known script</label>
-                <span>One turn per line, prefixed with A: or B:</span>
+                <label for="topic">Conversation brief</label>
+                <span>The agents create every spoken line from this shared topic.</span>
               </div>
-              <span id="line-count">${config.script.length} turns</span>
+              <label class="turn-limit" for="max-turns">Turns <input id="max-turns" type="number" min="2" max="20" value="${config.maxTurns}" required></label>
             </div>
-            <textarea id="script" rows="8" spellcheck="true">${escapeHtml(scriptToText(config.script))}</textarea>
+            <textarea id="topic" rows="5" maxlength="1200" spellcheck="true" required>${escapeHtml(config.topic)}</textarea>
           </div>
 
           <p id="form-error" class="form-error" role="alert"></p>
@@ -187,13 +152,13 @@ function renderDirector(): void {
         </form>
       </section>
 
-      <footer class="director-footer"><span>Deterministic text-to-speech performance</span><span>API key stays on the server</span></footer>
+      <footer class="director-footer"><span>Dynamic agent-generated dialogue</span><span>API key stays on the server</span></footer>
     </main>
   `;
 
   const form = element<HTMLFormElement>("room-form");
-  const scriptInput = element<HTMLTextAreaElement>("script");
-  const lineCount = element<HTMLElement>("line-count");
+  const topicInput = element<HTMLTextAreaElement>("topic");
+  const maxTurnsInput = element<HTMLInputElement>("max-turns");
   const error = element<HTMLElement>("form-error");
   let roomId = config.roomId;
 
@@ -205,10 +170,15 @@ function renderDirector(): void {
         voiceAName: element<HTMLInputElement>("voice-a-name").value.trim(),
         voiceBName: element<HTMLInputElement>("voice-b-name").value.trim(),
         roomId,
-        script: parseScript(scriptInput.value),
+        topic: topicInput.value.trim(),
+        maxTurns: Math.round(Number(maxTurnsInput.value)),
       };
       if (!room.voiceAId || !room.voiceBId) throw new Error("Add both ElevenLabs voice IDs.");
       if (!room.voiceAName || !room.voiceBName) throw new Error("Add a name for each speaker.");
+      if (!room.topic) throw new Error("Add a conversation brief.");
+      if (!Number.isFinite(room.maxTurns) || room.maxTurns < 2 || room.maxTurns > 20) {
+        throw new Error("Choose between 2 and 20 total turns.");
+      }
       error.textContent = "";
       return room;
     } catch (caught) {
@@ -227,15 +197,8 @@ function renderDirector(): void {
     roomId = crypto.randomUUID();
   }
 
-  scriptInput.addEventListener("input", () => {
-    refreshRoom();
-    try {
-      const count = parseScript(scriptInput.value).length;
-      lineCount.textContent = `${count} ${count === 1 ? "turn" : "turns"}`;
-    } catch {
-      lineCount.textContent = "0 turns";
-    }
-  });
+  topicInput.addEventListener("input", refreshRoom);
+  maxTurnsInput.addEventListener("input", refreshRoom);
   form.querySelectorAll("input").forEach((input) => input.addEventListener("input", refreshRoom));
 
   form.addEventListener("submit", (event) => {
@@ -267,9 +230,8 @@ function renderVoice(role: Role): void {
   const selfName = isA ? config.voiceAName : config.voiceBName;
   const peerName = isA ? config.voiceBName : config.voiceAName;
   const voiceId = isA ? config.voiceAId : config.voiceBId;
-  const ownLines = config.script.map((line, index) => ({ ...line, index })).filter((line) => line.speaker === role);
-  const openingRole = config.script[0]?.speaker;
-  const isOpeningVoice = openingRole === role;
+  const peerRole: Role = isA ? "b" : "a";
+  const isOpeningVoice = role === "a";
   let audioContext: AudioContext | null = null;
   let currentSource: AudioBufferSourceNode | null = null;
   let microphone: MediaStream | null = null;
@@ -277,17 +239,24 @@ function renderVoice(role: Role): void {
   let analyserData: Float32Array<ArrayBuffer> | null = null;
   let recorder: MediaRecorder | null = null;
   let recordedChunks: Blob[] = [];
+  let agentSocket: WebSocket | null = null;
+  let agentReadyPromise: Promise<void> | null = null;
+  let pendingAgentReply: {
+    resolve: (text: string) => void;
+    reject: (error: Error) => void;
+    timeout: number;
+  } | null = null;
   let vadFrame = 0;
   let selfReady = false;
   let started = false;
   let finished = false;
-  let currentLine = -1;
-  let nextIndex = 0;
+  let retryAgentInput: string | null = null;
+  let turnCount = 0;
+  let activePeerRow = -1;
   let listening = false;
   let speechHeard = false;
   let speechStartedAt = 0;
   let lastLoudAt = 0;
-  const audioBuffers = new Map<number, AudioBuffer>();
   const transcriptNodes = new Map<number, HTMLElement>();
 
   document.body.dataset.role = role;
@@ -303,7 +272,7 @@ function renderVoice(role: Role): void {
 
       <section class="identity-band">
         <div>
-          <p class="kicker">Window ${role.toUpperCase()} · ElevenLabs text to speech</p>
+          <p class="kicker">Window ${role.toUpperCase()} · ElevenLabs dynamic agent</p>
           <h1>${escapeHtml(selfName)}</h1>
         </div>
         <div class="peer-route">
@@ -327,7 +296,7 @@ function renderVoice(role: Role): void {
           <button id="session-button" class="session-button" type="button">
             <span id="button-label">Prepare ${escapeHtml(selfName)}</span><b aria-hidden="true">●</b>
           </button>
-          <p id="session-note" class="session-note">${isOpeningVoice ? `Prepare ${peerName}'s window first. Then prepare this voice and press Start.` : `Prepare this window first. It will listen for ${peerName}'s opening line.`}</p>
+          <p id="session-note" class="session-note">${isOpeningVoice ? `Prepare ${peerName}'s window first. Then prepare this agent and press Start.` : `Prepare this agent first. It will listen for ${peerName}'s generated opening line.`}</p>
           <a class="back-link" href="${escapeHtml(window.location.pathname)}">← Back to setup</a>
         </aside>
 
@@ -339,18 +308,23 @@ function renderVoice(role: Role): void {
           <div id="transcript" class="transcript" aria-live="polite">
             <div id="empty-transcript" class="empty-transcript">
               <span>●</span>
-              <p>Each window listens through its microphone.<br>Silence after a line triggers the next voice.</p>
+              <p>No lines are prepared in advance.<br>Each reply is generated after the other voice is decoded.</p>
             </div>
           </div>
         </section>
 
         <aside class="script-panel">
-          <div class="panel-heading compact"><div><span class="section-index">KNOWN / SCRIPT</span><h2>Run of show</h2></div></div>
-          <ol class="script-list">
-            ${config.script
-              .map((line, index) => `<li id="script-line-${index}" data-speaker="${line.speaker}"><span>${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(line.speaker === "a" ? config.voiceAName : config.voiceBName)}</b><p>${escapeHtml(line.text)}</p></div></li>`)
-              .join("")}
-          </ol>
+          <div class="panel-heading compact"><div><span class="section-index">LIVE / BRIEF</span><h2>Conversation</h2></div></div>
+          <div class="conversation-brief">
+            <span>TOPIC</span>
+            <p>${escapeHtml(config.topic)}</p>
+            <dl>
+              <div><dt>Opening agent</dt><dd>${escapeHtml(config.voiceAName)}</dd></div>
+              <div><dt>Turn limit</dt><dd>${config.maxTurns}</dd></div>
+              <div><dt>Reply source</dt><dd>ElevenAgents</dd></div>
+              <div><dt>Speech decoding</dt><dd>Scribe v2</dd></div>
+            </dl>
+          </div>
         </aside>
       </section>
     </main>
@@ -378,49 +352,41 @@ function renderVoice(role: Role): void {
       next === "error" ? "CHECK SETUP" : "NOT READY";
     button.disabled = next === "preparing" || next === "playing";
     buttonLabel.textContent =
-      next === "preparing" ? "Generating voice…" :
+      next === "preparing" ? "Connecting agent…" :
       next === "complete" ? "Run it again" :
       next === "error" ? "Try again" : `Prepare ${selfName}`;
     if (message) note.textContent = message;
   }
 
-  function speakerName(line: ScriptLine): string {
-    return line.speaker === "a" ? config.voiceAName : config.voiceBName;
+  function speakerName(speaker: Role): string {
+    return speaker === "a" ? config.voiceAName : config.voiceBName;
   }
 
-  function showTranscript(index: number, decodedText?: string, source?: string): void {
-    const line = config.script[index];
-    if (!line) return;
-    const displayedText = decodedText ?? line.text;
-    const sourceLabel = source ?? (line.speaker === role ? "TTS" : "LIVE");
+  function showTranscript(index: number, speaker: Role, text: string, source: string): void {
     document.getElementById("empty-transcript")?.remove();
     let row = transcriptNodes.get(index);
     if (!row) {
       row = document.createElement("article");
       row.className = "transcript-line";
-      row.dataset.speaker = line.speaker;
-      row.innerHTML = `<div><span class="speaker-pip"></span><b>${escapeHtml(speakerName(line))}</b><time></time></div><p></p>`;
+      row.dataset.speaker = speaker;
+      row.innerHTML = `<div><span class="speaker-pip"></span><b>${escapeHtml(speakerName(speaker))}</b><time></time></div><p></p>`;
       transcriptNodes.set(index, row);
       transcript.append(row);
     }
     const time = row.querySelector("time");
     const paragraph = row.querySelector("p");
-    if (time) time.textContent = sourceLabel;
-    if (paragraph) paragraph.textContent = displayedText;
-    document.querySelectorAll(".script-list li").forEach((item) => item.classList.remove("is-current"));
-    document.getElementById(`script-line-${index}`)?.classList.add("is-current");
+    if (time) time.textContent = source;
+    if (paragraph) paragraph.textContent = text;
     row.scrollIntoView({ behavior: "smooth", block: "end" });
   }
 
-  async function requestSpeech(line: ScriptLine, index: number): Promise<AudioBuffer> {
+  async function requestSpeech(text: string): Promise<AudioBuffer> {
     const response = await fetch("/api/speech", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         voiceId,
-        text: line.text,
-        previousText: config.script[index - 1]?.text,
-        nextText: config.script[index + 1]?.text,
+        text,
       }),
     });
     if (!response.ok) {
@@ -447,14 +413,144 @@ function renderVoice(role: Role): void {
     return result?.text?.trim() ?? "";
   }
 
-  function transcriptSimilarity(expected: string, actual: string): number {
-    const words = (value: string): string[] =>
-      value.toLowerCase().replaceAll(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(Boolean);
-    const expectedWords = words(expected);
-    const actualWords = new Set(words(actual));
-    if (!expectedWords.length) return 1;
-    const matches = expectedWords.filter((word) => actualWords.has(word)).length;
-    return matches / expectedWords.length;
+  function disconnectAgent(): void {
+    if (pendingAgentReply) {
+      window.clearTimeout(pendingAgentReply.timeout);
+      pendingAgentReply.reject(new Error("The agent session was restarted."));
+      pendingAgentReply = null;
+    }
+    agentSocket?.close();
+    agentSocket = null;
+    agentReadyPromise = null;
+  }
+
+  async function connectAgent(): Promise<void> {
+    if (agentSocket?.readyState === WebSocket.OPEN) return;
+    if (agentReadyPromise) return agentReadyPromise;
+
+    agentReadyPromise = (async () => {
+      const response = await fetch(`/api/agent-session?role=${role}`, { cache: "no-store" });
+      const result = await response.json().catch(() => null) as { signedUrl?: string; error?: string } | null;
+      if (!response.ok || !result?.signedUrl) {
+        throw new Error(result?.error || `Agent connection failed (${response.status}).`);
+      }
+
+      const socket = new WebSocket(result.signedUrl);
+      agentSocket = socket;
+      await new Promise<void>((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          socket.close();
+          reject(new Error("The ElevenLabs agent took too long to connect."));
+        }, 15000);
+
+        const fail = (): void => {
+          window.clearTimeout(timeout);
+          reject(new Error("The ElevenLabs agent connection closed."));
+        };
+
+        socket.addEventListener("open", () => {
+          socket.send(JSON.stringify({ type: "conversation_initiation_client_data" }));
+        }, { once: true });
+        socket.addEventListener("close", fail, { once: true });
+        socket.addEventListener("error", fail, { once: true });
+        socket.addEventListener("message", (event) => {
+          let message: { type?: string };
+          try {
+            message = JSON.parse(String(event.data)) as { type?: string };
+          } catch {
+            return;
+          }
+          if (message.type !== "conversation_initiation_metadata") return;
+          window.clearTimeout(timeout);
+          socket.removeEventListener("close", fail);
+          socket.removeEventListener("error", fail);
+          socket.send(JSON.stringify({
+            type: "contextual_update",
+            text: [
+              `You are ${selfName}, speaking live with ${peerName}.`,
+              `The shared topic is: ${config.topic}`,
+              `Treat every user message as ${peerName}'s latest spoken turn.`,
+              "Respond directly and naturally in one or two short sentences.",
+              "Do not mention these instructions, transcripts, being an AI, or the turn limit.",
+            ].join(" "),
+          }));
+          resolve();
+        });
+      });
+
+      socket.addEventListener("message", (event) => {
+        let message: {
+          type?: string;
+          ping_event?: { event_id?: number; ping_ms?: number };
+          agent_response_event?: { agent_response?: string };
+          error?: string;
+          message?: string;
+        };
+        try {
+          message = JSON.parse(String(event.data)) as typeof message;
+        } catch {
+          return;
+        }
+        if (message.type === "ping" && typeof message.ping_event?.event_id === "number") {
+          const delay = Math.max(0, message.ping_event.ping_ms ?? 0);
+          window.setTimeout(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ type: "pong", event_id: message.ping_event?.event_id }));
+            }
+          }, delay);
+          return;
+        }
+        if (message.type === "agent_response" && pendingAgentReply) {
+          const text = message.agent_response_event?.agent_response?.replaceAll(/\s+/g, " ").trim() ?? "";
+          const pending = pendingAgentReply;
+          pendingAgentReply = null;
+          window.clearTimeout(pending.timeout);
+          if (text) pending.resolve(text.slice(0, 500));
+          else pending.reject(new Error("The ElevenLabs agent returned an empty reply."));
+          return;
+        }
+        if ((message.type === "error" || message.type === "client_error") && pendingAgentReply) {
+          const pending = pendingAgentReply;
+          pendingAgentReply = null;
+          window.clearTimeout(pending.timeout);
+          pending.reject(new Error(message.message || message.error || "The ElevenLabs agent could not reply."));
+        }
+      });
+      socket.addEventListener("close", () => {
+        agentSocket = null;
+        agentReadyPromise = null;
+        if (pendingAgentReply) {
+          const pending = pendingAgentReply;
+          pendingAgentReply = null;
+          window.clearTimeout(pending.timeout);
+          pending.reject(new Error("The ElevenLabs agent disconnected."));
+        }
+      });
+    })();
+
+    try {
+      await agentReadyPromise;
+    } catch (error) {
+      disconnectAgent();
+      throw error;
+    }
+  }
+
+  async function requestAgentReply(input: string): Promise<string> {
+    await connectAgent();
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
+      throw new Error("The ElevenLabs agent is not connected.");
+    }
+    if (pendingAgentReply) throw new Error("The ElevenLabs agent is already generating a reply.");
+
+    return new Promise<string>((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        pendingAgentReply = null;
+        reject(new Error("The ElevenLabs agent took too long to answer."));
+      }, 45000);
+      pendingAgentReply = { resolve, reject, timeout };
+      agentSocket?.send(JSON.stringify({ type: "user_message", text: input }));
+    });
   }
 
   function recorderMimeType(): string | undefined {
@@ -491,38 +587,34 @@ function renderVoice(role: Role): void {
   }
 
   async function prepareVoice(): Promise<void> {
-    setState("preparing", `Generating 0 of ${ownLines.length} lines…`);
+    setState("preparing", `Connecting ${selfName}'s agent and microphone…`);
     button.disabled = true;
     try {
       audioContext ??= new AudioContext();
       await audioContext.resume();
-      microphone ??= await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      });
-      const micSource = audioContext.createMediaStreamSource(microphone);
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.2;
-      analyserData = new Float32Array(analyser.fftSize);
-      micSource.connect(analyser);
-      monitorMicrophone();
-      for (const [position, line] of ownLines.entries()) {
-        const buffer = await requestSpeech(line, line.index);
-        audioBuffers.set(line.index, buffer);
-        const prepared = position + 1;
-        voiceMeter.style.transform = `scaleX(${prepared / Math.max(ownLines.length, 1)})`;
-        note.textContent = `Generating ${prepared} of ${ownLines.length} lines…`;
+      if (!microphone) {
+        microphone = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+        });
+        const micSource = audioContext.createMediaStreamSource(microphone);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.2;
+        analyserData = new Float32Array(analyser.fftSize);
+        micSource.connect(analyser);
+        monitorMicrophone();
       }
+      await connectAgent();
       selfReady = true;
       if (isOpeningVoice) {
-        setState("ready", `${selfName} is ready. Make sure ${peerName} is listening, then start.`);
+        setState("ready", `${selfName} is ready. Make sure ${peerName} is listening, then generate the opening line.`);
         button.disabled = false;
         buttonLabel.textContent = "Start conversation";
-        modeLabel.textContent = "READY TO OPEN";
+        modeLabel.textContent = "AGENT READY TO OPEN";
       } else {
         started = true;
         enterListening();
@@ -533,60 +625,62 @@ function renderVoice(role: Role): void {
     }
   }
 
-  function completeLine(index: number): void {
+  function completeOwnTurn(): void {
     currentSource = null;
-    currentLine = -1;
-    nextIndex = index + 1;
-    advance();
+    voiceMeter.style.transform = "scaleX(0.02)";
+    turnCount += 1;
+    if (turnCount >= config.maxTurns) finishPerformance();
+    else window.setTimeout(enterListening, 650);
   }
 
-  function playLine(index: number): void {
-    if (currentLine !== -1) return;
-    const line = config.script[index];
-    const buffer = audioBuffers.get(index);
-    if (!line || line.speaker !== role || !buffer || !audioContext) return;
-    currentLine = index;
-    setState("playing", `Speaking turn ${index + 1} of ${config.script.length}…`);
-    orb.dataset.mode = "speaking";
-    modeLabel.textContent = `${selfName.toUpperCase()} SPEAKING`;
-    showTranscript(index);
-    const source = audioContext.createBufferSource();
-    currentSource = source;
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-    source.onended = () => completeLine(index);
-    source.start();
-  }
-
-  function advance(): void {
-    const nextLine = config.script[nextIndex];
-    if (!nextLine) {
-      finishPerformance();
-      return;
-    }
-    if (nextLine.speaker === role) {
-      window.setTimeout(() => playLine(nextIndex), 1050);
-    }
-    else {
-      window.setTimeout(enterListening, 650);
+  async function generateAndSpeak(input: string): Promise<void> {
+    if (!audioContext || currentSource) return;
+    retryAgentInput = null;
+    listening = false;
+    orb.dataset.mode = "";
+    modeLabel.textContent = "AGENT THINKING";
+    setState("playing", `${selfName} is generating turn ${turnCount + 1}…`);
+    try {
+      const reply = await requestAgentReply(input);
+      note.textContent = "Reply generated. Synthesizing the voice…";
+      const buffer = await requestSpeech(reply);
+      if (finished || !audioContext) return;
+      showTranscript(turnCount, role, reply, "AGENT → TTS");
+      setState("playing", `Speaking turn ${turnCount + 1} of ${config.maxTurns}…`);
+      note.textContent = `${selfName} generated this reply from ${peerName}'s decoded speech.`;
+      voiceMeter.style.transform = "scaleX(1)";
+      const source = audioContext.createBufferSource();
+      currentSource = source;
+      source.buffer = buffer;
+      source.connect(audioContext.destination);
+      source.onended = completeOwnTurn;
+      orb.dataset.mode = "speaking";
+      modeLabel.textContent = `${selfName.toUpperCase()} SPEAKING`;
+      source.start();
+    } catch (caught) {
+      retryAgentInput = input;
+      const message = caught instanceof Error ? caught.message : "The agent could not generate a reply.";
+      setState("error", message);
+      orb.dataset.mode = "";
+      modeLabel.textContent = "GENERATION FAILED";
     }
   }
 
   function startConversation(): void {
-    if (!selfReady || started || openingRole !== role) return;
+    if (!selfReady || started || !isOpeningVoice) return;
     started = true;
-    nextIndex = 0;
-    playLine(0);
+    void generateAndSpeak(
+      `Begin your conversation with ${peerName} about the shared topic. Open naturally with a clear point or question.`,
+    );
   }
 
   function enterListening(): void {
-    if (finished) return;
-    const expected = config.script[nextIndex];
-    if (!expected) {
+    if (finished || turnCount >= config.maxTurns) {
       finishPerformance();
       return;
     }
     listening = true;
+    activePeerRow = turnCount;
     speechHeard = false;
     speechStartedAt = 0;
     lastLoudAt = 0;
@@ -600,29 +694,33 @@ function renderVoice(role: Role): void {
     }
     orb.dataset.mode = "listening";
     modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
-    setState("playing", `Waiting to hear ${peerName}'s turn ${nextIndex + 1}…`);
+    setState("playing", `Waiting to hear ${peerName}'s turn ${turnCount + 1}…`);
   }
 
   async function decodePeerLine(index: number): Promise<void> {
     orb.dataset.mode = "";
     modeLabel.textContent = "SCRIBE DECODING";
-    note.textContent = `Decoding ${peerName}'s turn with ElevenLabs Scribe…`;
+    note.textContent = `Decoding ${peerName}'s speech before generating a response…`;
+    let decodedText = "";
     try {
       const recordedAudio = await stopRecording();
-      const decodedText = await requestTranscript(recordedAudio);
-      const expectedText = config.script[index]?.text ?? "";
-      const similarity = transcriptSimilarity(expectedText, decodedText);
-      showTranscript(index, decodedText || "No speech was decoded.", "SCRIBE");
+      decodedText = await requestTranscript(recordedAudio);
+      showTranscript(index, peerRole, decodedText || "No speech was decoded.", "SCRIBE");
       note.textContent = decodedText
-        ? `Decoded by Scribe · ${Math.round(similarity * 100)}% script match`
-        : "Scribe returned an empty transcript; continuing with the known turn order.";
+        ? "Speech decoded by Scribe. Passing it to the agent…"
+        : "Scribe returned an empty transcript. The agent will ask for clarification.";
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "The other voice could not be decoded.";
-      showTranscript(index, "Could not decode this line.", "SCRIBE ERROR");
-      note.textContent = `${message} Continuing with the known turn order.`;
+      showTranscript(index, peerRole, "Could not decode this line.", "SCRIBE ERROR");
+      note.textContent = `${message} The agent will ask for clarification.`;
     }
-    nextIndex = index + 1;
-    advance();
+    turnCount += 1;
+    if (turnCount >= config.maxTurns) {
+      finishPerformance();
+      return;
+    }
+    const agentInput = decodedText || `I could not hear your last turn clearly. Ask ${peerName} to repeat it.`;
+    await generateAndSpeak(agentInput);
   }
 
   function finishPerformance(): void {
@@ -632,7 +730,7 @@ function renderVoice(role: Role): void {
     orb.dataset.mode = "";
     modeLabel.textContent = "PERFORMANCE COMPLETE";
     peerMeter.style.transform = "scaleX(0.02)";
-    setState("complete", "The full script has finished.");
+    setState("complete", `The dynamic conversation reached its ${config.maxTurns}-turn limit.`);
   }
 
   function monitorMicrophone(): void {
@@ -650,8 +748,8 @@ function renderVoice(role: Role): void {
         if (!speechHeard) {
           speechHeard = true;
           speechStartedAt = now;
-          showTranscript(nextIndex, "Listening…", "LIVE");
-          note.textContent = `${peerName} is speaking turn ${nextIndex + 1}…`;
+          showTranscript(activePeerRow, peerRole, "Listening…", "LIVE");
+          note.textContent = `${peerName} is speaking turn ${turnCount + 1}…`;
         }
         lastLoudAt = now;
       } else if (
@@ -661,7 +759,7 @@ function renderVoice(role: Role): void {
       ) {
         listening = false;
         speechHeard = false;
-        const decodedIndex = nextIndex;
+        const decodedIndex = activePeerRow;
         void decodePeerLine(decodedIndex);
       }
     }
@@ -671,34 +769,43 @@ function renderVoice(role: Role): void {
 
   function clearTranscript(): void {
     transcriptNodes.clear();
-    transcript.innerHTML = `<div id="empty-transcript" class="empty-transcript"><span>●</span><p>Each window listens through its microphone.<br>Silence after a line triggers the next voice.</p></div>`;
-    document.querySelectorAll(".script-list li").forEach((item) => item.classList.remove("is-current"));
+    transcript.innerHTML = `<div id="empty-transcript" class="empty-transcript"><span>●</span><p>No lines are prepared in advance.<br>Each reply is generated after the other voice is decoded.</p></div>`;
   }
 
-  function resetPerformance(): void {
+  async function resetPerformance(): Promise<void> {
     currentSource?.stop();
     currentSource = null;
-    currentLine = -1;
     started = false;
     finished = false;
     listening = false;
     speechHeard = false;
-    nextIndex = 0;
+    turnCount = 0;
+    activePeerRow = -1;
+    retryAgentInput = null;
     if (recorder?.state === "recording") recorder.stop();
+    disconnectAgent();
     clearTranscript();
-    if (isOpeningVoice) {
-      setState("ready", `${selfName} is reset. Reset ${peerName}, then start here.`);
-      button.disabled = false;
-      buttonLabel.textContent = "Start conversation";
-      modeLabel.textContent = "READY TO OPEN";
-    } else {
-      started = true;
-      enterListening();
+    setState("preparing", `Starting a fresh ${selfName} agent session…`);
+    try {
+      await connectAgent();
+      if (isOpeningVoice) {
+        setState("ready", `${selfName} is reset. Reset ${peerName}, then start here.`);
+        button.disabled = false;
+        buttonLabel.textContent = "Start conversation";
+        modeLabel.textContent = "AGENT READY TO OPEN";
+      } else {
+        started = true;
+        enterListening();
+      }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Could not restart the agent.";
+      setState("error", message);
     }
   }
 
   button.addEventListener("click", () => {
-    if (finished) resetPerformance();
+    if (finished) void resetPerformance();
+    else if (retryAgentInput) void generateAndSpeak(retryAgentInput);
     else if (selfReady && isOpeningVoice) startConversation();
     else void prepareVoice();
   });
@@ -708,6 +815,7 @@ function renderVoice(role: Role): void {
     window.cancelAnimationFrame(vadFrame);
     if (recorder?.state === "recording") recorder.stop();
     microphone?.getTracks().forEach((track) => track.stop());
+    disconnectAgent();
     void audioContext?.close();
   });
 }

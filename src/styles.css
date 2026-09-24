@@ -59,6 +59,8 @@ input::placeholder, textarea::placeholder { color: #505156; }
 .field-heading { display: flex; justify-content: space-between; gap: 20px; }
 .field-heading label { margin-bottom: 7px; }
 .field-heading span { color: #65666a; font-family: "DM Mono", monospace; font-size: 9px; }
+.turn-limit { width: 82px; flex: 0 0 auto; }
+.turn-limit input { height: 29px; margin-top: 3px; padding: 0 0 3px; text-align: right; font-family: "DM Mono", monospace; }
 textarea { margin-top: 20px; min-height: 215px; padding: 18px; resize: vertical; border: 1px solid var(--line); line-height: 1.8; font-family: "DM Mono", monospace; font-size: 12px; background: #0e0f12; }
 .form-error { min-height: 22px; margin: 0 0 8px; color: #ff866a; font-family: "DM Mono", monospace; font-size: 10px; }
 .launch-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -142,6 +144,14 @@ body[data-connection="connected"] .session-button { color: var(--ink); backgroun
 
 .script-panel { padding: 34px 0 30px 30px; overflow: hidden; }
 .panel-heading.compact { padding-bottom: 18px; }
+.conversation-brief { padding-right: 10px; }
+.conversation-brief > span { color: var(--signal); font-family: "DM Mono", monospace; font-size: 8px; letter-spacing: .12em; }
+.conversation-brief > p { margin: 14px 0 35px; color: #d6d3cc; font-size: 18px; line-height: 1.55; letter-spacing: -.02em; }
+.conversation-brief dl { margin: 0; border-top: 1px solid var(--line); }
+.conversation-brief dl div { display: flex; justify-content: space-between; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.conversation-brief dt, .conversation-brief dd { margin: 0; font-family: "DM Mono", monospace; font-size: 8px; letter-spacing: .06em; }
+.conversation-brief dt { color: #68696d; }
+.conversation-brief dd { color: #aaa; text-align: right; }
 .script-list { height: 477px; overflow: auto; margin: 0; padding: 0 10px 0 0; list-style: none; scrollbar-color: #303136 transparent; scrollbar-width: thin; }
 .script-list li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 18px 0; border-top: 1px solid var(--line); }
 .script-list li > span { color: #4f5054; font-family: "DM Mono", monospace; font-size: 8px; }
