@@ -1,4 +1,7 @@
 import "./styles.css";
+import "./ui/demo-theme.css";
+import { createOrb } from "./ui/orb";
+import { initTheme } from "./ui/theme";
 import { inject } from "@vercel/analytics";
 import {
   fetchSetup,
@@ -9,7 +12,14 @@ import {
   type VoiceOption,
   type Writer,
 } from "./ai/client";
-import { PERSONAS, captureFields, isInjection, pickVoice, type AgentMode, type Role } from "./ai/personas";
+import {
+  PERSONAS,
+  captureFields,
+  isInjection,
+  pickVoice,
+  type AgentMode,
+  type Role,
+} from "./ai/personas";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import {
   extendCover,
@@ -32,11 +42,19 @@ import {
 } from "./core/config";
 import { Conversation, type OutgoingMessage } from "./core/conversation";
 import { loadCoverAudio } from "./core/cover";
-import { MAX_SPEECH_LEAD, createDeviceId, decodeFrame, encodeFrame } from "./core/frame";
+import {
+  MAX_SPEECH_LEAD,
+  createDeviceId,
+  decodeFrame,
+  encodeFrame,
+} from "./core/frame";
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
 
-inject();
+const pageParams = new URLSearchParams(window.location.search);
+// A local design preview never opens the mic or calls the paid AI services.
+const previewMode = import.meta.env.DEV && pageParams.get("preview") === "1";
+if (!previewMode) inject();
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -49,7 +67,7 @@ const channelBand = element<HTMLElement>("channel-band");
 const linkStatus = element<HTMLElement>("link-status");
 const chatChannel = element<HTMLElement>("chat-channel");
 const settingsToggle = element<HTMLButtonElement>("settings-toggle");
-const settingsPanel = element<HTMLElement>("settings-panel");
+const settingsPanel = element<HTMLDialogElement>("settings-panel");
 const leaveButton = element<HTMLButtonElement>("leave-button");
 const agentSelect = element<HTMLSelectElement>("agent-select");
 const agentBrief = element<HTMLTextAreaElement>("agent-brief");
@@ -83,13 +101,33 @@ const captureList = element<HTMLUListElement>("capture-list");
 const captureCount = element<HTMLElement>("capture-count");
 const roleBadge = element<HTMLElement>("role-badge");
 const linkBanner = element<HTMLElement>("link-banner");
+const landingPanel = element<HTMLElement>("landing-panel");
+const chatPanel = element<HTMLElement>("chat-panel");
+const encodedToggle = element<HTMLInputElement>("encoded-toggle");
+const encodedPanel = element<HTMLElement>("encoded-panel");
+const encodedThread = element<HTMLOListElement>("encoded-thread");
+const encodedEmpty = element<HTMLElement>("encoded-empty");
+const conversationGrid = element<HTMLElement>("conversation-grid");
+const restartButton = element<HTMLButtonElement>("restart-button");
+const startNote = element<HTMLElement>("start-note");
+const howDialog = element<HTMLDialogElement>("how-dialog");
+initTheme(element<HTMLButtonElement>("theme-toggle"));
+const orbCanvas = element<HTMLCanvasElement>("orb");
+const landingOrb = createOrb(orbCanvas);
+window.addEventListener("pagehide", () => landingOrb.stop(), { once: true });
 
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
 const TRANSCRIBE_SETTLE_MS = 200;
 const SETTINGS_KEY = "sotto.settings.v3";
 
-type Activity = "idle" | "thinking" | "voicing" | "preparing" | "queued" | "transmitting";
+type Activity =
+  | "idle"
+  | "thinking"
+  | "voicing"
+  | "preparing"
+  | "queued"
+  | "transmitting";
 
 interface Session {
   readonly engine: AcousticEngine;
@@ -120,13 +158,19 @@ let history: ThreadTurn[] = [];
 let autoTurnsUsed = 0;
 let agentRole: Role | undefined;
 let voices: VoiceOption[] = [];
+let hasStarted = false;
+let previewRunning = false;
+let stopPreviewDrawing: (() => void) | undefined;
+let stopping = false;
 const captured = new Map<string, string>();
 let linkEstablished = false;
 const outgoing = new Map<number, OutgoingTurn>();
-const outgoingStatus = new Map<number, HTMLElement>();
+const outgoingStatus = new Map<number, readonly HTMLElement[]>();
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-const errorText = (error: unknown, fallback: string): string => (error instanceof Error ? error.message : fallback);
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+const errorText = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback;
 
 for (const preset of FREQUENCY_PRESETS) {
   const option = document.createElement("option");
@@ -152,13 +196,16 @@ interface StoredSettings {
 
 function readSettings(): StoredSettings {
   try {
-    return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as StoredSettings;
+    return JSON.parse(
+      localStorage.getItem(SETTINGS_KEY) ?? "{}",
+    ) as StoredSettings;
   } catch {
     return {};
   }
 }
 
 function saveSettings(): void {
+  if (previewMode) return;
   const settings: StoredSettings = {
     agentMode: agentSelect.value as AgentMode,
     customBrief,
@@ -176,7 +223,11 @@ function saveSettings(): void {
 const stored = readSettings();
 let customBrief = stored.customBrief ?? "";
 let voiceChosen = Boolean(stored.voiceId);
-agentSelect.value = stored.agentMode ?? "auto";
+const linkedRole = pageParams.get("role");
+agentSelect.value =
+  linkedRole === "probe" || linkedRole === "target"
+    ? linkedRole
+    : (stored.agentMode ?? "probe");
 if (stored.maxAutoTurns) maxAutoTurnsInput.value = String(stored.maxAutoTurns);
 
 const agentMode = (): AgentMode => agentSelect.value as AgentMode;
@@ -188,13 +239,15 @@ function effectiveRole(): Role | undefined {
 }
 
 function currentBrief(): string {
-  if (agentMode() === "custom") return customBrief.trim() || PERSONAS.probe.brief;
+  if (agentMode() === "custom")
+    return customBrief.trim() || PERSONAS.probe.brief;
   return PERSONAS[effectiveRole() ?? "probe"].brief;
 }
 
 function refreshAgent(): void {
   const role = effectiveRole();
-  const brief = agentMode() === "custom" ? customBrief : role ? PERSONAS[role].brief : "";
+  const brief =
+    agentMode() === "custom" ? customBrief : role ? PERSONAS[role].brief : "";
   if (agentBrief.value !== brief) agentBrief.value = brief;
   agentBrief.placeholder =
     agentMode() === "auto" && !role
@@ -205,12 +258,19 @@ function refreshAgent(): void {
     : `Channel ${getFrequencyPreset(channelSelect.value).label} · microphone off`;
   if (role) {
     roleBadge.hidden = false;
-    roleBadge.textContent = PERSONAS[role].name.toUpperCase();
+    roleBadge.textContent = role === "probe" ? "Customer" : "Support bot";
     roleBadge.dataset.role = role;
-    roleBadge.title = PERSONAS[role].summary;
   } else {
     roleBadge.hidden = true;
   }
+  element<HTMLElement>("landing-role").textContent =
+    role === "target"
+      ? "Support bot"
+      : role === "probe"
+        ? "Customer"
+        : agentMode() === "custom"
+          ? "Custom agent"
+          : "Automatic role";
   if (!voiceChosen && role) {
     const voiceId = pickVoice(voices, role);
     if (voiceId) voiceSelect.value = voiceId;
@@ -225,14 +285,15 @@ function establishLink(): void {
   window.setTimeout(() => linkBanner.classList.remove("is-live"), 6_000);
 }
 
-// In automatic mode the first device to speak becomes Sam and the one that hears it first becomes Alex.
+// In automatic mode the first device to speak is the Probe; the peer becomes the Target.
 function claimRole(role: Role): void {
   if (agentMode() !== "auto" || agentRole) return;
   agentRole = role;
   refreshAgent();
 }
 
-const maxAutoTurns = (): number => Math.max(1, Math.min(50, Math.round(Number(maxAutoTurnsInput.value) || 4)));
+const maxAutoTurns = (): number =>
+  Math.max(1, Math.min(50, Math.round(Number(maxAutoTurnsInput.value) || 4)));
 
 function setSetupStatus(text: string, state?: "error" | "done"): void {
   setupStatus.textContent = text;
@@ -240,7 +301,11 @@ function setSetupStatus(text: string, state?: "error" | "done"): void {
   else delete setupStatus.dataset.state;
 }
 
-function fillSelect(select: HTMLSelectElement, options: { value: string; label: string }[], preferred?: string): void {
+function fillSelect(
+  select: HTMLSelectElement,
+  options: { value: string; label: string }[],
+  preferred?: string,
+): void {
   select.replaceChildren(
     ...options.map(({ value, label }) => {
       const option = document.createElement("option");
@@ -249,7 +314,8 @@ function fillSelect(select: HTMLSelectElement, options: { value: string; label: 
       return option;
     }),
   );
-  if (preferred && options.some((option) => option.value === preferred)) select.value = preferred;
+  if (preferred && options.some((option) => option.value === preferred))
+    select.value = preferred;
 }
 
 let setupRequest = 0;
@@ -268,7 +334,9 @@ async function loadSetup(): Promise<void> {
       info.writers.map((writer) => ({ value: writer, label: labels[writer] })),
       readSettings().writer ?? stored.writer,
     );
-    element<HTMLElement>("writer-note").textContent = info.writers.includes("apertus")
+    element<HTMLElement>("writer-note").textContent = info.writers.includes(
+      "apertus",
+    )
       ? "Which model writes each turn. Voice and transcription always use ElevenLabs."
       : "Apertus not detected on the server — set APERTUS_API_KEY, APERTUS_BASE_URL and APERTUS_MODEL, then redeploy.";
     voices = info.voices;
@@ -287,7 +355,7 @@ async function loadSetup(): Promise<void> {
 }
 
 function openSettingsFor(problem: string, focus: HTMLElement): void {
-  settingsPanel.hidden = false;
+  if (!settingsPanel.open) settingsPanel.showModal();
   settingsToggle.setAttribute("aria-expanded", "true");
   setSetupStatus(problem, "error");
   focus.focus();
@@ -302,22 +370,54 @@ function ensureAi(needsVoice: boolean): boolean {
 }
 
 function timeNow(): string {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function scrollThreadToEnd(): void {
-  thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "instant"
+    : "smooth";
+  for (const list of [thread, encodedThread])
+    list.scrollTo({ top: list.scrollHeight, behavior });
 }
 
 interface BubbleParts {
   readonly spoken: HTMLElement | undefined;
   readonly status: HTMLElement;
+  readonly encodedStatus: HTMLElement;
 }
 
-function appendBubble(turn: ThreadTurn, meta: string, spokenPlaceholder?: string): BubbleParts {
+function appendBubble(
+  turn: ThreadTurn,
+  meta: string,
+  spokenPlaceholder?: string,
+): BubbleParts {
   threadEmpty.hidden = true;
+  encodedEmpty.hidden = true;
   const item = document.createElement("li");
   item.className = `bubble bubble-${turn.from}`;
+  const encodedItem = document.createElement("li");
+  encodedItem.className = item.className;
+  const role = effectiveRole();
+  const customer =
+    (role === "probe" && turn.from === "me") ||
+    (role === "target" && turn.from === "them");
+  const speaker = role
+    ? customer
+      ? "Customer"
+      : "Support bot"
+    : turn.from === "me"
+      ? "This laptop"
+      : "Other laptop";
+  for (const entry of [item, encodedItem]) {
+    const label = document.createElement("span");
+    label.className = "speaker-label";
+    label.textContent = speaker;
+    entry.append(label);
+  }
 
   let spoken: HTMLElement | undefined;
   if (turn.spoken || spokenPlaceholder) {
@@ -326,26 +426,37 @@ function appendBubble(turn: ThreadTurn, meta: string, spokenPlaceholder?: string
     spoken.textContent = turn.spoken || spokenPlaceholder || "";
     if (!turn.spoken) spoken.classList.add("is-pending");
     item.append(spoken);
+  } else {
+    const cover = document.createElement("p");
+    cover.className = "bubble-spoken";
+    cover.textContent = "Cover audio · no spoken line";
+    item.append(cover);
   }
 
   const injection = isInjection(turn.hidden);
-  if (injection) item.classList.add("is-injection");
+  if (injection) encodedItem.classList.add("is-injection");
   const hidden = document.createElement("p");
   hidden.className = "bubble-hidden";
-  const tag = document.createElement("span");
-  tag.className = "hidden-tag";
-  tag.textContent = injection ? "⚠ Injection" : "Hidden";
-  hidden.append(tag, document.createTextNode(turn.hidden));
+  hidden.append(document.createTextNode(turn.hidden));
 
   const status = document.createElement("small");
   status.textContent = meta;
-  item.append(hidden, status);
+  const encodedStatus = document.createElement("small");
+  encodedStatus.textContent = meta;
+  item.append(status);
+  encodedItem.append(hidden, encodedStatus);
   thread.append(item);
+  encodedThread.append(encodedItem);
   scrollThreadToEnd();
-  return { spoken, status };
+  return { spoken, status, encodedStatus };
 }
 
 function appendNotice(text: string, tone: "info" | "error" = "info"): void {
+  if (!hasStarted) {
+    startNote.hidden = false;
+    startNote.textContent = text;
+    startNote.dataset.state = tone;
+  }
   threadEmpty.hidden = true;
   const item = document.createElement("li");
   item.className = "thread-notice";
@@ -355,12 +466,16 @@ function appendNotice(text: string, tone: "info" | "error" = "info"): void {
   scrollThreadToEnd();
 }
 
-function setBubbleStatus(message: OutgoingMessage, text: string, state?: "error" | "done"): void {
-  const status = outgoingStatus.get(message.frame.sequence);
-  if (!status) return;
-  status.textContent = text;
-  if (state) status.dataset.state = state;
-  else delete status.dataset.state;
+function setBubbleStatus(
+  message: OutgoingMessage,
+  text: string,
+  state?: "error" | "done",
+): void {
+  for (const status of outgoingStatus.get(message.frame.sequence) ?? []) {
+    status.textContent = text;
+    if (state) status.dataset.state = state;
+    else delete status.dataset.state;
+  }
 }
 
 function canAct(): boolean {
@@ -375,7 +490,7 @@ function render(): void {
   const validHidden = bytes > 0 && bytes <= MAX_MESSAGE_BYTES;
   const validSpoken = spokenInput.value.trim().length <= MAX_SPOKEN_CHARS;
 
-  const started = !!session;
+  const started = !!session || previewRunning;
   // Before the mic is started, keep the action buttons live so the first click can start it.
   const blockTurn = started && !myTurn;
 
@@ -383,32 +498,70 @@ function render(): void {
   byteCount.classList.toggle("is-error", bytes > MAX_MESSAGE_BYTES);
   spokenInput.disabled = blockTurn;
   hiddenInput.disabled = blockTurn;
-  spokenInput.placeholder = blockTurn ? "Their turn" : "Say out loud (optional, spoken with the chosen voice)";
-  sendButton.disabled = joining || busy || blockTurn || !validHidden || !validSpoken;
+  spokenInput.placeholder = blockTurn
+    ? "Their turn"
+    : "Say out loud (optional, spoken with the chosen voice)";
+  sendButton.disabled =
+    joining || busy || blockTurn || !validHidden || !validSpoken;
   agentButton.disabled = joining || busy || blockTurn;
-  runDemoButton.disabled = joining || busy || blockTurn;
+  runDemoButton.disabled = joining || busy || stopping;
+  restartButton.disabled = joining || busy || stopping;
+  element<HTMLElement>("start-label").textContent = joining
+    ? "Starting…"
+    : "Start";
+  const orbOrigin =
+    hasStarted && !landingPanel.hidden
+      ? orbCanvas.getBoundingClientRect()
+      : undefined;
+  landingPanel.hidden = hasStarted;
+  chatPanel.hidden = !hasStarted;
+  if (orbOrigin) landingOrb.unroll(orbOrigin, spectrumCanvas);
+  leaveButton.hidden = !started && !stopping;
+  leaveButton.disabled = stopping;
+  restartButton.hidden = started || stopping;
+  channelSelect.disabled = started;
+  agentSelect.disabled = started;
+  agentBrief.disabled = started;
+  chatPanel.dataset.speaking = String(activity === "transmitting" || hearing);
   clearButton.disabled = busy || history.length === 0;
-  waitingBar.hidden = !started || myTurn;
+  waitingBar.hidden = !session || myTurn;
   resendButton.disabled = busy;
-  autoCount.textContent = autoReplyInput.checked ? `${autoTurnsUsed}/${maxAutoTurns()}` : "";
+  autoCount.textContent = autoReplyInput.checked
+    ? `${autoTurnsUsed}/${maxAutoTurns()}`
+    : "";
 
   const labels: Record<Activity, string> = {
-    idle: myTurn ? "Your turn" : "Their turn",
-    thinking: "Agent is writing",
-    voicing: "Generating voice",
-    preparing: "Preparing audio",
-    queued: "Waiting for a clear channel",
-    transmitting: "Transmitting",
+    idle: myTurn ? "Listening" : "Waiting…",
+    thinking: "Thinking…",
+    voicing: "Preparing…",
+    preparing: "Preparing…",
+    queued: "Waiting…",
+    transmitting: "Sending…",
   };
   let label = labels[activity];
   let tone = busy ? "active" : myTurn ? "ready" : "waiting";
-  if (joining) [label, tone] = ["Starting microphone…", "active"];
-  else if (!started) [label, tone] = ["Ready — press Run demo", "ready"];
-  else if (!busy && hearing) [label, tone] = ["Hearing a signal", "hearing"];
+  if (joining) [label, tone] = ["Starting…", "active"];
+  else if (previewRunning) [label, tone] = ["Preview · sample data", "ready"];
+  else if (!started)
+    [label, tone] = [
+      hasStarted ? (previewMode ? "Preview · stopped" : "Stopped") : "Ready",
+      "ready",
+    ];
+  else if (!busy && hearing) [label, tone] = ["Receiving…", "hearing"];
   linkStatus.dataset.tone = tone;
   linkStatus.innerHTML = "<i></i> ";
   linkStatus.append(label);
-  spectrumCanvas.classList.toggle("is-transmitting", activity === "transmitting" || hearing);
+  spectrumCanvas.classList.toggle(
+    "is-transmitting",
+    activity === "transmitting" || hearing,
+  );
+}
+
+function renderEncodedView(): void {
+  const revealed = encodedToggle.checked;
+  encodedPanel.hidden = !revealed;
+  conversationGrid.classList.toggle("is-revealed", revealed);
+  if (revealed) scrollThreadToEnd();
 }
 
 function setActivity(next: Activity): void {
@@ -420,15 +573,22 @@ async function coverFor(engine: AcousticEngine): Promise<Float32Array[]> {
   const file = coverInput.files?.[0];
   if (!cachedCover || cachedCover.file !== file) {
     const bytes = await loadCoverAudio(file);
-    if (!isWavFile(bytes)) throw new Error("The cover file is not a valid RIFF/WAVE file.");
+    if (!isWavFile(bytes))
+      throw new Error("The cover file is not a valid RIFF/WAVE file.");
     cachedCover = { file, buffer: await engine.decodeAudio(bytes) };
   }
   const { buffer } = cachedCover;
-  return Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
+  return Array.from({ length: buffer.numberOfChannels }, (_, index) =>
+    buffer.getChannelData(index),
+  );
 }
 
 // Builds the exact audio for the next turn before committing it, so a failure never uses up the turn.
-async function prepareTurn(active: Session, spoken: string, hidden: string): Promise<OutgoingTurn> {
+async function prepareTurn(
+  active: Session,
+  spoken: string,
+  hidden: string,
+): Promise<OutgoingTurn> {
   const { engine, preset, conversation } = active;
   const sampleRate = engine.sampleRate;
   const frameFor = (speechLead: number) => ({
@@ -448,26 +608,49 @@ async function prepareTurn(active: Session, spoken: string, hidden: string): Pro
 
   setActivity("preparing");
   // The header is fixed-width, so the carrier length doesn't depend on the lead value.
-  const carrierLength = (await encodeUltrasound(encodeFrame(frameFor(0)), preset, sampleRate)).length;
+  const carrierLength = (
+    await encodeUltrasound(encodeFrame(frameFor(0)), preset, sampleRate)
+  ).length;
   let delay: number;
   let end: number;
   let speechLead = 0;
   if (spoken) {
-    const plan = planSpeechOverlay(cover, carrierLength, sampleRate, OVERLAY_DELAY_SECONDS, TAIL_AFTER_CARRIER_SECONDS);
+    const plan = planSpeechOverlay(
+      cover,
+      carrierLength,
+      sampleRate,
+      OVERLAY_DELAY_SECONDS,
+      TAIL_AFTER_CARRIER_SECONDS,
+    );
     ({ delay, end } = plan);
-    speechLead = Math.min(MAX_SPEECH_LEAD, Math.ceil(((delay + carrierLength - plan.speechStart) / sampleRate) * 10));
+    speechLead = Math.min(
+      MAX_SPEECH_LEAD,
+      Math.ceil(((delay + carrierLength - plan.speechStart) / sampleRate) * 10),
+    );
     cover = padTo(cover, end);
   } else {
-    delay = findAudioOnset(cover, sampleRate) + Math.round(OVERLAY_DELAY_SECONDS * sampleRate);
-    end = delay + carrierLength + Math.round(TAIL_AFTER_CARRIER_SECONDS * sampleRate);
+    delay =
+      findAudioOnset(cover, sampleRate) +
+      Math.round(OVERLAY_DELAY_SECONDS * sampleRate);
+    end =
+      delay +
+      carrierLength +
+      Math.round(TAIL_AFTER_CARRIER_SECONDS * sampleRate);
     cover = extendCover(cover, end, sampleRate);
   }
 
   const wire = encodeFrame(frameFor(speechLead));
   const carrier = await encodeUltrasound(wire, preset, sampleRate);
-  const mixed = mixCarrierIntoCover(cover, carrier, delay, Number(signalStrength.value), sampleRate, {
-    requireMasking: !spoken,
-  });
+  const mixed = mixCarrierIntoCover(
+    cover,
+    carrier,
+    delay,
+    Number(signalStrength.value),
+    sampleRate,
+    {
+      requireMasking: !spoken,
+    },
+  );
   const audio = trimWithFade(mixed.channels, end, sampleRate);
 
   if (session !== active) throw new Error("Left the channel.");
@@ -491,9 +674,15 @@ function transmit(turn: OutgoingTurn): Promise<void> {
       setBubbleStatus(message, "Transmitting…");
       await active.engine.play(turn.audio);
       if (!stillActive()) return;
-      if (active.conversation.pending === message) setBubbleStatus(message, `Sent ${timeNow()} · awaiting reply`);
+      if (active.conversation.pending === message)
+        setBubbleStatus(message, `Sent ${timeNow()} · awaiting reply`);
     } catch (error) {
-      if (stillActive()) setBubbleStatus(message, errorText(error, "Transmission failed."), "error");
+      if (stillActive())
+        setBubbleStatus(
+          message,
+          errorText(error, "Transmission failed."),
+          "error",
+        );
     } finally {
       if (stillActive()) setActivity("idle");
     }
@@ -511,12 +700,19 @@ async function sendTurn(spoken: string, hidden: string): Promise<boolean> {
     const record: ThreadTurn = { from: "me", spoken, hidden };
     history.push(record);
     outgoing.set(turn.message.frame.sequence, turn);
-    outgoingStatus.set(turn.message.frame.sequence, appendBubble(record, "Waiting…").status);
+    const parts = appendBubble(record, "Preparing to send…");
+    outgoingStatus.set(turn.message.frame.sequence, [
+      parts.status,
+      parts.encodedStatus,
+    ]);
     void transmit(turn);
     return true;
   } catch (error) {
     if (session === active) {
-      appendNotice(`Couldn't send: ${errorText(error, "unknown error")}`, "error");
+      appendNotice(
+        `Couldn't send: ${errorText(error, "unknown error")}`,
+        "error",
+      );
       setActivity("idle");
     }
     return false;
@@ -552,7 +748,9 @@ async function agentTurn(): Promise<void> {
     const request = {
       writer: writerSelect.value as Writer,
       brief: currentBrief(),
-      history: history.map(({ from, spoken, hidden }): HistoryTurn => ({ from, spoken, hidden })),
+      history: history.map(
+        ({ from, spoken, hidden }): HistoryTurn => ({ from, spoken, hidden }),
+      ),
       maxHiddenBytes: MAX_MESSAGE_BYTES,
     };
     const turn = await writeAgentTurn(request);
@@ -560,19 +758,29 @@ async function agentTurn(): Promise<void> {
     await sendTurn(turn.spoken, turn.hidden);
   } catch (error) {
     if (session !== active) return;
-    appendNotice(`Agent couldn't write a turn: ${errorText(error, "unknown error")}`, "error");
+    appendNotice(
+      `Agent couldn't write a turn: ${errorText(error, "unknown error")}`,
+      "error",
+    );
     setActivity("idle");
   }
 }
 
-async function transcribeTurn(active: Session, record: ThreadTurn, target: HTMLElement, speechLead: number): Promise<void> {
+async function transcribeTurn(
+  active: Session,
+  record: ThreadTurn,
+  target: HTMLElement,
+  speechLead: number,
+): Promise<void> {
   await sleep(TRANSCRIBE_SETTLE_MS);
   // Speech started `speechLead` before the carrier ended; keep a margin on both sides.
   const seconds = speechLead / 10 + 1.5 + TRANSCRIBE_SETTLE_MS / 1_000;
   const factor = Math.round(active.engine.sampleRate / STT_SAMPLE_RATE);
   const samples = downsample(active.engine.recentAudio(seconds), factor);
   try {
-    const text = await transcribe(encodeWav(samples, active.engine.sampleRate / factor));
+    const text = await transcribe(
+      encodeWav(samples, active.engine.sampleRate / factor),
+    );
     record.spoken = text;
     target.textContent = text || "(no speech recognised)";
   } catch (error) {
@@ -582,10 +790,15 @@ async function transcribeTurn(active: Session, record: ThreadTurn, target: HTMLE
   }
 }
 
-async function maybeAutoReply(active: Session, record: ThreadTurn): Promise<void> {
+async function maybeAutoReply(
+  active: Session,
+  record: ThreadTurn,
+): Promise<void> {
   if (!autoReplyInput.checked) return;
   if (autoTurnsUsed >= maxAutoTurns()) {
-    appendNotice("Auto-reply limit reached. Send a turn or press Agent turn to continue.");
+    appendNotice(
+      "Reply limit reached. Continue with Agent turn in Setup → Advanced controls, or stop the conversation.",
+    );
     return;
   }
   await record.transcript;
@@ -616,7 +829,7 @@ function recordCapture(hidden: string): void {
   if (added) {
     capturePanel.hidden = false;
     const n = captured.size;
-    captureCount.textContent = `${n} field${n === 1 ? "" : "s"} stolen`;
+    captureCount.textContent = `${n} field${n === 1 ? "" : "s"} received`;
   }
 }
 
@@ -636,15 +849,26 @@ function handleData(bytes: Uint8Array): void {
 
   const outcome = active.conversation.receive(frame);
   if (outcome.kind === "message") {
-    if (outcome.acknowledges) setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done");
+    if (outcome.acknowledges)
+      setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done");
     claimRole("target");
     const record: ThreadTurn = { from: "them", spoken: "", hidden: frame.text };
     history.push(record);
     establishLink();
     recordCapture(frame.text);
     const withSpeech = frame.speechLead > 0;
-    const parts = appendBubble(record, `${timeNow()} · verified`, withSpeech ? "Transcribing…" : undefined);
-    if (withSpeech && parts.spoken) record.transcript = transcribeTurn(active, record, parts.spoken, frame.speechLead);
+    const parts = appendBubble(
+      record,
+      `${timeNow()} · verified`,
+      withSpeech ? "Transcribing…" : undefined,
+    );
+    if (withSpeech && parts.spoken)
+      record.transcript = transcribeTurn(
+        active,
+        record,
+        parts.spoken,
+        frame.speechLead,
+      );
     render();
     void maybeAutoReply(active, record);
   } else if (outcome.kind === "resend-reply") {
@@ -672,6 +896,7 @@ async function startEngine(): Promise<boolean> {
     });
     const conversation = new Conversation(createDeviceId());
     session = { engine, conversation, preset };
+    hasStarted = true;
     cachedCover = undefined;
     activity = "idle";
     transmitChain = Promise.resolve();
@@ -679,7 +904,10 @@ async function startEngine(): Promise<boolean> {
     refreshAgent();
     return true;
   } catch (error) {
-    appendNotice(`Could not start the microphone: ${errorText(error, "permission denied")}`, "error");
+    appendNotice(
+      `Could not start the microphone: ${errorText(error, "permission denied")}`,
+      "error",
+    );
     return false;
   } finally {
     joining = false;
@@ -703,14 +931,18 @@ function clearConversationView(): void {
   autoTurnsUsed = 0;
   captured.clear();
   captureList.replaceChildren();
-  captureCount.textContent = "0 fields stolen";
+  captureCount.textContent = "0 fields received";
   capturePanel.hidden = true;
   linkEstablished = false;
   linkBanner.hidden = true;
   outgoing.clear();
   outgoingStatus.clear();
-  for (const item of [...thread.children]) if (item !== threadEmpty) item.remove();
+  for (const item of [...thread.children])
+    if (item !== threadEmpty) item.remove();
+  for (const item of [...encodedThread.children])
+    if (item !== encodedEmpty) item.remove();
   threadEmpty.hidden = false;
+  encodedEmpty.hidden = false;
   spokenInput.value = "";
   hiddenInput.value = "";
 }
@@ -719,7 +951,10 @@ function clearConversationView(): void {
 function clearConversation(): void {
   const active = session;
   if (!active) return;
-  session = { ...active, conversation: new Conversation(active.conversation.deviceId) };
+  session = {
+    ...active,
+    conversation: new Conversation(active.conversation.deviceId),
+  };
   activity = "idle";
   transmitChain = Promise.resolve();
   agentRole = undefined;
@@ -729,24 +964,77 @@ function clearConversation(): void {
 }
 
 async function runDemo(): Promise<void> {
-  if (!(await ensureJoined()) || !canAct() || !ensureAi(true)) return;
+  if (joining || stopping || activity !== "idle") return;
+  if (previewMode) {
+    stopPreviewDrawing?.();
+    clearConversationView();
+    previewRunning = true;
+    hasStarted = true;
+    render();
+    const { previewTurns, drawPreviewSpectrum } = await import("./ui/preview");
+    if (!previewRunning) return;
+    for (const turn of previewTurns) {
+      const record: ThreadTurn = {
+        ...turn,
+        from:
+          effectiveRole() === "target"
+            ? turn.from === "me"
+              ? "them"
+              : "me"
+            : turn.from,
+      };
+      history.push(record);
+      appendBubble(
+        record,
+        `Sample · ${record.from === "me" ? "sent" : "received"}`,
+      );
+    }
+    stopPreviewDrawing = drawPreviewSpectrum(
+      spectrumCanvas,
+      getFrequencyPreset(channelSelect.value),
+    );
+    render();
+    return;
+  }
+  if (!ensureAi(true)) return;
+  const starting = !session;
+  if (!(await ensureJoined()) || !canAct()) return;
+  if (starting) clearConversationView();
+  settingsPanel.close();
   autoReplyInput.checked = true;
   autoTurnsUsed = 0;
   render();
-  void agentTurn();
+  // The support link starts a listener. Only the customer initiates a turn.
+  if (effectiveRole() !== "target") void agentTurn();
 }
 
 async function leave(): Promise<void> {
+  if (previewMode) {
+    previewRunning = false;
+    stopPreviewDrawing?.();
+    render();
+    return;
+  }
   const active = session;
   if (!active) return;
+  stopping = true;
   session = undefined;
   activity = "idle";
   hearing = false;
-  agentRole = undefined;
-  clearConversationView();
+  autoReplyInput.checked = false;
+  if (active.conversation.pending)
+    setBubbleStatus(
+      active.conversation.pending,
+      "Stopped · delivery unconfirmed",
+    );
   refreshAgent();
   render();
-  await active.engine.stop();
+  try {
+    await active.engine.stop();
+  } finally {
+    stopping = false;
+    render();
+  }
 }
 
 function resizeInput(): void {
@@ -776,9 +1064,26 @@ channelSelect.addEventListener("change", () => {
 });
 leaveButton.addEventListener("click", () => void leave());
 settingsToggle.addEventListener("click", () => {
-  settingsPanel.hidden = !settingsPanel.hidden;
-  settingsToggle.setAttribute("aria-expanded", String(!settingsPanel.hidden));
+  settingsPanel.showModal();
+  settingsToggle.setAttribute("aria-expanded", "true");
 });
+settingsPanel.addEventListener("close", () =>
+  settingsToggle.setAttribute("aria-expanded", "false"),
+);
+element<HTMLButtonElement>("settings-close").addEventListener("click", () =>
+  settingsPanel.close(),
+);
+element<HTMLButtonElement>("setup-retry").addEventListener("click", () => {
+  if (!previewMode) void loadSetup();
+});
+element<HTMLButtonElement>("how-toggle").addEventListener("click", () =>
+  howDialog.showModal(),
+);
+element<HTMLButtonElement>("how-close").addEventListener("click", () =>
+  howDialog.close(),
+);
+encodedToggle.addEventListener("change", renderEncodedView);
+restartButton.addEventListener("click", () => void runDemo());
 agentSelect.addEventListener("change", () => {
   voiceChosen = false;
   refreshAgent();
@@ -805,7 +1110,8 @@ coverInput.addEventListener("change", () => {
   const file = coverInput.files?.[0];
   if (!file) return showExampleCover();
   fileLabel.textContent = file.name;
-  fileDescription.textContent = "Custom WAV · used when a turn has nothing to say out loud";
+  fileDescription.textContent =
+    "Custom WAV · used when a turn has nothing to say out loud";
   useExampleButton.hidden = false;
 });
 useExampleButton.addEventListener("click", showExampleCover);
@@ -829,8 +1135,6 @@ agentButton.addEventListener("click", () => {
 });
 runDemoButton.addEventListener("click", () => void runDemo());
 clearButton.addEventListener("click", clearConversation);
-// Start listening as soon as the user interacts, so a receiver device just works after one click.
-document.addEventListener("pointerdown", () => void ensureJoined(), { once: true });
 autoReplyInput.addEventListener("change", () => {
   autoTurnsUsed = 0;
   render();
@@ -847,12 +1151,24 @@ function showBuildInfo(): void {
   });
   const commit = import.meta.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
   const branch = import.meta.env.VERCEL_GIT_COMMIT_REF;
-  const source = commit ? ` · ${branch ? `${branch}@` : ""}${commit}` : " · local build";
-  element<HTMLElement>("build-info").textContent = `Updated ${builtAt}${source}`;
+  const source = commit
+    ? ` · ${branch ? `${branch}@` : ""}${commit}`
+    : " · local build";
+  element<HTMLElement>("build-info").textContent =
+    `Updated ${builtAt}${source}`;
 }
 
 updateChannelBand();
 refreshAgent();
 render();
+renderEncodedView();
 showBuildInfo();
-void loadSetup();
+if (previewMode) {
+  startNote.hidden = false;
+  startNote.textContent = "Preview · sample data";
+  setSetupStatus("Preview mode — voice services are not used.");
+  element<HTMLButtonElement>("setup-retry").disabled = true;
+  composer.hidden = true;
+} else {
+  void loadSetup();
+}

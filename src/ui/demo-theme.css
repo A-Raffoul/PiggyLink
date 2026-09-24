@@ -1,0 +1,373 @@
+/* Visual direction from claude-frontend/mockup/demo.html. */
+:root {
+  color-scheme: dark;
+  --void: #07060e;
+  --control-line: #38303f;
+  --surface-hover: #1c1525;
+  --primary-hover: #fff9ff;
+  --support: #ffb03a;
+  --track: #3a3049;
+  --switch-on: #c13c61;
+  --knob: #ede8f2;
+  --surface-spoken: #0d101b;
+  --line-spoken: #202b3a;
+  --surface-encoded: #170c17;
+  --line-encoded: #40202f;
+  --bubble-spoken: #122235;
+  --text-spoken: #8ed0ff;
+  --bubble-encoded: #331422;
+  --text-encoded: #ff82a1;
+  --surface-raised: #211a2b;
+  --error: #ff9baf;
+  --surface-dialog: #100c18;
+  --surface-field: #191222;
+  --line-field: #3c314b;
+  --backdrop: #07060ed9;
+  --speech: #6fc3ff;
+  --hidden: #ff5c85;
+  --bone: #ede8f2;
+  --ink: var(--bone);
+  --muted: #aaa1b9;
+  --line: #292332;
+  --green: var(--speech);
+  --coral: var(--hidden);
+  color: var(--bone);
+  background: var(--void);
+}
+/* Shared layout and components; only palette tokens change. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --void: #faf8fb;
+  --bone: #282331;
+  --speech: #175b92;
+  --hidden: #b9234c;
+  --muted: #685e76;
+  --line: #ddd5e4;
+  --control-line: #d3c9dc;
+  --surface-hover: #efe8f3;
+  --primary-hover: #44394f;
+  --support: #8b510a;
+  --track: #d3cadb;
+  --switch-on: #b9234c;
+  --surface-spoken: #f1f5fa;
+  --line-spoken: #d0deeb;
+  --surface-encoded: #fcf0f4;
+  --line-encoded: #ecd0da;
+  --bubble-spoken: #e1ecf7;
+  --text-spoken: #154d7b;
+  --bubble-encoded: #f6dee7;
+  --text-encoded: #982243;
+  --surface-raised: #eee7f4;
+  --error: #a32240;
+  --surface-dialog: #faf8fb;
+  --surface-field: #ffffff;
+  --line-field: #d5cadf;
+  --backdrop: #e4dfe8c9;
+}
+body {
+  background: var(--void);
+  min-width: 0;
+}
+.masthead {
+  border-bottom-color: transparent;
+}
+.brand {
+  color: var(--bone);
+}
+.nav-action,
+.setup-action {
+  color: var(--muted);
+}
+.setup-action,
+.stop-action {
+  border-color: var(--control-line);
+  background: transparent;
+}
+.setup-action:hover,
+.stop-action:hover {
+  background: var(--surface-hover);
+}
+.setup-action svg circle {
+  fill: var(--void);
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-color: var(--speech);
+}
+.landing {
+  padding: 16px 0 40px;
+  gap: 8px;
+}
+.spectral-orb {
+  width: min(520px, 85vw);
+  height: clamp(300px, 50svh, 460px);
+  flex-shrink: 0;
+}
+#orb {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.landing-actions {
+  gap: 20px;
+}
+.primary-action {
+  background: var(--bone);
+  color: var(--void);
+  box-shadow: none;
+}
+.primary-action:hover {
+  background: var(--primary-hover);
+  box-shadow: none;
+}
+.landing .primary-action {
+  border-radius: 999px;
+  min-width: 180px;
+}
+.primary-action .play-icon {
+  border-left-color: var(--void);
+}
+.role-label,
+.role-badge,
+.role-badge[data-role="probe"] {
+  color: var(--speech);
+  background: transparent;
+}
+.role-badge {
+  padding-left: 0;
+  border-color: transparent;
+}
+.role-badge[data-role="target"] {
+  color: var(--support);
+  background: transparent;
+}
+.role-status,
+.start-note {
+  color: var(--muted);
+}
+.role-status i {
+  background: var(--speech);
+}
+.role-status[data-tone="active"] {
+  color: var(--speech);
+}
+.reveal-toggle {
+  color: var(--bone);
+}
+.switch-track {
+  background: var(--track);
+}
+.switch-track::after {
+  background: var(--knob);
+}
+.reveal-toggle input:checked + .switch-track {
+  background: var(--switch-on);
+}
+.stop-action {
+  color: var(--bone);
+}
+.stop-icon {
+  background: var(--hidden);
+}
+.chat {
+  grid-template-rows: auto 220px minmax(240px, 1fr);
+}
+.signal-panel {
+  width: min(100%, 760px);
+  height: 220px;
+  justify-self: center;
+  align-self: center;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+  padding: 12px 0;
+}
+.signal-heading {
+  color: var(--muted);
+  font-size: 18px;
+}
+.signal-dot {
+  background: var(--hidden);
+  box-shadow: none;
+}
+#spectrum {
+  background: transparent;
+}
+.spectrum-axis {
+  color: var(--muted);
+}
+.conversation-card {
+  background: var(--surface-spoken);
+  border-color: var(--line-spoken);
+  border-radius: 12px;
+}
+.encoded-card {
+  background: var(--surface-encoded);
+  border-color: var(--line-encoded);
+}
+.card-heading {
+  border-color: var(--line-spoken);
+}
+.card-heading h2,
+.channel-symbol {
+  color: var(--speech);
+}
+.encoded-card .card-heading {
+  border-color: var(--line-encoded);
+}
+.encoded-card h2,
+.encoded-card .channel-symbol {
+  color: var(--hidden);
+}
+.thread {
+  scrollbar-color: #3a3349 transparent;
+}
+.speaker-label,
+.encoded-card .speaker-label {
+  color: var(--muted);
+}
+.bubble-spoken,
+.bubble-me .bubble-spoken {
+  background: var(--bubble-spoken);
+  color: var(--text-spoken);
+  font-size: clamp(30px, 3.15vw, 46px);
+  font-weight: 500;
+}
+.bubble-hidden,
+.bubble-me .bubble-hidden {
+  background: var(--bubble-encoded);
+  color: var(--text-encoded);
+  font-size: clamp(29px, 2.45vw, 38px);
+}
+.bubble.is-injection .bubble-hidden {
+  border-left-color: var(--hidden);
+}
+.thread-empty,
+.thread-empty strong,
+.encoded-card .thread-empty,
+.encoded-card .thread-empty strong,
+.is-pending {
+  color: var(--muted);
+}
+.empty-line {
+  background: var(--speech);
+}
+.encoded-card .empty-line {
+  background: var(--hidden);
+}
+.thread-notice,
+.setup-connection,
+.file-drop {
+  background: var(--surface-raised);
+  color: var(--bone);
+}
+.bubble > small[data-state="error"],
+.thread-notice[data-tone="error"],
+#setup-status[data-state="error"],
+.start-note[data-state="error"],
+.is-error {
+  color: var(--error) !important;
+}
+.capture-panel {
+  color: var(--hidden);
+  border-color: var(--line-encoded);
+}
+.dialog {
+  color: var(--bone);
+  background: var(--surface-dialog);
+  border-color: var(--control-line);
+  box-shadow: 0 24px 100px #0008;
+}
+.dialog::backdrop {
+  background: var(--backdrop);
+}
+.icon-action {
+  color: var(--bone);
+  background: var(--surface-raised);
+}
+.dialog-intro,
+.how-steps p,
+.how-steps li > span,
+.context-note,
+.field label,
+.composer label,
+.field-note,
+.label-row output,
+.range-labels,
+.advanced-footer,
+.build-info,
+.waiting-bar {
+  color: var(--muted);
+}
+.text-action,
+.role-links {
+  color: var(--speech);
+}
+select,
+textarea,
+input[type="text"],
+input[type="number"] {
+  background: var(--surface-field);
+  border-color: var(--line-field);
+  color: var(--bone);
+}
+.file-drop {
+  border-color: var(--line-field);
+}
+@media (max-width: 700px) {
+  .signal-panel {
+    padding: 12px 0;
+    height: 220px;
+  }
+  .spectral-orb {
+    height: clamp(280px, 44svh, 400px);
+  }
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.theme-moon,
+:root[data-theme="light"] .theme-sun {
+  display: none;
+}
+:root[data-theme="light"] .theme-moon {
+  display: block;
+}
+@media (max-width: 560px) {
+  nav {
+    gap: 10px;
+  }
+  .brand {
+    font-size: 21px;
+  }
+  .brand-mark {
+    width: 27px;
+    height: 27px;
+    margin-right: 6px;
+  }
+  .nav-action {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  .nav-action span {
+    display: none;
+  }
+}
+@media (max-width: 380px) {
+  .brand-mark {
+    display: none;
+  }
+  nav {
+    gap: 8px;
+  }
+}

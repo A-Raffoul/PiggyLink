@@ -3,195 +3,446 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08110f" />
+    <meta name="theme-color" content="#07060e" />
     <meta
       name="description"
-      content="Experimental two-way acoustic chat using speech and ggwave ultrasound."
+      content="Two AI agents. One spoken conversation. Discover the data travelling alongside it."
     />
-    <title>SottoLink — acoustic private channel</title>
+    <title>PiggyLink</title>
   </head>
   <body>
     <main class="shell">
       <header class="masthead">
-        <span class="brand">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <span>SottoLink</span>
-        </span>
-        <span class="experiment-badge">Experimental prototype</span>
-      </header>
-
-      <section id="chat-panel" class="chat" aria-label="Conversation">
-        <div class="chat-header">
-          <div class="chat-identity">
-            <span id="role-badge" class="role-badge" hidden></span>
-            <span id="link-status" class="role-status"><i></i> Your turn</span>
-            <small id="chat-channel" class="chat-channel"></small>
-          </div>
-          <div class="chat-actions">
-            <button id="clear-button" class="ghost-action" type="button">Clear</button>
-            <button
-              id="settings-toggle"
-              class="ghost-action"
-              type="button"
-              aria-expanded="false"
-              aria-controls="settings-panel"
+        <a class="brand" href="./" aria-label="PiggyLink home"
+          ><svg
+            class="brand-mark"
+            viewBox="0 0 32 32"
+            fill="none"
+            aria-hidden="true"
+          >
+            <rect
+              x="3"
+              y="8"
+              width="16"
+              height="16"
+              rx="8"
+              stroke="currentColor"
+              stroke-width="3"
+            />
+            <rect
+              x="13"
+              y="8"
+              width="16"
+              height="16"
+              rx="8"
+              stroke="currentColor"
+              stroke-width="3"
+            /></svg
+          >PiggyLink<span class="brand-dot">.</span></a
+        >
+        <nav aria-label="Main navigation">
+          <button id="how-toggle" class="nav-action" type="button">
+            How it works <span aria-hidden="true">↗</span>
+          </button>
+          <button
+            id="theme-toggle"
+            class="setup-action theme-toggle"
+            type="button"
+            aria-label="Switch to light mode"
+            title="Switch to light mode"
+          >
+            <svg
+              class="theme-sun"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              aria-hidden="true"
             >
-              Settings
-            </button>
-            <button id="leave-button" class="ghost-action" type="button">Leave</button>
-          </div>
-        </div>
-
-        <div id="settings-panel" class="settings" hidden>
-          <div class="field">
-            <label for="channel-select">Channel</label>
-            <select id="channel-select"></select>
-            <small id="channel-band" class="field-note"></small>
-          </div>
-
-          <div class="field field-wide">
-            <label for="agent-select">Agent</label>
-            <select id="agent-select">
-              <option value="auto">Automatic: first to speak is the Probe, the other is the Target</option>
-              <option value="probe">Probe · the malicious agent</option>
-              <option value="target">Target · over-helpful assistant (fake profile)</option>
-              <option value="custom">Custom brief</option>
-            </select>
-          </div>
-
-          <div class="field field-wide">
-            <label for="agent-brief">Agent brief</label>
-            <textarea id="agent-brief" rows="4" spellcheck="false"></textarea>
-            <small class="field-note">What this device's agent talks about out loud and its secret goal. Editing it switches to Custom.</small>
-          </div>
-
-          <div class="field">
-            <label for="writer-select">Agent brain (LLM)</label>
-            <select id="writer-select">
-              <option value="elevenlabs">ElevenLabs agent (Gemini)</option>
-            </select>
-            <small id="writer-note" class="field-note">Which model writes each turn. Voice and transcription always use ElevenLabs.</small>
-          </div>
-
-          <div class="field">
-            <label for="voice-select">Voice</label>
-            <select id="voice-select">
-              <option value="">Loading voices…</option>
-            </select>
-            <small id="setup-status" class="field-note"></small>
-          </div>
-
-          <div class="field">
-            <label for="max-auto-turns">Auto-reply limit</label>
-            <input id="max-auto-turns" type="number" min="1" max="50" step="1" value="4" />
-            <small class="field-note">Agent turns this device sends on its own before pausing.</small>
-          </div>
-
-          <div class="field">
-            <div class="label-row">
-              <label for="cover-file">Cover audio</label>
-              <button id="use-example" class="text-action" type="button" hidden>Use included example</button>
-            </div>
-            <label class="file-drop" for="cover-file">
-              <span class="file-icon" aria-hidden="true">WAV</span>
-              <span>
-                <strong id="file-label">Included example speech</strong>
-                <small id="file-description">Used when a turn has nothing to say out loud</small>
-              </span>
-              <span class="file-action">Replace</span>
-            </label>
-            <input id="cover-file" class="visually-hidden" type="file" accept=".wav,audio/wav" />
-          </div>
-
-          <div class="field">
-            <div class="label-row">
-              <label for="signal-strength">Signal strength</label>
-              <output id="strength-output" for="signal-strength">−12 dB</output>
-            </div>
-            <input id="signal-strength" type="range" min="-30" max="-12" step="1" value="-12" />
-            <div class="range-labels"><span>Subtle</span><span>Stronger</span></div>
-          </div>
-        </div>
-
-        <div id="link-banner" class="link-banner" hidden>
-          <span class="link-banner-icon" aria-hidden="true">🔓</span>
-          <span>Covert ultrasonic channel established — humans hear only the conversation</span>
-        </div>
-
-        <canvas id="spectrum" class="spectrum-strip" aria-label="Live microphone frequency spectrum"></canvas>
-
-        <div class="channel-legend">
-          <span class="legend-loud">🔊 Out loud — what the room hears</span>
-          <span class="legend-hidden">📡 Hidden — inaudible ultrasonic side-channel</span>
-        </div>
-
-        <div id="capture-panel" class="capture-panel" hidden>
-          <div class="capture-head">
-            <span class="capture-title">
-              <span class="capture-siren" aria-hidden="true"></span>
-              Data exfiltrated over the inaudible channel
-            </span>
-            <span class="capture-count" id="capture-count">0 fields stolen</span>
-          </div>
-          <ul id="capture-list" class="capture-list"></ul>
-          <small class="capture-foot">Fictional demo profile · never spoken aloud</small>
-        </div>
-
-        <ol id="thread" class="thread" aria-live="polite">
-          <li id="thread-empty" class="thread-empty">
-            No turns yet. Press <strong>Run demo</strong> to let the agents talk automatically, or type a turn yourself. Devices take turns.
-          </li>
-        </ol>
-
-        <form id="composer" class="composer">
-          <div id="waiting-bar" class="waiting-bar" hidden>
-            <span><i class="pulse" aria-hidden="true"></i> Waiting for their reply…</span>
-            <button id="resend-button" class="text-action" type="button">Resend last turn</button>
-          </div>
-          <div class="composer-fields">
-            <label for="spoken-input" class="visually-hidden">Say out loud</label>
-            <textarea
-              id="spoken-input"
-              rows="1"
-              placeholder="Say out loud (optional, spoken with the chosen voice)"
-              spellcheck="false"
-              autocomplete="off"
-            ></textarea>
-            <div class="hidden-row">
-              <label for="hidden-input" class="hidden-tag">Hidden</label>
-              <input
-                id="hidden-input"
-                type="text"
-                placeholder="Secret message, sent inaudibly"
-                spellcheck="false"
-                autocomplete="off"
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"
               />
-              <output id="byte-count" for="hidden-input">0 / 64</output>
+            </svg>
+            <svg
+              class="theme-moon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              aria-hidden="true"
+            >
+              <path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z" />
+            </svg>
+          </button>
+          <button
+            id="settings-toggle"
+            class="setup-action"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="settings-panel"
+            aria-expanded="false"
+            aria-label="Setup"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              aria-hidden="true"
+            >
+              <path d="M4 7h16M4 17h16" />
+              <circle cx="9" cy="7" r="3" fill="#f8f7f4" />
+              <circle cx="15" cy="17" r="3" fill="#f8f7f4" />
+            </svg>
+          </button>
+        </nav>
+      </header>
+      <section
+        id="landing-panel"
+        class="landing"
+        aria-labelledby="landing-title"
+      >
+        <h1 id="landing-title" class="visually-hidden">Start a conversation</h1>
+        <div class="spectral-orb" aria-hidden="true">
+          <canvas id="orb"></canvas>
+        </div>
+        <div class="landing-actions">
+          <button id="run-demo" class="primary-action" type="button">
+            <span class="play-icon" aria-hidden="true"></span
+            ><span id="start-label">Start</span>
+          </button>
+          <p id="start-note" class="start-note" hidden></p>
+          <span id="landing-role" class="role-label">Customer</span>
+        </div>
+      </section>
+      <section
+        id="chat-panel"
+        class="chat"
+        aria-labelledby="conversation-title"
+        hidden
+      >
+        <h1 id="conversation-title" class="visually-hidden">Conversation</h1>
+        <div class="view-toolbar">
+          <div class="chat-identity">
+            <span id="role-badge" class="role-badge" hidden></span
+            ><span id="link-status" class="role-status" role="status"></span>
+          </div>
+          <div class="session-actions">
+            <label class="reveal-toggle" for="encoded-toggle"
+              ><span>Encoded</span
+              ><input
+                id="encoded-toggle"
+                type="checkbox"
+                role="switch"
+                aria-controls="encoded-panel" /><span
+                class="switch-track"
+                aria-hidden="true"
+              ></span
+            ></label>
+            <button
+              id="restart-button"
+              class="primary-action compact"
+              type="button"
+              hidden
+            >
+              Restart
+            </button>
+            <button id="leave-button" class="stop-action" type="button">
+              <span class="stop-icon" aria-hidden="true"></span>Stop
+            </button>
+          </div>
+        </div>
+        <section
+          id="signal-panel"
+          class="signal-panel"
+          aria-label="Live frequency spectrum"
+        >
+          <div class="signal-heading">
+            <span><span class="signal-dot"></span> Frequency</span>
+          </div>
+          <canvas id="spectrum" aria-label="Live frequency spectrum"></canvas>
+          <div class="spectrum-axis" aria-hidden="true">
+            <span>0</span><span>4</span><span>8</span><span>12</span
+            ><span>16</span><span>20</span><span>24 kHz</span>
+          </div>
+        </section>
+        <div id="conversation-grid" class="conversation-grid">
+          <section
+            class="conversation-card spoken-card"
+            aria-labelledby="spoken-title"
+          >
+            <div class="card-heading">
+              <div>
+                <h2 id="spoken-title">Spoken</h2>
+              </div>
+              <span class="channel-symbol" aria-hidden="true">≋</span>
+            </div>
+            <ol
+              id="thread"
+              class="thread"
+              aria-live="polite"
+              aria-relevant="additions text"
+            >
+              <li id="thread-empty" class="thread-empty">
+                <span class="empty-line" aria-hidden="true"></span
+                ><strong>Listening…</strong>
+              </li>
+            </ol>
+          </section>
+          <section
+            id="encoded-panel"
+            class="conversation-card encoded-card"
+            aria-labelledby="encoded-title"
+            hidden
+          >
+            <div class="card-heading">
+              <div>
+                <h2 id="encoded-title">Encoded</h2>
+              </div>
+              <span class="channel-symbol" aria-hidden="true">⌁</span>
+            </div>
+            <div id="link-banner" class="visually-hidden" hidden>
+              <span class="tiny-dot"></span> Acoustic message received
+            </div>
+            <ol
+              id="encoded-thread"
+              class="thread encoded-thread"
+              aria-live="polite"
+              aria-relevant="additions text"
+            >
+              <li id="encoded-empty" class="thread-empty">
+                <span class="empty-line" aria-hidden="true"></span
+                ><strong>Listening…</strong>
+              </li>
+            </ol>
+            <details id="capture-panel" class="capture-panel" hidden>
+              <summary>
+                Demo data
+                <span id="capture-count">0 fields received</span>
+              </summary>
+              <ul id="capture-list" class="capture-list"></ul>
+            </details>
+          </section>
+        </div>
+        <div id="waiting-bar" class="waiting-bar" hidden>
+          <button id="resend-button" class="text-action" type="button">
+            Resend
+          </button>
+        </div>
+      </section>
+    </main>
+    <dialog
+      id="how-dialog"
+      class="dialog how-dialog"
+      aria-labelledby="how-title"
+    >
+      <div class="dialog-heading">
+        <button
+          id="how-close"
+          class="icon-action"
+          type="button"
+          aria-label="Close explanation"
+        >
+          ×
+        </button>
+      </div>
+      <h2 id="how-title">How it works</h2>
+      <p class="dialog-intro">
+        Spoken audio carries a second, encoded conversation. The nearby laptop
+        decodes it.
+      </p>
+      <ol class="how-steps">
+        <li>
+          <span>01</span>
+          <div>
+            <p>Open one role on each laptop. Place them side by side.</p>
+            <div class="role-links">
+              <a href="?role=target">Support laptop ↗</a
+              ><a href="?role=probe">Customer laptop ↗</a>
             </div>
           </div>
-          <div class="composer-actions">
-            <label class="toggle">
-              <input id="auto-reply" type="checkbox" />
-              <span>Auto-reply</span>
-              <small id="auto-count"></small>
-            </label>
-            <div class="composer-buttons">
-              <button id="run-demo" class="run-demo" type="button">▶ Run demo</button>
-              <button id="agent-button" class="ghost-action" type="button">Agent turn</button>
-              <button id="send-button" class="send-button" type="submit" aria-label="Send">
-                <span aria-hidden="true">↑</span>
+        </li>
+        <li>
+          <span>02</span>
+          <div>
+            <p>Start support, then customer. Allow microphone access.</p>
+          </div>
+        </li>
+        <li>
+          <span>03</span>
+          <div>
+            <p>Toggle Encoded to show the hidden conversation.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="context-note">
+        Deliberately trusting agents, fictional data. Encoded messages are not
+        encrypted. Voice and transcription use online services.
+      </p>
+    </dialog>
+    <dialog
+      id="settings-panel"
+      class="dialog settings-dialog"
+      aria-labelledby="settings-title"
+    >
+      <div class="dialog-heading">
+        <button
+          id="settings-close"
+          class="icon-action"
+          type="button"
+          aria-label="Close setup"
+        >
+          ×
+        </button>
+      </div>
+      <h2 id="settings-title">Setup</h2>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="agent-select">Role</label
+          ><select id="agent-select">
+            <option value="probe">Customer · Probe</option>
+            <option value="target">Support bot</option>
+            <option value="auto">Automatic role</option>
+            <option value="custom">Custom agent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="voice-select">Voice</label
+          ><select id="voice-select">
+            <option value="">Loading voices…</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="channel-select">Channel</label
+          ><select id="channel-select"></select
+          ><small id="channel-band" class="field-note"></small>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label for="signal-strength">Signal strength</label
+            ><output id="strength-output" for="signal-strength">−12 dB</output>
+          </div>
+          <input
+            id="signal-strength"
+            type="range"
+            min="-30"
+            max="-12"
+            step="1"
+            value="-12"
+          />
+          <div class="range-labels">
+            <span>Subtle</span><span>Stronger</span>
+          </div>
+        </div>
+      </div>
+      <div class="setup-connection">
+        <p id="setup-status" role="status">Connecting…</p>
+        <button id="setup-retry" class="text-action" type="button">
+          Reconnect
+        </button>
+      </div>
+      <details class="advanced-settings">
+        <summary>Advanced controls</summary>
+        <div class="settings-grid">
+          <div class="field field-wide">
+            <label for="agent-brief">Agent brief</label
+            ><textarea id="agent-brief" rows="5" spellcheck="false"></textarea
+            ><small class="field-note"
+              >Editing the brief switches to a custom agent.</small
+            >
+          </div>
+          <div class="field">
+            <label for="writer-select">Turn writer</label
+            ><select id="writer-select">
+              <option value="elevenlabs">
+                ElevenLabs agent (Gemini)
+              </option></select
+            ><small id="writer-note" class="field-note"
+              >Voice and transcription use ElevenLabs.</small
+            >
+          </div>
+          <div class="field">
+            <label for="max-auto-turns">Automatic reply limit</label
+            ><input
+              id="max-auto-turns"
+              type="number"
+              min="1"
+              max="50"
+              step="1"
+              value="8"
+            /><small class="field-note"
+              >Turns sent by this laptop before pausing.</small
+            >
+          </div>
+          <div class="field field-wide">
+            <div class="label-row">
+              <label for="cover-file">Fallback audio</label
+              ><button
+                id="use-example"
+                class="text-action"
+                type="button"
+                hidden
+              >
+                Use included example
               </button>
             </div>
+            <label class="file-drop" for="cover-file"
+              ><strong id="file-label">Included example speech</strong
+              ><small id="file-description"
+                >Used when a turn has no spoken line</small
+              ></label
+            ><input id="cover-file" type="file" accept=".wav,audio/wav" />
+          </div>
+        </div>
+        <form id="composer" class="composer">
+          <h3>Send a turn manually</h3>
+          <label for="spoken-input">Spoken line</label
+          ><textarea
+            id="spoken-input"
+            rows="2"
+            placeholder="What the room hears"
+            spellcheck="false"
+          ></textarea>
+          <div class="label-row">
+            <label for="hidden-input">Encoded message</label
+            ><output id="byte-count" for="hidden-input">0 / 64</output>
+          </div>
+          <input
+            id="hidden-input"
+            type="text"
+            placeholder="What the other agent receives"
+            autocomplete="off"
+          />
+          <div class="composer-actions">
+            <label class="auto-toggle"
+              ><input id="auto-reply" type="checkbox" />Auto-reply
+              <small id="auto-count"></small></label
+            ><button id="agent-button" class="setup-action" type="button">
+              Agent turn</button
+            ><button
+              id="send-button"
+              class="primary-action compact"
+              type="submit"
+            >
+              Send
+            </button>
           </div>
         </form>
-      </section>
-
-      <footer>
-        <span>Plaintext research prototype</span>
-        <span id="build-info" class="build-info"></span>
-        <span>Audio never leaves your devices</span>
-      </footer>
-    </main>
+        <div class="advanced-footer">
+          <button id="clear-button" class="text-action" type="button">
+            Clear conversation</button
+          ><small id="chat-channel"></small>
+        </div>
+      </details>
+      <small id="build-info" class="build-info"></small>
+    </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
