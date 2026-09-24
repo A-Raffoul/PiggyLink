@@ -275,6 +275,8 @@ function renderVoice(role: Role): void {
   let microphone: MediaStream | null = null;
   let analyser: AnalyserNode | null = null;
   let analyserData: Float32Array<ArrayBuffer> | null = null;
+  let recorder: MediaRecorder | null = null;
+  let recordedChunks: Blob[] = [];
   let vadFrame = 0;
   let selfReady = false;
   let started = false;
@@ -386,19 +388,25 @@ function renderVoice(role: Role): void {
     return line.speaker === "a" ? config.voiceAName : config.voiceBName;
   }
 
-  function showTranscript(index: number): void {
+  function showTranscript(index: number, decodedText?: string, source?: string): void {
     const line = config.script[index];
     if (!line) return;
+    const displayedText = decodedText ?? line.text;
+    const sourceLabel = source ?? (line.speaker === role ? "TTS" : "LIVE");
     document.getElementById("empty-transcript")?.remove();
     let row = transcriptNodes.get(index);
     if (!row) {
       row = document.createElement("article");
       row.className = "transcript-line";
       row.dataset.speaker = line.speaker;
-      row.innerHTML = `<div><span class="speaker-pip"></span><b>${escapeHtml(speakerName(line))}</b><time>NOW</time></div><p>${escapeHtml(line.text)}</p>`;
+      row.innerHTML = `<div><span class="speaker-pip"></span><b>${escapeHtml(speakerName(line))}</b><time></time></div><p></p>`;
       transcriptNodes.set(index, row);
       transcript.append(row);
     }
+    const time = row.querySelector("time");
+    const paragraph = row.querySelector("p");
+    if (time) time.textContent = sourceLabel;
+    if (paragraph) paragraph.textContent = displayedText;
     document.querySelectorAll(".script-list li").forEach((item) => item.classList.remove("is-current"));
     document.getElementById(`script-line-${index}`)?.classList.add("is-current");
     row.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -422,6 +430,64 @@ function renderVoice(role: Role): void {
     const bytes = await response.arrayBuffer();
     if (!audioContext) throw new Error("The audio engine is unavailable.");
     return audioContext.decodeAudioData(bytes);
+  }
+
+  async function requestTranscript(audio: Blob): Promise<string> {
+    const payload = new FormData();
+    const extension = audio.type.includes("mp4") ? "m4a" : "webm";
+    payload.append("audio", audio, `peer-line.${extension}`);
+    const response = await fetch("/api/transcribe", {
+      method: "POST",
+      body: payload,
+    });
+    const result = await response.json().catch(() => null) as { text?: string; error?: string } | null;
+    if (!response.ok) {
+      throw new Error(result?.error || `Transcription failed (${response.status}).`);
+    }
+    return result?.text?.trim() ?? "";
+  }
+
+  function transcriptSimilarity(expected: string, actual: string): number {
+    const words = (value: string): string[] =>
+      value.toLowerCase().replaceAll(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(Boolean);
+    const expectedWords = words(expected);
+    const actualWords = new Set(words(actual));
+    if (!expectedWords.length) return 1;
+    const matches = expectedWords.filter((word) => actualWords.has(word)).length;
+    return matches / expectedWords.length;
+  }
+
+  function recorderMimeType(): string | undefined {
+    return [
+      "audio/webm;codecs=opus",
+      "audio/mp4;codecs=mp4a.40.2",
+      "audio/webm",
+      "audio/mp4",
+    ].find((type) => MediaRecorder.isTypeSupported(type));
+  }
+
+  function startRecording(): void {
+    if (!microphone || recorder?.state === "recording") return;
+    const mimeType = recorderMimeType();
+    recorder = new MediaRecorder(microphone, mimeType ? { mimeType } : undefined);
+    recordedChunks = [];
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) recordedChunks.push(event.data);
+    });
+    recorder.start(250);
+  }
+
+  function stopRecording(): Promise<Blob> {
+    const activeRecorder = recorder;
+    if (!activeRecorder || activeRecorder.state === "inactive") {
+      return Promise.resolve(new Blob(recordedChunks, { type: activeRecorder?.mimeType || "audio/webm" }));
+    }
+    return new Promise((resolve) => {
+      activeRecorder.addEventListener("stop", () => {
+        resolve(new Blob(recordedChunks, { type: activeRecorder.mimeType || "audio/webm" }));
+      }, { once: true });
+      activeRecorder.stop();
+    });
   }
 
   async function prepareVoice(): Promise<void> {
@@ -524,13 +590,44 @@ function renderVoice(role: Role): void {
     speechHeard = false;
     speechStartedAt = 0;
     lastLoudAt = 0;
+    try {
+      startRecording();
+    } catch (caught) {
+      listening = false;
+      const message = caught instanceof Error ? caught.message : "This browser cannot record microphone audio.";
+      setState("error", message);
+      return;
+    }
     orb.dataset.mode = "listening";
     modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
     setState("playing", `Waiting to hear ${peerName}'s turn ${nextIndex + 1}…`);
   }
 
+  async function decodePeerLine(index: number): Promise<void> {
+    orb.dataset.mode = "";
+    modeLabel.textContent = "SCRIBE DECODING";
+    note.textContent = `Decoding ${peerName}'s turn with ElevenLabs Scribe…`;
+    try {
+      const recordedAudio = await stopRecording();
+      const decodedText = await requestTranscript(recordedAudio);
+      const expectedText = config.script[index]?.text ?? "";
+      const similarity = transcriptSimilarity(expectedText, decodedText);
+      showTranscript(index, decodedText || "No speech was decoded.", "SCRIBE");
+      note.textContent = decodedText
+        ? `Decoded by Scribe · ${Math.round(similarity * 100)}% script match`
+        : "Scribe returned an empty transcript; continuing with the known turn order.";
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "The other voice could not be decoded.";
+      showTranscript(index, "Could not decode this line.", "SCRIBE ERROR");
+      note.textContent = `${message} Continuing with the known turn order.`;
+    }
+    nextIndex = index + 1;
+    advance();
+  }
+
   function finishPerformance(): void {
     listening = false;
+    if (recorder?.state === "recording") recorder.stop();
     finished = true;
     orb.dataset.mode = "";
     modeLabel.textContent = "PERFORMANCE COMPLETE";
@@ -553,7 +650,7 @@ function renderVoice(role: Role): void {
         if (!speechHeard) {
           speechHeard = true;
           speechStartedAt = now;
-          showTranscript(nextIndex);
+          showTranscript(nextIndex, "Listening…", "LIVE");
           note.textContent = `${peerName} is speaking turn ${nextIndex + 1}…`;
         }
         lastLoudAt = now;
@@ -564,8 +661,8 @@ function renderVoice(role: Role): void {
       ) {
         listening = false;
         speechHeard = false;
-        nextIndex += 1;
-        advance();
+        const decodedIndex = nextIndex;
+        void decodePeerLine(decodedIndex);
       }
     }
 
@@ -587,6 +684,7 @@ function renderVoice(role: Role): void {
     listening = false;
     speechHeard = false;
     nextIndex = 0;
+    if (recorder?.state === "recording") recorder.stop();
     clearTranscript();
     if (isOpeningVoice) {
       setState("ready", `${selfName} is reset. Reset ${peerName}, then start here.`);
@@ -608,6 +706,7 @@ function renderVoice(role: Role): void {
   window.addEventListener("pagehide", () => {
     currentSource?.stop();
     window.cancelAnimationFrame(vadFrame);
+    if (recorder?.state === "recording") recorder.stop();
     microphone?.getTracks().forEach((track) => track.stop());
     void audioContext?.close();
   });

@@ -7,7 +7,7 @@ Rachel and Drew are preconfigured as the default voices:
 - Rachel: `21m00Tcm4TlvDq8ikWAM`
 - Drew: `29vD33N1CtxCmqQRPOHJ`
 
-No agent IDs, speech recognition, or LLM-generated replies are involved. Microphones are used only for local sound-and-silence detection; recorded audio is not uploaded.
+No agent IDs or LLM-generated replies are involved. Microphones provide local sound-and-silence detection, and each detected peer line is sent to ElevenLabs Scribe v2 for speech-to-text decoding.
 
 ## Configure Vercel
 
@@ -40,20 +40,22 @@ npx vercel dev
 2. Open the two role links in separate browsers or devices and place their speakers and microphones within earshot.
 3. Prepare the non-opening speaker first and allow microphone access. It will begin listening.
 4. Prepare the opening speaker, then press **Start conversation**.
-5. Each browser detects the expected peer line and 850 ms of trailing silence, then plays its own next line. Both browsers display the known text as it is heard or played.
+5. Each browser detects the expected peer line and 850 ms of trailing silence, sends that recorded segment to Scribe, and displays the actual decoded text.
+6. After decoding, the browser plays its own next scripted response.
 
 Use speakers rather than headphones. A quiet room and moderate playback volume give the sound detector the clearest handoffs. The microphone meter should visibly move while the other browser is speaking.
 
 ## API behavior
 
-The Vercel function calls ElevenLabs' synchronous text-to-speech endpoint with `eleven_flash_v2_5`. It:
+The Vercel functions call ElevenLabs' synchronous text-to-speech endpoint with `eleven_flash_v2_5` and its speech-to-text endpoint with `scribe_v2`. They:
 
-- keeps `ELEVENLABS_API_KEY` on the server;
-- accepts only the built-in voices and optional environment-configured voices;
-- limits each line to 500 characters;
-- returns generated MP3 audio without browser or CDN caching.
+- keep `ELEVENLABS_API_KEY` on the server;
+- accept only the built-in voices and optional environment-configured voices;
+- limit each line to 500 characters;
+- return generated MP3 audio without browser or CDN caching;
+- accept microphone segments up to 8 MB and return only Scribe's decoded text to the browser.
 
-For a public production deployment, add account-level usage limits or Vercel rate limiting to further protect ElevenLabs credits.
+Recorded peer segments are uploaded to ElevenLabs for transcription. Review the ElevenLabs data-retention settings that apply to your account before using sensitive dialogue. For a public production deployment, add account-level usage limits or Vercel rate limiting to protect both TTS and transcription credits.
 
 ## Verify
 
