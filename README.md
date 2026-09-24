@@ -15,26 +15,24 @@ Rachel and Drew remain the default text-to-speech voices:
 
 The setup screen now accepts a conversation brief and a total turn limit instead of a fixed script.
 
-## Configure ElevenLabs Agents
+## Default ElevenLabs Agents
 
-Create two agents in the ElevenLabs dashboard, one for each personality. Configure both agents as text-only and leave their automatic first message empty; CrossTalk generates the opening turn itself. Keep replies concise in each agent's system prompt because the TTS endpoint accepts at most 500 characters per turn.
+No manual agent setup is required for testing. On the first session, CrossTalk uses the API key to create two text-only agents in the ElevenLabs account:
 
-Example personality prompts:
+- **CrossTalk Default — Rachel:** a curious, optimistic participant;
+- **CrossTalk Default — Drew:** a thoughtful, constructively skeptical participant.
 
-- **Agent A / Rachel:** “You are Rachel, a curious optimist. Make clear, lively arguments and ask focused questions. Keep each response to one or two short sentences.”
-- **Agent B / Drew:** “You are Drew, a thoughtful skeptic. Challenge assumptions constructively and use concrete examples. Keep each response to one or two short sentences.”
+Later sessions find and reuse those agents by their fixed names instead of creating duplicates. Explicit Agent IDs remain available as optional overrides.
 
 ## Configure Vercel
 
-Add these server-side environment variables in Vercel Project Settings:
+The existing server-side environment variable is enough:
 
 ```sh
 ELEVENLABS_API_KEY=your_key
-ELEVENLABS_AGENT_A_ID=your_rachel_agent_id
-ELEVENLABS_AGENT_B_ID=your_drew_agent_id
 ```
 
-You can instead set `ELEVENLABS_AGENT_ID` to use one agent configuration for both browser roles. Separate IDs produce more distinct personalities.
+The API key must allow ElevenLabs Agent read/create access. To override the defaults later, set `ELEVENLABS_AGENT_A_ID` and `ELEVENLABS_AGENT_B_ID`, or set `ELEVENLABS_AGENT_ID` to use one custom agent for both roles.
 
 Do not prefix the key with `VITE_`; Vite variables are exposed to the browser. The API key is read only by the Vercel functions. The browser receives a short-lived signed WebSocket URL, never the key.
 
@@ -65,6 +63,7 @@ Use speakers rather than headphones. A quiet room and moderate playback volume g
 
 The Vercel functions use:
 
+- the ElevenLabs list/create APIs to provision and reuse the two default test agents;
 - ElevenLabs Agents signed WebSocket sessions for dynamic text generation;
 - `scribe_v2` for speech-to-text;
 - `eleven_flash_v2_5` for text-to-speech.
