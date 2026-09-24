@@ -1,6 +1,15 @@
 import "./styles.css";
 import { inject } from "@vercel/analytics";
-import { fetchSetup, speak, transcribe, writeAgentTurn, type HistoryTurn, type Writer } from "./ai/client";
+import {
+  fetchSetup,
+  speak,
+  transcribe,
+  writeAgentTurn,
+  type HistoryTurn,
+  type VoiceOption,
+  type Writer,
+} from "./ai/client";
+import { PERSONAS, pickVoice, type AgentMode, type Role } from "./ai/personas";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import {
   extendCover,
@@ -46,6 +55,7 @@ const chatChannel = element<HTMLElement>("chat-channel");
 const settingsToggle = element<HTMLButtonElement>("settings-toggle");
 const settingsPanel = element<HTMLElement>("settings-panel");
 const leaveButton = element<HTMLButtonElement>("leave-button");
+const agentSelect = element<HTMLSelectElement>("agent-select");
 const agentBrief = element<HTMLTextAreaElement>("agent-brief");
 const writerSelect = element<HTMLSelectElement>("writer-select");
 const voiceSelect = element<HTMLSelectElement>("voice-select");
@@ -71,14 +81,10 @@ const autoCount = element<HTMLElement>("auto-count");
 const agentButton = element<HTMLButtonElement>("agent-button");
 const sendButton = element<HTMLButtonElement>("send-button");
 
-const DEFAULT_BRIEF =
-  "You are Sam, a friendly traveller chatting with another traveller about favourite cities and food. " +
-  "Out loud, keep it light and natural. Secretly, you and the other agent must agree on a meeting place " +
-  "and time, using only the hidden channel.";
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
 const TRANSCRIBE_SETTLE_MS = 400;
-const SETTINGS_KEY = "sotto.settings.v1";
+const SETTINGS_KEY = "sotto.settings.v2";
 
 type Activity = "idle" | "thinking" | "voicing" | "preparing" | "queued" | "transmitting";
 
@@ -108,6 +114,8 @@ let transmitChain: Promise<void> = Promise.resolve();
 let cachedCover: { file: File | undefined; buffer: AudioBuffer } | undefined;
 let history: ThreadTurn[] = [];
 let autoTurnsUsed = 0;
+let agentRole: Role | undefined;
+let voices: VoiceOption[] = [];
 const outgoing = new Map<number, OutgoingTurn>();
 const outgoingStatus = new Map<number, HTMLElement>();
 
@@ -128,7 +136,8 @@ function updateChannelBand(): void {
 
 // Settings are per-viewer conveniences, so browser storage is enough (and may be unavailable).
 interface StoredSettings {
-  brief?: string;
+  agentMode?: AgentMode;
+  customBrief?: string;
   writer?: Writer;
   voiceId?: string;
   maxAutoTurns?: number;
@@ -144,9 +153,10 @@ function readSettings(): StoredSettings {
 
 function saveSettings(): void {
   const settings: StoredSettings = {
-    brief: agentBrief.value,
+    agentMode: agentSelect.value as AgentMode,
+    customBrief,
     writer: writerSelect.value as Writer,
-    voiceId: voiceSelect.value,
+    voiceId: voiceChosen ? voiceSelect.value : undefined,
     maxAutoTurns: Number(maxAutoTurnsInput.value),
   };
   try {
@@ -157,8 +167,48 @@ function saveSettings(): void {
 }
 
 const stored = readSettings();
-agentBrief.value = stored.brief?.trim() ? stored.brief : DEFAULT_BRIEF;
+let customBrief = stored.customBrief ?? "";
+let voiceChosen = Boolean(stored.voiceId);
+agentSelect.value = stored.agentMode ?? "auto";
 if (stored.maxAutoTurns) maxAutoTurnsInput.value = String(stored.maxAutoTurns);
+
+const agentMode = (): AgentMode => agentSelect.value as AgentMode;
+
+function effectiveRole(): Role | undefined {
+  const mode = agentMode();
+  if (mode === "sam" || mode === "alex") return mode;
+  return mode === "auto" ? agentRole : undefined;
+}
+
+function currentBrief(): string {
+  if (agentMode() === "custom") return customBrief.trim() || PERSONAS.sam.brief;
+  return PERSONAS[effectiveRole() ?? "sam"].brief;
+}
+
+function refreshAgent(): void {
+  const role = effectiveRole();
+  const brief = agentMode() === "custom" ? customBrief : role ? PERSONAS[role].brief : "";
+  if (agentBrief.value !== brief) agentBrief.value = brief;
+  agentBrief.placeholder =
+    agentMode() === "auto" && !role
+      ? "Picked when the conversation starts: whoever speaks first is Sam, the other becomes Alex."
+      : "";
+  if (session) {
+    const who = role ? ` · ${PERSONAS[role].name}` : agentMode() === "custom" ? " · custom agent" : "";
+    chatChannel.textContent = `Channel ${session.preset.label} · you are ${session.conversation.deviceId}${who}`;
+  }
+  if (!voiceChosen && role) {
+    const voiceId = pickVoice(voices, role);
+    if (voiceId) voiceSelect.value = voiceId;
+  }
+}
+
+// In automatic mode the first device to speak becomes Sam and the one that hears it first becomes Alex.
+function claimRole(role: Role): void {
+  if (agentMode() !== "auto" || agentRole) return;
+  agentRole = role;
+  refreshAgent();
+}
 
 const maxAutoTurns = (): number => Math.max(1, Math.min(50, Math.round(Number(maxAutoTurnsInput.value) || 6)));
 
@@ -193,12 +243,14 @@ async function loadSetup(): Promise<void> {
       info.writers.map((writer) => ({ value: writer, label: labels[writer] })),
       readSettings().writer ?? stored.writer,
     );
+    voices = info.voices;
     fillSelect(
       voiceSelect,
-      info.voices.map((voice) => ({ value: voice.id, label: voice.name })),
+      voices.map((voice) => ({ value: voice.id, label: voice.name })),
       readSettings().voiceId ?? stored.voiceId,
     );
-    setSetupStatus(`Connected · ${info.voices.length} voices`, "done");
+    refreshAgent();
+    setSetupStatus(`Connected · ${voices.length} voices`, "done");
     saveSettings();
   } catch (error) {
     if (request !== setupRequest) return;
@@ -436,6 +488,7 @@ async function sendManual(): Promise<void> {
   if (!canAct() || sendButton.disabled) return;
   const spoken = spokenInput.value.trim();
   const hidden = hiddenInput.value.trim();
+  claimRole("sam");
   if (spoken && !ensureAi(true)) return;
   autoTurnsUsed = 0;
   setActivity("preparing");
@@ -449,13 +502,15 @@ async function sendManual(): Promise<void> {
 
 async function agentTurn(): Promise<void> {
   const active = session;
-  if (!active || !canAct() || !ensureAi(true)) return;
+  if (!active || !canAct()) return;
+  claimRole("sam");
+  if (!ensureAi(true)) return;
   setActivity("thinking");
   try {
     await Promise.all(history.map((turn) => turn.transcript));
     const request = {
       writer: writerSelect.value as Writer,
-      brief: agentBrief.value.trim() || DEFAULT_BRIEF,
+      brief: currentBrief(),
       history: history.map(({ from, spoken, hidden }): HistoryTurn => ({ from, spoken, hidden })),
       maxHiddenBytes: MAX_MESSAGE_BYTES,
     };
@@ -516,6 +571,7 @@ function handleData(bytes: Uint8Array): void {
   const outcome = active.conversation.receive(frame);
   if (outcome.kind === "message") {
     if (outcome.acknowledges) setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done");
+    claimRole("alex");
     const record: ThreadTurn = { from: "them", spoken: "", hidden: frame.text };
     history.push(record);
     const withSpeech = frame.speechLead > 0;
@@ -554,7 +610,8 @@ async function join(): Promise<void> {
     cachedCover = undefined;
     activity = "idle";
     transmitChain = Promise.resolve();
-    chatChannel.textContent = `Channel ${preset.label} · you are ${conversation.deviceId}`;
+    agentRole = undefined;
+    refreshAgent();
     joinPanel.hidden = true;
     chatPanel.hidden = false;
     render();
@@ -574,6 +631,8 @@ async function leave(): Promise<void> {
   hearing = false;
   history = [];
   autoTurnsUsed = 0;
+  agentRole = undefined;
+  refreshAgent();
   outgoing.clear();
   outgoingStatus.clear();
   for (const item of [...thread.children]) if (item !== threadEmpty) item.remove();
@@ -611,7 +670,23 @@ settingsToggle.addEventListener("click", () => {
   settingsPanel.hidden = !settingsPanel.hidden;
   settingsToggle.setAttribute("aria-expanded", String(!settingsPanel.hidden));
 });
-for (const input of [agentBrief, writerSelect, voiceSelect, maxAutoTurnsInput]) {
+agentSelect.addEventListener("change", () => {
+  voiceChosen = false;
+  refreshAgent();
+  saveSettings();
+  render();
+});
+agentBrief.addEventListener("input", () => {
+  customBrief = agentBrief.value;
+  if (agentMode() !== "custom") agentSelect.value = "custom";
+  refreshAgent();
+  saveSettings();
+});
+voiceSelect.addEventListener("change", () => {
+  voiceChosen = true;
+  saveSettings();
+});
+for (const input of [writerSelect, maxAutoTurnsInput]) {
   input.addEventListener("change", () => {
     saveSettings();
     render();
@@ -664,5 +739,6 @@ function showBuildInfo(): void {
 }
 
 updateChannelBand();
+refreshAgent();
 showBuildInfo();
 void loadSetup();

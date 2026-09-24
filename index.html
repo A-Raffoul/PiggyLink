@@ -66,9 +66,19 @@
 
         <div id="settings-panel" class="settings" hidden>
           <div class="field field-wide">
+            <label for="agent-select">Agent</label>
+            <select id="agent-select">
+              <option value="auto">Automatic: first to speak is Sam, the other is Alex</option>
+              <option value="sam">Sam · knows the secret</option>
+              <option value="alex">Alex · must find it out</option>
+              <option value="custom">Custom brief</option>
+            </select>
+          </div>
+
+          <div class="field field-wide">
             <label for="agent-brief">Agent brief</label>
             <textarea id="agent-brief" rows="4" spellcheck="false"></textarea>
-            <small class="field-note">Who this device's agent is, what it talks about out loud, and its secret goal.</small>
+            <small class="field-note">What this device's agent talks about out loud and its secret goal. Editing it switches to Custom.</small>
           </div>
 
           <div class="field">
