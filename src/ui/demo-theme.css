@@ -22,6 +22,10 @@
   --line-encoded: #40202f;
   --bubble-spoken: #122235;
   --text-spoken: #8ed0ff;
+  --bubble-received: #272033;
+  --line-received: #695176;
+  --text-received: #eee2f6;
+  --label-received: #d4b5e8;
   --bubble-encoded: #331422;
   --text-encoded: #ff82a1;
   --surface-raised: #211a2b;
@@ -62,6 +66,10 @@
   --line-encoded: #ecd0da;
   --bubble-spoken: #e1ecf7;
   --text-spoken: #154d7b;
+  --bubble-received: #efe7f4;
+  --line-received: #ccb8da;
+  --text-received: #4d2c60;
+  --label-received: #794a91;
   --bubble-encoded: #f6dee7;
   --text-encoded: #982243;
   --surface-raised: #eee7f4;
@@ -573,6 +581,9 @@ input[type="range"] {
 .current-message[data-from="me"] .current-direction {
   text-align: right;
 }
+.current-message[data-from="them"] .current-direction {
+  color: var(--label-received);
+}
 .current-message[data-delivery="failed"] .current-direction {
   color: var(--error);
 }
@@ -609,6 +620,9 @@ input[type="range"] {
   color: var(--hidden);
   font-size: clamp(1.125rem, 1.8vw, 1.5rem);
   letter-spacing: 0;
+}
+.current-message[data-from="them"] #current-spoken {
+  color: var(--text-received);
 }
 .current-message[data-from="none"] #current-spoken {
   color: var(--muted);
@@ -656,6 +670,20 @@ input[type="range"] {
 }
 .bubble-me .bubble-pair {
   background: var(--bubble-spoken);
+  border-color: var(--line-spoken);
+}
+.bubble-them .bubble-pair {
+  background: var(--bubble-received);
+  border-color: var(--line-received);
+}
+.bubble-me .speaker-label {
+  color: var(--speech);
+}
+.bubble-them .speaker-label {
+  color: var(--label-received);
+}
+.bubble-them .bubble-pair .bubble-spoken {
+  color: var(--text-received);
 }
 .bubble-channel-label {
   display: block;
@@ -860,28 +888,39 @@ input[type="range"] {
     padding: 8px 12px;
   }
   .signal-stage {
-    position: relative;
-    display: block;
-    flex: 0 0 220px;
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
     min-height: 220px;
+    gap: 8px;
   }
   .signal-panel {
     width: 100%;
     height: 220px;
+    min-height: 0;
+    flex: none;
     padding: 8px 0;
   }
   .current-message {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
+    display: none;
     width: 100%;
-    height: 100%;
+    height: auto;
+    max-height: 112px;
     margin: 0;
-    padding: 12px;
+    padding: 8px 10px;
     border: 1px solid var(--line);
     border-radius: 12px;
     background: var(--void);
-    justify-content: flex-start;
+    gap: 4px;
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+  }
+  .current-message.is-visible {
+    display: flex;
+  }
+  .current-message.is-visible + .signal-panel {
+    height: 175px;
   }
   .current-direction {
     font-size: 0.8125rem;
