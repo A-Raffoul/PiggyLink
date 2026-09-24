@@ -20,24 +20,7 @@
         <span class="experiment-badge">Experimental prototype</span>
       </header>
 
-      <section id="join-panel" class="join" aria-labelledby="join-title">
-        <div class="join-card">
-          <h1 id="join-title" class="join-title">Start the demo</h1>
-          <div class="field">
-            <label for="channel-select">Channel</label>
-            <select id="channel-select"></select>
-            <small id="channel-band" class="field-note"></small>
-          </div>
-          <button id="join-button" class="primary-action" type="button">
-            <span>Start</span>
-            <span aria-hidden="true">→</span>
-          </button>
-          <p id="join-error" class="field-error" role="alert"></p>
-          <p class="field-note">Both devices must use the same channel. Your browser will ask for the microphone.</p>
-        </div>
-      </section>
-
-      <section id="chat-panel" class="chat" aria-label="Conversation" hidden>
+      <section id="chat-panel" class="chat" aria-label="Conversation">
         <div class="chat-header">
           <div class="chat-identity">
             <span id="role-badge" class="role-badge" hidden></span>
@@ -60,6 +43,12 @@
         </div>
 
         <div id="settings-panel" class="settings" hidden>
+          <div class="field">
+            <label for="channel-select">Channel</label>
+            <select id="channel-select"></select>
+            <small id="channel-band" class="field-note"></small>
+          </div>
+
           <div class="field field-wide">
             <label for="agent-select">Agent</label>
             <select id="agent-select">

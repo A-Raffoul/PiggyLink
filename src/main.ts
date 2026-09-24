@@ -44,12 +44,8 @@ function element<T extends HTMLElement>(id: string): T {
   return found as T;
 }
 
-const joinPanel = element<HTMLElement>("join-panel");
 const channelSelect = element<HTMLSelectElement>("channel-select");
 const channelBand = element<HTMLElement>("channel-band");
-const joinButton = element<HTMLButtonElement>("join-button");
-const joinError = element<HTMLElement>("join-error");
-const chatPanel = element<HTMLElement>("chat-panel");
 const linkStatus = element<HTMLElement>("link-status");
 const chatChannel = element<HTMLElement>("chat-channel");
 const settingsToggle = element<HTMLButtonElement>("settings-toggle");
@@ -115,6 +111,7 @@ interface ThreadTurn {
 
 let session: Session | undefined;
 let joining = false;
+let joinPromise: Promise<boolean> | undefined;
 let activity: Activity = "idle";
 let hearing = false;
 let transmitChain: Promise<void> = Promise.resolve();
@@ -203,9 +200,9 @@ function refreshAgent(): void {
     agentMode() === "auto" && !role
       ? "Picked when the conversation starts: whoever speaks first is the Probe, the other becomes the Target."
       : "";
-  if (session) {
-    chatChannel.textContent = `Channel ${session.preset.label} · you are ${session.conversation.deviceId}`;
-  }
+  chatChannel.textContent = session
+    ? `Channel ${session.preset.label} · you are ${session.conversation.deviceId}`
+    : `Channel ${getFrequencyPreset(channelSelect.value).label} · microphone off`;
   if (role) {
     roleBadge.hidden = false;
     roleBadge.textContent = PERSONAS[role].name.toUpperCase();
@@ -378,16 +375,20 @@ function render(): void {
   const validHidden = bytes > 0 && bytes <= MAX_MESSAGE_BYTES;
   const validSpoken = spokenInput.value.trim().length <= MAX_SPOKEN_CHARS;
 
+  const started = !!session;
+  // Before the mic is started, keep the action buttons live so the first click can start it.
+  const blockTurn = started && !myTurn;
+
   byteCount.textContent = `${bytes} / ${MAX_MESSAGE_BYTES}`;
   byteCount.classList.toggle("is-error", bytes > MAX_MESSAGE_BYTES);
-  spokenInput.disabled = !myTurn;
-  hiddenInput.disabled = !myTurn;
-  spokenInput.placeholder = myTurn ? "Say out loud (optional, spoken with the chosen voice)" : "Their turn";
-  sendButton.disabled = !myTurn || busy || !validHidden || !validSpoken;
-  agentButton.disabled = !myTurn || busy;
-  runDemoButton.disabled = !myTurn || busy;
+  spokenInput.disabled = blockTurn;
+  hiddenInput.disabled = blockTurn;
+  spokenInput.placeholder = blockTurn ? "Their turn" : "Say out loud (optional, spoken with the chosen voice)";
+  sendButton.disabled = joining || busy || blockTurn || !validHidden || !validSpoken;
+  agentButton.disabled = joining || busy || blockTurn;
+  runDemoButton.disabled = joining || busy || blockTurn;
   clearButton.disabled = busy || history.length === 0;
-  waitingBar.hidden = !conversation || myTurn;
+  waitingBar.hidden = !started || myTurn;
   resendButton.disabled = busy;
   autoCount.textContent = autoReplyInput.checked ? `${autoTurnsUsed}/${maxAutoTurns()}` : "";
 
@@ -401,7 +402,9 @@ function render(): void {
   };
   let label = labels[activity];
   let tone = busy ? "active" : myTurn ? "ready" : "waiting";
-  if (!busy && hearing) [label, tone] = ["Hearing a signal", "hearing"];
+  if (joining) [label, tone] = ["Starting microphone…", "active"];
+  else if (!started) [label, tone] = ["Ready — press Run demo", "ready"];
+  else if (!busy && hearing) [label, tone] = ["Hearing a signal", "hearing"];
   linkStatus.dataset.tone = tone;
   linkStatus.innerHTML = "<i></i> ";
   linkStatus.append(label);
@@ -521,9 +524,10 @@ async function sendTurn(spoken: string, hidden: string): Promise<boolean> {
 }
 
 async function sendManual(): Promise<void> {
-  if (!canAct() || sendButton.disabled) return;
   const spoken = spokenInput.value.trim();
   const hidden = hiddenInput.value.trim();
+  if (!hidden) return;
+  if (!(await ensureJoined()) || !canAct()) return;
   claimRole("probe");
   if (spoken && !ensureAi(true)) return;
   autoTurnsUsed = 0;
@@ -537,6 +541,7 @@ async function sendManual(): Promise<void> {
 }
 
 async function agentTurn(): Promise<void> {
+  if (!(await ensureJoined())) return;
   const active = session;
   if (!active || !canAct()) return;
   claimRole("probe");
@@ -651,13 +656,10 @@ function handleData(bytes: Uint8Array): void {
   }
 }
 
-async function join(): Promise<void> {
-  if (joining || session) return;
+async function startEngine(): Promise<boolean> {
   joining = true;
-  joinButton.disabled = true;
-  joinError.textContent = "";
+  render();
   const preset = getFrequencyPreset(channelSelect.value);
-
   try {
     const engine = await startAcousticEngine({
       preset,
@@ -675,16 +677,26 @@ async function join(): Promise<void> {
     transmitChain = Promise.resolve();
     agentRole = undefined;
     refreshAgent();
-    joinPanel.hidden = true;
-    chatPanel.hidden = false;
-    render();
+    return true;
   } catch (error) {
-    joinError.textContent = `Could not start the microphone: ${errorText(error, "permission denied")}`;
+    appendNotice(`Could not start the microphone: ${errorText(error, "permission denied")}`, "error");
+    return false;
   } finally {
     joining = false;
-    joinButton.disabled = false;
+    render();
   }
 }
+
+// The mic needs a user gesture, so the engine starts lazily; concurrent callers share one attempt.
+function join(): Promise<boolean> {
+  if (session) return Promise.resolve(true);
+  joinPromise ??= startEngine().finally(() => {
+    joinPromise = undefined;
+  });
+  return joinPromise;
+}
+
+const ensureJoined = (): Promise<boolean> => join();
 
 function clearConversationView(): void {
   history = [];
@@ -716,8 +728,8 @@ function clearConversation(): void {
   render();
 }
 
-function runDemo(): void {
-  if (!session || !canAct() || !ensureAi(true)) return;
+async function runDemo(): Promise<void> {
+  if (!(await ensureJoined()) || !canAct() || !ensureAi(true)) return;
   autoReplyInput.checked = true;
   autoTurnsUsed = 0;
   render();
@@ -733,8 +745,7 @@ async function leave(): Promise<void> {
   agentRole = undefined;
   clearConversationView();
   refreshAgent();
-  chatPanel.hidden = true;
-  joinPanel.hidden = false;
+  render();
   await active.engine.stop();
 }
 
@@ -757,8 +768,12 @@ function submitOnEnter(event: KeyboardEvent): void {
   }
 }
 
-channelSelect.addEventListener("change", updateChannelBand);
-joinButton.addEventListener("click", () => void join());
+channelSelect.addEventListener("change", () => {
+  updateChannelBand();
+  // Changing the channel mid-session needs the engine restarted on the new band.
+  if (session) void leave().then(join);
+  else refreshAgent();
+});
 leaveButton.addEventListener("click", () => void leave());
 settingsToggle.addEventListener("click", () => {
   settingsPanel.hidden = !settingsPanel.hidden;
@@ -812,8 +827,10 @@ agentButton.addEventListener("click", () => {
   autoTurnsUsed = 0;
   void agentTurn();
 });
-runDemoButton.addEventListener("click", runDemo);
+runDemoButton.addEventListener("click", () => void runDemo());
 clearButton.addEventListener("click", clearConversation);
+// Start listening as soon as the user interacts, so a receiver device just works after one click.
+document.addEventListener("pointerdown", () => void ensureJoined(), { once: true });
 autoReplyInput.addEventListener("change", () => {
   autoTurnsUsed = 0;
   render();
@@ -836,5 +853,6 @@ function showBuildInfo(): void {
 
 updateChannelBand();
 refreshAgent();
+render();
 showBuildInfo();
 void loadSetup();
