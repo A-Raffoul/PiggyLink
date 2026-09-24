@@ -65,6 +65,38 @@
         </div>
 
         <div id="settings-panel" class="settings" hidden>
+          <div class="field field-wide">
+            <label for="agent-brief">Agent brief</label>
+            <textarea id="agent-brief" rows="4" spellcheck="false"></textarea>
+            <small class="field-note">Who this device's agent is, what it talks about out loud, and its secret goal.</small>
+          </div>
+
+          <div class="field">
+            <label for="writer-select">Turn writer</label>
+            <select id="writer-select">
+              <option value="elevenlabs">ElevenLabs agent</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="voice-select">Voice</label>
+            <select id="voice-select">
+              <option value="">Enter the access code first</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="access-code">Access code</label>
+            <input id="access-code" type="password" autocomplete="off" spellcheck="false" />
+            <small id="setup-status" class="field-note">Needed for AI voices, transcription and agents.</small>
+          </div>
+
+          <div class="field">
+            <label for="max-auto-turns">Auto-reply limit</label>
+            <input id="max-auto-turns" type="number" min="1" max="50" step="1" value="6" />
+            <small class="field-note">Agent turns this device sends on its own before pausing.</small>
+          </div>
+
           <div class="field">
             <div class="label-row">
               <label for="cover-file">Cover audio</label>
@@ -74,7 +106,7 @@
               <span class="file-icon" aria-hidden="true">WAV</span>
               <span>
                 <strong id="file-label">Included example speech</strong>
-                <small id="file-description">8.8 seconds · looped when a message needs longer</small>
+                <small id="file-description">Used when a turn has nothing to say out loud</small>
               </span>
               <span class="file-action">Replace</span>
             </label>
@@ -95,31 +127,48 @@
 
         <ol id="thread" class="thread" aria-live="polite">
           <li id="thread-empty" class="thread-empty">
-            No messages yet. Whoever sends first starts the conversation, then you take turns.
+            No turns yet. Press Agent turn to let this device's agent start, or type one yourself. Devices take turns.
           </li>
         </ol>
 
         <form id="composer" class="composer">
           <div id="waiting-bar" class="waiting-bar" hidden>
             <span><i class="pulse" aria-hidden="true"></i> Waiting for their reply…</span>
-            <button id="resend-button" class="text-action" type="button">Resend last message</button>
+            <button id="resend-button" class="text-action" type="button">Resend last turn</button>
           </div>
-          <div class="composer-row">
-            <label for="message-input" class="visually-hidden">Message</label>
+          <div class="composer-fields">
+            <label for="spoken-input" class="visually-hidden">Say out loud</label>
             <textarea
-              id="message-input"
+              id="spoken-input"
               rows="1"
-              placeholder="Type a message"
+              placeholder="Say out loud (optional, spoken with the chosen voice)"
               spellcheck="false"
               autocomplete="off"
             ></textarea>
-            <button id="send-button" class="send-button" type="submit" aria-label="Send">
-              <span aria-hidden="true">↑</span>
-            </button>
+            <div class="hidden-row">
+              <label for="hidden-input" class="hidden-tag">Hidden</label>
+              <input
+                id="hidden-input"
+                type="text"
+                placeholder="Secret message, sent inaudibly"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <output id="byte-count" for="hidden-input">0 / 64</output>
+            </div>
           </div>
-          <div class="composer-meta">
-            <output id="byte-count" for="message-input">0 / 64 bytes</output>
-            <span>Enter to send · Shift+Enter for a new line</span>
+          <div class="composer-actions">
+            <label class="toggle">
+              <input id="auto-reply" type="checkbox" />
+              <span>Auto-reply</span>
+              <small id="auto-count"></small>
+            </label>
+            <div class="composer-buttons">
+              <button id="agent-button" class="ghost-action" type="button">Agent turn</button>
+              <button id="send-button" class="send-button" type="submit" aria-label="Send">
+                <span aria-hidden="true">↑</span>
+              </button>
+            </div>
           </div>
         </form>
       </section>

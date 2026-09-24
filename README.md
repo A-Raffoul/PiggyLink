@@ -5,8 +5,39 @@ mixes short private messages into speech audio using ggwave's ultrasonic FSK
 protocol and plays it aloud; the other device listens through its microphone
 and shows only messages that pass SottoLink's integrity check.
 
-No message relay or application backend is used. After the static app loads,
-the data path is acoustic only.
+Messages between devices never go over the network: the data path is acoustic
+only. Small server functions in `api/` are used only to call AI services
+(voice, transcription, and the agent that writes each turn).
+
+## Agent conversations
+
+Each turn has a spoken line and a hidden message (up to 64 bytes).
+
+1. The turn writer produces both from the device's agent brief and the
+   conversation so far: an ElevenLabs agent in text-only mode (default) or
+   Apertus via any OpenAI-compatible provider.
+2. ElevenLabs text-to-speech voices the spoken line (48 kHz PCM); the hidden
+   message is mixed in as near-ultrasound, ending with the speech.
+3. The receiver decodes the hidden message, then sends the last few seconds of
+   microphone audio to ElevenLabs speech-to-text (Scribe) for the spoken line.
+   The frame carries how long the speech ran, so the receiver knows how far
+   back to cut.
+4. With Auto-reply on at both ends, the agents keep talking up to the
+   Auto-reply limit.
+
+### Server settings
+
+Set these in Vercel → Project Settings → Environment Variables (and in
+`.env.local` for `npm run dev`, which serves `api/` locally):
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `ELEVENLABS_API_KEY` | yes | Voices, transcription and the default turn writer |
+| `SOTTO_ACCESS_CODE` | yes | Shared code entered in Settings; stops strangers spending your credits |
+| `APERTUS_API_KEY`, `APERTUS_BASE_URL`, `APERTUS_MODEL` | for Apertus | OpenAI-compatible endpoint (base URL ending in `/v1`) |
+| `ELEVENLABS_AGENT_LLM` | no | Model for a newly created agent (default `gemini-2.5-flash`) |
+| `ELEVENLABS_AGENT_ID` | no | Use a specific agent instead of the auto-created "SottoLink turn writer" |
+| `ELEVENLABS_TTS_MODEL`, `ELEVENLABS_STT_MODEL` | no | Defaults `eleven_multilingual_v2`, `scribe_v2` |
 
 ## How a conversation works
 
@@ -53,9 +84,12 @@ npm run build
 
 1. Deploy to Vercel and open the same URL in Chrome on both computers.
 2. On both, choose 15 kHz and click Join channel, allowing microphone access.
-3. Send a message from one computer with the devices about one metre apart.
-4. Reply from the other computer; the first sender's message turns "Delivered".
-5. If nothing arrives, raise signal strength in Settings toward -12 dB, then
+3. Open Settings on both, enter the access code, pick a voice (different per
+   device) and write each agent's brief.
+4. Tick Auto-reply on both, then press Agent turn on one computer.
+5. Or type turns by hand: a spoken line (optional) plus a hidden message.
+   Without a spoken line the included example clip is used as cover.
+6. If nothing arrives, raise signal strength in Settings toward -12 dB, then
    repeat at higher frequency presets to compare audibility and reliability.
 
 The target first milestone is at least 9 successful decodes out of 10 trials on

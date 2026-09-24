@@ -101,6 +101,36 @@ export function extendCover(
   });
 }
 
+export interface SpeechOverlay {
+  readonly delay: number;
+  readonly end: number;
+  readonly speechStart: number;
+}
+
+// Ends the carrier with the speech so playback can stop right after both.
+export function planSpeechOverlay(
+  channels: readonly Float32Array[],
+  carrierLength: number,
+  sampleRate: number,
+  minimumLeadSeconds: number,
+  tailSeconds: number,
+): SpeechOverlay {
+  const speechStart = findAudioOnset(channels, sampleRate);
+  const speechEnd = findAudioEnd(channels, sampleRate);
+  const earliest = speechStart + Math.round(minimumLeadSeconds * sampleRate);
+  const delay = Math.max(earliest, speechEnd - carrierLength);
+  return { delay, end: delay + carrierLength + Math.round(tailSeconds * sampleRate), speechStart };
+}
+
+export function padTo(channels: readonly Float32Array[], length: number): Float32Array[] {
+  return channels.map((channel) => {
+    if (channel.length >= length) return channel;
+    const padded = new Float32Array(length);
+    padded.set(channel);
+    return padded;
+  });
+}
+
 export function trimWithFade(
   channels: readonly Float32Array[],
   length: number,
@@ -128,7 +158,7 @@ export function mixCarrierIntoCover(
   delaySamples: number,
   relativeDecibels: number,
   sampleRate: number,
-  headroom = 0.98,
+  { headroom = 0.98, requireMasking = true }: { headroom?: number; requireMasking?: boolean } = {},
 ): MixResult {
   const firstChannel = coverChannels[0];
   if (!firstChannel || coverChannels.length === 0) throw new Error("Cover audio has no channels.");
@@ -151,7 +181,7 @@ export function mixCarrierIntoCover(
   const conservativeQuietLimit = Math.max(1, maximumQuietSamples - analysisHopSamples);
   const maskingThreshold = coverRms * 0.05;
   let quietCoverageStart = -1;
-  for (let offset = 0; offset < carrier.length; offset += analysisHopSamples) {
+  for (let offset = 0; requireMasking && offset < carrier.length; offset += analysisHopSamples) {
     const frameLength = Math.min(analysisFrameSamples, carrier.length - offset);
     const frameRms = rmsOfRange(coverChannels, delaySamples + offset, frameLength);
     if (frameRms < maskingThreshold) {

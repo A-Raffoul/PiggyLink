@@ -34,9 +34,13 @@ export class Conversation {
     return this.turnState === "theirs" ? this.lastSent : undefined;
   }
 
-  send(text: string): OutgoingMessage {
+  get upcomingSequence(): number {
+    return this.nextSequence;
+  }
+
+  send(text: string, speechLead = 0): OutgoingMessage {
     if (this.turnState !== "mine") throw new Error("Wait for a reply before sending again.");
-    const frame = { senderId: this.deviceId, sequence: this.nextSequence, text };
+    const frame = { senderId: this.deviceId, sequence: this.nextSequence, speechLead, text };
     const message = { frame, wire: encodeFrame(frame), inReplyTo: this.lastAcceptedKey };
     this.nextSequence = (this.nextSequence + 1) % SEQUENCE_MODULO;
     this.lastSent = message;

@@ -1,13 +1,16 @@
 import type { FrequencyPreset } from "../core/config";
 import { createUltrasoundDecoder } from "../modem/ggwave";
 import { ChannelSense } from "./channel";
+import { AudioRing } from "./pcm";
 import { renderSpectrum } from "./spectrum";
 
 const MAX_WAIT_FOR_CLEAR_MS = 10_000;
+const RECORDING_SECONDS = 45;
 
 export interface AcousticEngine {
   readonly sampleRate: number;
   decodeAudio(bytes: ArrayBuffer): Promise<AudioBuffer>;
+  recentAudio(seconds: number): Float32Array;
   play(channels: readonly Float32Array[]): Promise<void>;
   waitForClearChannel(isCancelled: () => boolean): Promise<void>;
   stop(): Promise<void>;
@@ -71,6 +74,7 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
   let busy = false;
   let playing: AudioBufferSourceNode | undefined;
   let closed = false;
+  const recording = new AudioRing(Math.round(RECORDING_SECONDS * audioContext.sampleRate));
 
   const senseChannel = (): void => {
     bandAnalyser.getFloatFrequencyData(bins);
@@ -87,7 +91,9 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
   processor.onaudioprocess = (event): void => {
     if (closed) return;
     senseChannel();
-    const decoded = decoder.decode(new Float32Array(event.inputBuffer.getChannelData(0)));
+    const samples = new Float32Array(event.inputBuffer.getChannelData(0));
+    recording.push(samples);
+    const decoded = decoder.decode(samples);
     if (decoded) options.onData(decoded);
   };
 
@@ -98,6 +104,10 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
 
     decodeAudio(bytes) {
       return audioContext.decodeAudioData(bytes.slice(0));
+    },
+
+    recentAudio(seconds) {
+      return recording.latest(Math.round(seconds * audioContext.sampleRate));
     },
 
     play(channels) {

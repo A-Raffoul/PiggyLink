@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { decibelsToGain, extendCover, findAudioEnd, findAudioOnset, mixCarrierIntoCover, trimWithFade } from "./mix";
+import {
+  decibelsToGain,
+  extendCover,
+  findAudioEnd,
+  findAudioOnset,
+  mixCarrierIntoCover,
+  padTo,
+  planSpeechOverlay,
+  trimWithFade,
+} from "./mix";
 
 describe("audio onset detection", () => {
   it("locates the first non-silent 20 ms frame", () => {
@@ -12,6 +21,30 @@ describe("audio onset detection", () => {
     const samples = new Float32Array(4_800);
     samples.fill(0.4, 0, 1_920);
     expect(findAudioEnd([samples], 48_000)).toBe(1_920);
+  });
+});
+
+describe("speech overlay planning", () => {
+  const sampleRate = 1_000;
+  const speech = (start: number, end: number, length: number): Float32Array => {
+    const channel = new Float32Array(length);
+    channel.fill(0.5, start, end);
+    return channel;
+  };
+
+  it("ends the carrier together with long speech", () => {
+    const plan = planSpeechOverlay([speech(100, 5_000, 5_500)], 2_000, sampleRate, 0.25, 0.2);
+    expect(plan).toEqual({ speechStart: 100, delay: 3_000, end: 5_200 });
+  });
+
+  it("starts the carrier shortly after onset when speech is shorter than the carrier", () => {
+    const plan = planSpeechOverlay([speech(100, 1_000, 1_200)], 2_000, sampleRate, 0.25, 0.2);
+    expect(plan).toEqual({ speechStart: 100, delay: 350, end: 2_550 });
+  });
+
+  it("pads short audio with silence", () => {
+    const [padded] = padTo([new Float32Array([1, 2])], 4);
+    expect([...(padded ?? [])]).toEqual([1, 2, 0, 0]);
   });
 });
 
@@ -81,6 +114,14 @@ describe("audio mixing", () => {
     expect(() =>
       mixCarrierIntoCover([cover], new Float32Array([1, 1, 1, 1, 1]), 1, -20, 10),
     ).toThrow("sustained quiet gap");
+  });
+
+  it("can skip the quiet-gap check for natural speech with pauses", () => {
+    const cover = new Float32Array([0.5, 0.5, 0, 0, 0, 0.5]);
+    const mixed = mixCarrierIntoCover([cover], new Float32Array([1, 1, 1, 1, 1]), 1, -20, 10, {
+      requireMasking: false,
+    });
+    expect(mixed.channels[0]).toHaveLength(6);
   });
 
   it("rejects a 250 ms quiet gap that is not aligned to analysis frames", () => {
