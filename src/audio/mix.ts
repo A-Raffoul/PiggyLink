@@ -49,6 +49,58 @@ export function findAudioOnset(
   return 0;
 }
 
+export function findAudioEnd(
+  channels: readonly Float32Array[],
+  sampleRate: number,
+  thresholdRatio = 0.08,
+): number {
+  const reversed = channels.map((channel) => channel.slice().reverse());
+  const firstChannel = channels[0];
+  if (!firstChannel) throw new Error("Cover audio has no channels.");
+  return firstChannel.length - findAudioOnset(reversed, sampleRate, thresholdRatio);
+}
+
+// Repeats the spoken part of the cover (crossfaded) until at least `minimumLength` samples exist.
+export function extendCover(
+  channels: readonly Float32Array[],
+  minimumLength: number,
+  sampleRate: number,
+): Float32Array[] {
+  const firstChannel = channels[0];
+  if (!firstChannel) throw new Error("Cover audio has no channels.");
+  if (firstChannel.length >= minimumLength) return channels.map((channel) => channel);
+
+  const start = findAudioOnset(channels, sampleRate);
+  const end = findAudioEnd(channels, sampleRate);
+  const fade = Math.round(sampleRate * 0.03);
+  const loopLength = end - start;
+  if (loopLength <= fade * 2) throw new Error("Cover audio is too short to loop.");
+
+  const repeats = Math.ceil((minimumLength - end) / (loopLength - fade));
+  const outputLength = end + repeats * (loopLength - fade);
+
+  return channels.map((channel) => {
+    const output = new Float32Array(outputLength);
+    output.set(channel.subarray(0, end));
+    let writeEnd = end;
+    for (let repeat = 0; repeat < repeats; repeat += 1) {
+      const writeStart = writeEnd - fade;
+      for (let index = 0; index < loopLength; index += 1) {
+        const sample = channel[start + index] ?? 0;
+        const target = writeStart + index;
+        if (index < fade) {
+          const weight = index / fade;
+          output[target] = (output[target] ?? 0) * (1 - weight) + sample * weight;
+        } else {
+          output[target] = sample;
+        }
+      }
+      writeEnd = writeStart + loopLength;
+    }
+    return output;
+  });
+}
+
 export function decibelsToGain(decibels: number): number {
   return 10 ** (decibels / 20);
 }

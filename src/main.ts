@@ -1,7 +1,7 @@
 import "./styles.css";
 import { inject } from "@vercel/analytics";
-import { startAcousticReceiver, type AcousticReceiver, type CaptureSettings } from "./audio/capture";
-import { findAudioOnset, mixCarrierIntoCover } from "./audio/mix";
+import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
+import { extendCover, findAudioOnset, mixCarrierIntoCover } from "./audio/mix";
 import {
   FREQUENCY_PRESETS,
   MAX_MESSAGE_BYTES,
@@ -9,9 +9,11 @@ import {
   formatKhz,
   getFrequencyPreset,
   utf8ByteLength,
+  type FrequencyPreset,
 } from "./core/config";
+import { Conversation, type OutgoingMessage } from "./core/conversation";
 import { loadCoverAudio } from "./core/cover";
-import { decodePrivateFrame, encodePrivateFrame } from "./core/frame";
+import { createDeviceId, decodeFrame } from "./core/frame";
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
 
@@ -23,277 +25,316 @@ function element<T extends HTMLElement>(id: string): T {
   return found as T;
 }
 
-const senderTab = element<HTMLButtonElement>("sender-tab");
-const receiverTab = element<HTMLButtonElement>("receiver-tab");
-const senderPanel = element<HTMLElement>("sender-panel");
-const receiverPanel = element<HTMLElement>("receiver-panel");
+const joinPanel = element<HTMLElement>("join-panel");
+const channelSelect = element<HTMLSelectElement>("channel-select");
+const channelBand = element<HTMLElement>("channel-band");
+const joinButton = element<HTMLButtonElement>("join-button");
+const joinError = element<HTMLElement>("join-error");
+const chatPanel = element<HTMLElement>("chat-panel");
+const linkStatus = element<HTMLElement>("link-status");
+const chatChannel = element<HTMLElement>("chat-channel");
+const settingsToggle = element<HTMLButtonElement>("settings-toggle");
+const settingsPanel = element<HTMLElement>("settings-panel");
+const leaveButton = element<HTMLButtonElement>("leave-button");
 const coverInput = element<HTMLInputElement>("cover-file");
 const fileLabel = element<HTMLElement>("file-label");
 const fileDescription = element<HTMLElement>("file-description");
 const useExampleButton = element<HTMLButtonElement>("use-example");
-const privateMessage = element<HTMLTextAreaElement>("private-message");
-const byteCount = element<HTMLOutputElement>("byte-count");
-const messageError = element<HTMLElement>("message-error");
-const senderFrequency = element<HTMLSelectElement>("sender-frequency");
-const receiverFrequency = element<HTMLSelectElement>("receiver-frequency");
-const senderBand = element<HTMLElement>("sender-band");
-const receiverBand = element<HTMLElement>("receiver-band");
 const signalStrength = element<HTMLInputElement>("signal-strength");
 const strengthOutput = element<HTMLOutputElement>("strength-output");
-const transmitButton = element<HTMLButtonElement>("transmit-button");
-const senderStatus = element<HTMLElement>("sender-status");
-const listenButton = element<HTMLButtonElement>("listen-button");
-const stopButton = element<HTMLButtonElement>("stop-button");
-const receiverRoleStatus = element<HTMLElement>("receiver-role-status");
-const captureTitle = element<HTMLElement>("capture-title");
-const captureDescription = element<HTMLElement>("capture-description");
-const captureSettings = element<HTMLElement>("capture-settings");
-const frameCount = element<HTMLElement>("frame-count");
 const spectrumCanvas = element<HTMLCanvasElement>("spectrum");
-const receivedMessage = element<HTMLElement>("received-message");
-const receivedMeta = element<HTMLElement>("received-meta");
+const thread = element<HTMLOListElement>("thread");
+const threadEmpty = element<HTMLElement>("thread-empty");
+const composer = element<HTMLFormElement>("composer");
+const waitingBar = element<HTMLElement>("waiting-bar");
+const resendButton = element<HTMLButtonElement>("resend-button");
+const messageInput = element<HTMLTextAreaElement>("message-input");
+const sendButton = element<HTMLButtonElement>("send-button");
+const byteCount = element<HTMLOutputElement>("byte-count");
 
-let receiver: AcousticReceiver | undefined;
-let receiverStartGeneration = 0;
-let senderContext: AudioContext | undefined;
-let playingSource: AudioBufferSourceNode | undefined;
+type Activity = "idle" | "preparing" | "queued" | "transmitting";
 
-function frequencyOptionMarkup(select: HTMLSelectElement): void {
-  for (const preset of FREQUENCY_PRESETS) {
-    const option = document.createElement("option");
-    option.value = preset.id;
-    option.textContent = `${preset.label} · ${formatKhz(preset.actualHz)}–${formatKhz(preset.endHz)}`;
-    select.append(option);
-  }
+interface Session {
+  readonly engine: AcousticEngine;
+  readonly conversation: Conversation;
+  readonly preset: FrequencyPreset;
 }
 
-frequencyOptionMarkup(senderFrequency);
-frequencyOptionMarkup(receiverFrequency);
+let session: Session | undefined;
+let joining = false;
+let activity: Activity = "idle";
+let hearing = false;
+let transmitChain: Promise<void> = Promise.resolve();
+let cachedCover: { file: File | undefined; buffer: AudioBuffer } | undefined;
+const outgoingStatus = new Map<number, HTMLElement>();
 
-function updateBandLabels(): void {
-  const senderPreset = getFrequencyPreset(senderFrequency.value);
-  const receiverPreset = getFrequencyPreset(receiverFrequency.value);
-  senderBand.textContent = `Actual ggwave band: ${formatKhz(senderPreset.actualHz)}–${formatKhz(senderPreset.endHz)}`;
-  receiverBand.textContent = `Listening at ${formatKhz(receiverPreset.actualHz)}–${formatKhz(receiverPreset.endHz)}`;
+for (const preset of FREQUENCY_PRESETS) {
+  const option = document.createElement("option");
+  option.value = preset.id;
+  option.textContent = `${preset.label} · ${formatKhz(preset.actualHz)}–${formatKhz(preset.endHz)}`;
+  channelSelect.append(option);
 }
 
-function updateMessageCount(): boolean {
-  const count = utf8ByteLength(privateMessage.value);
-  const valid = count > 0 && count <= MAX_MESSAGE_BYTES;
-  byteCount.textContent = `${count} / ${MAX_MESSAGE_BYTES} bytes`;
-  byteCount.classList.toggle("is-error", count > MAX_MESSAGE_BYTES);
-  messageError.textContent = count > MAX_MESSAGE_BYTES ? "Message exceeds the 32-byte UTF-8 limit." : "";
-  return valid;
+function updateChannelBand(): void {
+  const preset = getFrequencyPreset(channelSelect.value);
+  channelBand.textContent = `ggwave band ${formatKhz(preset.actualHz)}–${formatKhz(preset.endHz)}`;
 }
 
-function setSenderStatus(message: string, state: "normal" | "error" | "success" = "normal"): void {
-  senderStatus.textContent = message;
-  senderStatus.dataset.state = state;
+function timeNow(): string {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function modeFromHash(): "sender" | "receiver" {
-  return window.location.hash === "#receiver" ? "receiver" : "sender";
+function scrollThreadToEnd(): void {
+  thread.scrollTo({ top: thread.scrollHeight, behavior: "smooth" });
 }
 
-async function setMode(mode: "sender" | "receiver"): Promise<void> {
-  const showSender = mode === "sender";
-  senderPanel.hidden = !showSender;
-  receiverPanel.hidden = showSender;
-  senderTab.classList.toggle("is-active", showSender);
-  receiverTab.classList.toggle("is-active", !showSender);
-  senderTab.setAttribute("aria-selected", String(showSender));
-  receiverTab.setAttribute("aria-selected", String(!showSender));
-  if (showSender && receiver) await stopListening();
+function appendBubble(text: string, from: "me" | "them", meta: string): HTMLElement {
+  threadEmpty.hidden = true;
+  const item = document.createElement("li");
+  item.className = `bubble bubble-${from}`;
+  const body = document.createElement("p");
+  body.textContent = text;
+  const status = document.createElement("small");
+  status.textContent = meta;
+  item.append(body, status);
+  thread.append(item);
+  scrollThreadToEnd();
+  return status;
 }
 
-senderTab.addEventListener("click", () => {
-  window.location.hash = "sender";
-});
-receiverTab.addEventListener("click", () => {
-  window.location.hash = "receiver";
-});
-window.addEventListener("hashchange", () => void setMode(modeFromHash()));
+function appendNotice(text: string): void {
+  threadEmpty.hidden = true;
+  const item = document.createElement("li");
+  item.className = "thread-notice";
+  item.textContent = text;
+  thread.append(item);
+  scrollThreadToEnd();
+}
 
-coverInput.addEventListener("change", () => {
+function setBubbleStatus(message: OutgoingMessage, text: string, state?: "error" | "done"): void {
+  const status = outgoingStatus.get(message.frame.sequence);
+  if (!status) return;
+  status.textContent = text;
+  if (state) status.dataset.state = state;
+  else delete status.dataset.state;
+}
+
+function render(): void {
+  const conversation = session?.conversation;
+  const myTurn = conversation?.turn === "mine";
+  const busyTransmitting = activity !== "idle";
+  const bytes = utf8ByteLength(messageInput.value);
+  const validLength = bytes > 0 && bytes <= MAX_MESSAGE_BYTES;
+
+  byteCount.textContent = `${bytes} / ${MAX_MESSAGE_BYTES} bytes`;
+  byteCount.classList.toggle("is-error", bytes > MAX_MESSAGE_BYTES);
+  messageInput.disabled = !myTurn;
+  messageInput.placeholder = myTurn ? "Type a message" : "Their turn — wait for a reply";
+  sendButton.disabled = !myTurn || busyTransmitting || !validLength;
+  waitingBar.hidden = !conversation || myTurn;
+  resendButton.disabled = busyTransmitting;
+
+  let label = myTurn ? "Your turn" : "Their turn";
+  let tone = myTurn ? "ready" : "waiting";
+  if (activity === "preparing") [label, tone] = ["Preparing audio", "active"];
+  else if (activity === "queued") [label, tone] = ["Waiting for a clear channel", "active"];
+  else if (activity === "transmitting") [label, tone] = ["Transmitting", "active"];
+  else if (hearing) [label, tone] = ["Hearing a signal", "hearing"];
+  linkStatus.dataset.tone = tone;
+  linkStatus.innerHTML = "<i></i> ";
+  linkStatus.append(label);
+}
+
+async function coverFor(engine: AcousticEngine): Promise<AudioBuffer> {
   const file = coverInput.files?.[0];
-  if (file) {
-    fileLabel.textContent = file.name;
-    fileDescription.textContent = "Custom lossless WAV · selected for this session";
-    useExampleButton.hidden = false;
-    setSenderStatus("Custom WAV selected. Ready when the message is valid.");
-  } else {
-    showExampleCover();
+  if (cachedCover && cachedCover.file === file) return cachedCover.buffer;
+  const bytes = await loadCoverAudio(file);
+  if (!isWavFile(bytes)) throw new Error("The cover file is not a valid RIFF/WAVE file.");
+  const buffer = await engine.decodeAudio(bytes);
+  cachedCover = { file, buffer };
+  return buffer;
+}
+
+async function buildTransmission(active: Session, wire: string): Promise<Float32Array[]> {
+  const { engine, preset } = active;
+  const cover = await coverFor(engine);
+  const channels = Array.from({ length: cover.numberOfChannels }, (_, index) => cover.getChannelData(index));
+  const carrier = await encodeUltrasound(wire, preset, engine.sampleRate);
+  const delay = findAudioOnset(channels, engine.sampleRate) + Math.round(OVERLAY_DELAY_SECONDS * engine.sampleRate);
+  const extended = extendCover(channels, delay + carrier.length, engine.sampleRate);
+  return mixCarrierIntoCover(extended, carrier, delay, Number(signalStrength.value), engine.sampleRate).channels;
+}
+
+function transmit(message: OutgoingMessage): Promise<void> {
+  const active = session;
+  const run = async (): Promise<void> => {
+    if (session !== active || !active) return;
+    const stillActive = (): boolean => session === active;
+    try {
+      activity = "preparing";
+      render();
+      const audio = await buildTransmission(active, message.wire);
+      if (!stillActive()) return;
+
+      activity = "queued";
+      setBubbleStatus(message, "Waiting for a clear channel…");
+      render();
+      await active.engine.waitForClearChannel(() => !stillActive());
+      if (!stillActive()) return;
+
+      activity = "transmitting";
+      setBubbleStatus(message, "Transmitting…");
+      render();
+      await active.engine.play(audio);
+      if (!stillActive()) return;
+      if (active.conversation.pending === message) setBubbleStatus(message, `Sent ${timeNow()} · awaiting reply`);
+    } catch (error) {
+      if (!stillActive()) return;
+      setBubbleStatus(message, error instanceof Error ? error.message : "Transmission failed.", "error");
+    } finally {
+      if (stillActive()) {
+        activity = "idle";
+        render();
+      }
+    }
+  };
+  transmitChain = transmitChain.then(run);
+  return transmitChain;
+}
+
+function send(): void {
+  if (!session || sendButton.disabled) return;
+  const text = messageInput.value;
+  const message = session.conversation.send(text);
+  outgoingStatus.set(message.frame.sequence, appendBubble(text, "me", "Preparing…"));
+  messageInput.value = "";
+  resizeInput();
+  render();
+  void transmit(message);
+}
+
+function resend(): void {
+  const message = session?.conversation.pending;
+  if (!message || activity !== "idle") return;
+  setBubbleStatus(message, "Resending…");
+  void transmit(message);
+}
+
+function handleData(bytes: Uint8Array): void {
+  const active = session;
+  if (!active) return;
+  const frame = decodeFrame(bytes);
+  if (!frame) return;
+
+  const outcome = active.conversation.receive(frame);
+  if (outcome.kind === "message") {
+    if (outcome.acknowledges) setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done");
+    appendBubble(frame.text, "them", `${timeNow()} · verified`);
+    render();
+    messageInput.focus();
+  } else if (outcome.kind === "resend-reply") {
+    appendNotice("They missed your last reply — sending it again.");
+    setBubbleStatus(outcome.message, "Resending…");
+    void transmit(outcome.message);
   }
-});
+}
+
+async function join(): Promise<void> {
+  if (joining || session) return;
+  joining = true;
+  joinButton.disabled = true;
+  joinError.textContent = "";
+  const preset = getFrequencyPreset(channelSelect.value);
+
+  try {
+    const engine = await startAcousticEngine({
+      preset,
+      canvas: spectrumCanvas,
+      onData: handleData,
+      onBusyChange(busy) {
+        hearing = busy;
+        render();
+      },
+    });
+    const conversation = new Conversation(createDeviceId());
+    session = { engine, conversation, preset };
+    cachedCover = undefined;
+    activity = "idle";
+    transmitChain = Promise.resolve();
+    chatChannel.textContent = `Channel ${preset.label} · you are ${conversation.deviceId}`;
+    joinPanel.hidden = true;
+    chatPanel.hidden = false;
+    render();
+    messageInput.focus();
+  } catch (error) {
+    joinError.textContent =
+      error instanceof Error ? `Could not start the microphone: ${error.message}` : "Could not start the microphone.";
+  } finally {
+    joining = false;
+    joinButton.disabled = false;
+  }
+}
+
+async function leave(): Promise<void> {
+  const active = session;
+  if (!active) return;
+  session = undefined;
+  activity = "idle";
+  hearing = false;
+  outgoingStatus.clear();
+  for (const item of [...thread.children]) if (item !== threadEmpty) item.remove();
+  threadEmpty.hidden = false;
+  messageInput.value = "";
+  chatPanel.hidden = true;
+  joinPanel.hidden = false;
+  await active.engine.stop();
+}
+
+function resizeInput(): void {
+  messageInput.style.height = "auto";
+  messageInput.style.height = `${Math.min(messageInput.scrollHeight, 140)}px`;
+}
 
 function showExampleCover(): void {
   coverInput.value = "";
   fileLabel.textContent = "Included example speech";
-  fileDescription.textContent = "8.8 seconds · 48 kHz mono · ready to transmit";
+  fileDescription.textContent = "8.8 seconds · looped when a message needs longer";
   useExampleButton.hidden = true;
-  setSenderStatus("Included example ready. Enter a private message.");
 }
 
+channelSelect.addEventListener("change", updateChannelBand);
+joinButton.addEventListener("click", () => void join());
+leaveButton.addEventListener("click", () => void leave());
+settingsToggle.addEventListener("click", () => {
+  settingsPanel.hidden = !settingsPanel.hidden;
+  settingsToggle.setAttribute("aria-expanded", String(!settingsPanel.hidden));
+});
+coverInput.addEventListener("change", () => {
+  const file = coverInput.files?.[0];
+  if (!file) return showExampleCover();
+  fileLabel.textContent = file.name;
+  fileDescription.textContent = "Custom WAV · looped when a message needs longer";
+  useExampleButton.hidden = false;
+});
 useExampleButton.addEventListener("click", showExampleCover);
-privateMessage.addEventListener("input", updateMessageCount);
-senderFrequency.addEventListener("change", updateBandLabels);
-receiverFrequency.addEventListener("change", updateBandLabels);
 signalStrength.addEventListener("input", () => {
   strengthOutput.textContent = `−${Math.abs(Number(signalStrength.value))} dB`;
 });
-
-function getSenderContext(): AudioContext {
-  senderContext ??= new AudioContext({ sampleRate: 48_000 });
-  return senderContext;
-}
-
-async function transmit(): Promise<void> {
-  const file = coverInput.files?.[0];
-  if (!updateMessageCount()) {
-    setSenderStatus("Enter a private message between 1 and 32 UTF-8 bytes.", "error");
-    return;
-  }
-
-  transmitButton.disabled = true;
-  setSenderStatus("Preparing the ggwave signal…");
-
-  try {
-    const fileBytes = await loadCoverAudio(file);
-    if (!isWavFile(fileBytes)) throw new Error("The selected file is not a valid RIFF/WAVE file.");
-
-    const audioContext = getSenderContext();
-    await audioContext.resume();
-    const cover = await audioContext.decodeAudioData(fileBytes.slice(0));
-    const preset = getFrequencyPreset(senderFrequency.value);
-    const framedMessage = encodePrivateFrame(privateMessage.value);
-    const carrier = await encodeUltrasound(framedMessage, preset, audioContext.sampleRate);
-    const channels = Array.from({ length: cover.numberOfChannels }, (_, index) => cover.getChannelData(index));
-    const speechOnset = findAudioOnset(channels, audioContext.sampleRate);
-    const delaySamples = speechOnset + Math.round(OVERLAY_DELAY_SECONDS * audioContext.sampleRate);
-    const requiredSeconds = (delaySamples + carrier.length) / audioContext.sampleRate;
-
-    if (cover.length < delaySamples + carrier.length) {
-      throw new Error(
-        `This WAV is ${cover.duration.toFixed(1)} s; the encoded message needs at least ${requiredSeconds.toFixed(1)} s.`,
-      );
-    }
-
-    const mixed = mixCarrierIntoCover(
-      channels,
-      carrier,
-      delaySamples,
-      Number(signalStrength.value),
-      audioContext.sampleRate,
-    );
-    const output = audioContext.createBuffer(
-      mixed.channels.length,
-      mixed.channels[0]?.length ?? 0,
-      audioContext.sampleRate,
-    );
-    mixed.channels.forEach((channel, index) => output.getChannelData(index).set(channel));
-
-    playingSource?.stop();
-    const source = audioContext.createBufferSource();
-    playingSource = source;
-    source.buffer = output;
-    source.connect(audioContext.destination);
-    source.onended = () => {
-      if (playingSource !== source) return;
-      playingSource = undefined;
-      transmitButton.disabled = false;
-      setSenderStatus(`Transmission complete · ${preset.label} · ${signalStrength.value} dB`, "success");
-    };
-    source.start();
-    setSenderStatus(`Transmitting ${framedMessage.length} modem bytes inside ${cover.duration.toFixed(1)} s of speech…`);
-  } catch (error) {
-    transmitButton.disabled = false;
-    setSenderStatus(error instanceof Error ? error.message : "Transmission failed.", "error");
-  }
-}
-
-function showCaptureSettings(settings: CaptureSettings): void {
-  const values = [
-    `${settings.sampleRate.toLocaleString()} Hz`,
-    settings.echoCancellation === undefined ? "Not reported" : settings.echoCancellation ? "On" : "Off",
-    settings.noiseSuppression === undefined ? "Not reported" : settings.noiseSuppression ? "On" : "Off",
-    settings.autoGainControl === undefined ? "Not reported" : settings.autoGainControl ? "On" : "Off",
-  ];
-  const outputs = captureSettings.querySelectorAll("dd");
-  outputs.forEach((output, index) => {
-    output.textContent = values[index] ?? "—";
-  });
-}
-
-function setReceiverActive(active: boolean): void {
-  listenButton.hidden = active;
-  stopButton.hidden = !active;
-  receiverFrequency.disabled = active;
-  receiverRoleStatus.classList.toggle("is-listening", active);
-  receiverRoleStatus.innerHTML = `<i></i> ${active ? "Listening" : "Idle"}`;
-  captureTitle.textContent = active ? "Microphone is listening" : "Microphone is off";
-  captureDescription.textContent = active
-    ? "Keep this page visible and play the sender audio nearby."
-    : "Choose the matching frequency, then start listening.";
-}
-
-async function startListening(): Promise<void> {
-  const startGeneration = ++receiverStartGeneration;
-  listenButton.disabled = true;
-  receivedMessage.textContent = "Waiting for a valid transmission…";
-  receivedMeta.textContent = "Only integrity-checked messages appear here.";
-  frameCount.textContent = "0 frames";
-
-  try {
-    const preset = getFrequencyPreset(receiverFrequency.value);
-    const startedReceiver = await startAcousticReceiver({
-      preset,
-      canvas: spectrumCanvas,
-      onData(data) {
-        const rawFrame = new TextDecoder().decode(data);
-        const message = decodePrivateFrame(rawFrame);
-        if (message === null) {
-          receivedMeta.textContent = "A modem payload was rejected by the SottoLink integrity check.";
-          return;
-        }
-        receivedMessage.textContent = message;
-        receivedMeta.textContent = `Verified · ${utf8ByteLength(message)} bytes · ${preset.label}`;
-      },
-      onFrame(count) {
-        frameCount.textContent = `${count.toLocaleString()} frames`;
-      },
-      onSettings: showCaptureSettings,
-    });
-    if (startGeneration !== receiverStartGeneration || modeFromHash() !== "receiver") {
-      await startedReceiver.stop();
-      return;
-    }
-    receiver = startedReceiver;
-    setReceiverActive(true);
-  } catch (error) {
-    if (startGeneration !== receiverStartGeneration) return;
-    receivedMessage.textContent = "Could not start the microphone.";
-    receivedMeta.textContent = error instanceof Error ? error.message : "Microphone access failed.";
-  } finally {
-    if (startGeneration === receiverStartGeneration) listenButton.disabled = false;
-  }
-}
-
-async function stopListening(): Promise<void> {
-  receiverStartGeneration += 1;
-  const activeReceiver = receiver;
-  receiver = undefined;
-  await activeReceiver?.stop();
-  setReceiverActive(false);
-}
-
-transmitButton.addEventListener("click", () => void transmit());
-listenButton.addEventListener("click", () => void startListening());
-stopButton.addEventListener("click", () => void stopListening());
-window.addEventListener("pagehide", () => {
-  playingSource?.stop();
-  void stopListening();
+messageInput.addEventListener("input", () => {
+  resizeInput();
+  render();
 });
+messageInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    send();
+  }
+});
+composer.addEventListener("submit", (event) => {
+  event.preventDefault();
+  send();
+});
+resendButton.addEventListener("click", resend);
+window.addEventListener("pagehide", () => void leave());
 
-updateBandLabels();
-updateMessageCount();
-void setMode(modeFromHash());
+updateChannelBand();

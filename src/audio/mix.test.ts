@@ -1,11 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { decibelsToGain, findAudioOnset, mixCarrierIntoCover } from "./mix";
+import { decibelsToGain, extendCover, findAudioEnd, findAudioOnset, mixCarrierIntoCover } from "./mix";
 
 describe("audio onset detection", () => {
   it("locates the first non-silent 20 ms frame", () => {
     const samples = new Float32Array(4_800);
     samples.fill(0.4, 1_920);
     expect(findAudioOnset([samples], 48_000)).toBe(1_920);
+  });
+
+  it("locates the end of the last non-silent 20 ms frame", () => {
+    const samples = new Float32Array(4_800);
+    samples.fill(0.4, 0, 1_920);
+    expect(findAudioEnd([samples], 48_000)).toBe(1_920);
+  });
+});
+
+describe("cover extension", () => {
+  it("returns the cover unchanged when it is already long enough", () => {
+    const cover = new Float32Array(100).fill(0.5);
+    expect(extendCover([cover], 100, 1_000)[0]).toBe(cover);
+  });
+
+  it("loops the spoken part, skipping leading and trailing silence", () => {
+    const sampleRate = 1_000;
+    const cover = new Float32Array(1_000);
+    cover.fill(0.5, 100, 600);
+    const [extended] = extendCover([cover], 2_000, sampleRate);
+
+    expect(extended?.length).toBeGreaterThanOrEqual(2_000);
+    expect(extended?.subarray(0, 600)).toEqual(cover.subarray(0, 600));
+    // No long silence where the original trailing silence would have been.
+    expect(Math.min(...(extended?.subarray(600, 2_000) ?? []))).toBeGreaterThan(0.2);
   });
 });
 

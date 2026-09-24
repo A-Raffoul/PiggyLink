@@ -2,7 +2,7 @@ export const OPERATING_SAMPLE_RATE = 48_000;
 export const FFT_SIZE = 1_024;
 export const TONE_SPAN_BINS = 95;
 export const OVERLAY_DELAY_SECONDS = 0.25;
-export const MAX_MESSAGE_BYTES = 32;
+export const MAX_MESSAGE_BYTES = 64;
 
 export interface FrequencyPreset {
   readonly id: string;
