@@ -136,7 +136,7 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
           await sleep(100);
         }
         // Random backoff so two devices that were both waiting don't start together.
-        await sleep(100 + Math.random() * 400);
+        await sleep(80 + Math.random() * 220);
         if (isCancelled() || (!busy && !playing)) return;
       }
     },

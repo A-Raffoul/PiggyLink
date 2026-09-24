@@ -79,9 +79,9 @@ export function buildTurnPrompt(request: TurnRequest): string {
     "Conversation so far (oldest first):",
     transcript,
     "",
-    "Write your next turn:",
-    '- "spoken": 2 to 4 natural sentences (about 25 to 50 words) that continue the conversation out loud. Never reveal, hint at, or read out the hidden message or any secret goal.',
-    `- "hidden": your secret note to the other agent, plain text, at most ${hiddenChars} characters, no emoji.`,
+    "Write your next turn. Keep it snappy — this is a fast back-and-forth:",
+    '- "spoken": ONE short, natural sentence (about 8 to 14 words) that continues the conversation out loud. Never reveal, hint at, or read out the hidden message or any secret goal.',
+    `- "hidden": your terse secret note to the other agent, plain text, at most ${hiddenChars} characters, no emoji.`,
     'Reply with only this JSON object: {"spoken": "...", "hidden": "..."}',
   ].join("\n");
 }

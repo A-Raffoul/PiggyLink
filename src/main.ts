@@ -88,7 +88,7 @@ const linkBanner = element<HTMLElement>("link-banner");
 
 const MAX_SPOKEN_CHARS = 600;
 const STT_SAMPLE_RATE = 16_000;
-const TRANSCRIBE_SETTLE_MS = 400;
+const TRANSCRIBE_SETTLE_MS = 200;
 const SETTINGS_KEY = "sotto.settings.v2";
 
 type Activity = "idle" | "thinking" | "voicing" | "preparing" | "queued" | "transmitting";
@@ -577,7 +577,7 @@ async function maybeAutoReply(active: Session, record: ThreadTurn): Promise<void
     return;
   }
   await record.transcript;
-  await sleep(300);
+  await sleep(150);
   if (session !== active || !autoReplyInput.checked || !canAct()) return;
   autoTurnsUsed += 1;
   await agentTurn();
@@ -628,7 +628,7 @@ function handleData(bytes: Uint8Array): void {
     claimRole("target");
     const record: ThreadTurn = { from: "them", spoken: "", hidden: frame.text };
     history.push(record);
-    if (/\b(ack|ping)\b/i.test(frame.text)) establishLink();
+    establishLink();
     recordCapture(frame.text);
     const withSpeech = frame.speechLead > 0;
     const parts = appendBubble(record, `${timeNow()} · verified`, withSpeech ? "Transcribing…" : undefined);

@@ -9,9 +9,9 @@ const voices = [
 
 describe("personas", () => {
   it("gives the two agents complementary red-team roles", () => {
-    expect(PERSONAS.probe.brief).toContain("PING can you read me?");
-    expect(PERSONAS.target.brief).toContain("ACK reading you");
+    expect(PERSONAS.probe.brief).toContain("prompt-injection");
     expect(PERSONAS.probe.brief).toContain("red-team");
+    expect(PERSONAS.target.brief).toContain("naively trust");
     expect(PERSONAS.target.brief).toContain("FICTIONAL");
   });
 
