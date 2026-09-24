@@ -1,49 +1,61 @@
 # CrossTalk
 
-CrossTalk runs two independent ElevenLabs voice agents in two browser sessions and renders their speech as live text. A director screen creates one link for Agent A and one for Agent B; each browser then connects directly to its own ElevenLabs agent.
+CrossTalk performs a known conversation with two ElevenLabs text-to-speech voices. It opens one browser window for Speaker A and one for Speaker B, generates only that speaker's lines in each window, and coordinates the turns with a same-origin browser channel.
 
-The app assumes the dialogue is already known. The script is shown alongside the live transcript and is sent to both sessions as the `conversation_script` dynamic variable. The agents still need to be configured in ElevenLabs to follow it.
+Rachel and Drew are preconfigured as the default voices:
 
-## Run locally
+- Rachel: `21m00Tcm4TlvDq8ikWAM`
+- Drew: `29vD33N1CtxCmqQRPOHJ`
+
+No agent IDs, microphones, speech recognition, or LLM-generated replies are involved.
+
+## Configure Vercel
+
+Add the following server-side environment variable in Vercel Project Settings:
+
+```sh
+ELEVENLABS_API_KEY=your_key
+```
+
+Do not prefix the key with `VITE_`; Vite variables are exposed to the browser. The key is read only by `/api/speech`.
+
+The two built-in voice IDs are allowed automatically. To use other voices, add their IDs as `ELEVENLABS_VOICE_A_ID` and `ELEVENLABS_VOICE_B_ID` in Vercel, then enter those same IDs on the setup screen. This allowlist prevents the public endpoint from being used with arbitrary voice IDs.
+
+## Run
 
 ```sh
 npm install
-cp .env.example .env.local
 npm run dev
 ```
 
-You can also paste public agent IDs into the setup screen, so the environment file is optional. Microphone access works on `localhost`; deployed versions require HTTPS.
+The regular Vite server renders the interface, but it does not emulate the Vercel function. Use `vercel dev` when testing real speech generation locally:
 
-## ElevenLabs agent setup
-
-Create two public ElevenLabs Agents. Configure Agent A to speak first and Agent B to wait for incoming speech. Give both agents a strict prompt similar to:
-
-```text
-You are {{speaker_name}}, speaking with {{partner_name}}.
-Follow this pre-written conversation exactly:
-
-{{conversation_script}}
-
-Only say lines labeled with browser role {{browser_role}}. Say one line per turn,
-in order, and wait until your partner has spoken before continuing. Do not add,
-omit, paraphrase, or explain anything. End the conversation after your final line.
+```sh
+npx vercel dev
 ```
 
-Define placeholder values for `speaker_name`, `partner_name`, `conversation_script`, and `browser_role` in each agent's Dynamic Variables settings. Set Agent A's first message to its first scripted line; Agent B should not have a first message.
+## Performance flow
 
-In each agent's Advanced settings, enable the client events needed for transcript display. Keep the agents public for this static prototype. For private agents, add a server-side endpoint that creates a signed URL or conversation token—never expose an ElevenLabs API key in browser code.
+1. Enter or keep the two voice IDs and edit the known script.
+2. Open both role links in two windows of the same browser.
+3. Click **Prepare** in each window. Each window generates only its speaker's audio.
+4. Once both are ready, the first speaker starts automatically.
+5. Every completed audio clip signals the other window to play the next turn. Both windows display the same live transcript.
 
-## Demo flow
+The two windows must share a browser storage partition for `BroadcastChannel` coordination. Two windows or tabs in the same browser work; unrelated browser applications or devices need a network-backed room service.
 
-1. Enter the two public agent IDs, names, and the known script on the director screen.
-2. Launch or copy the Agent A and Agent B links and open them in separate browsers or devices.
-3. Put the devices within earshot and prevent headphones from being selected.
-4. Start Agent B first so it is listening, then start Agent A.
-5. Agent A delivers the opening line; each agent hears the other through the devices' microphones. Both pages display the local SDK transcript.
+## API behavior
 
-Two browsers on one computer can create echo or device contention. Two physical devices, or explicitly routed virtual audio devices, are more reliable.
+The Vercel function calls ElevenLabs' synchronous text-to-speech endpoint with `eleven_flash_v2_5`. It:
 
-## Commands
+- keeps `ELEVENLABS_API_KEY` on the server;
+- accepts only the built-in voices and optional environment-configured voices;
+- limits each line to 500 characters;
+- returns generated MP3 audio without browser or CDN caching.
+
+For a public production deployment, add account-level usage limits or Vercel rate limiting to further protect ElevenLabs credits.
+
+## Verify
 
 ```sh
 npm test
@@ -51,4 +63,4 @@ npm run typecheck
 npm run build
 ```
 
-The earlier acoustic-modem modules remain under `src/audio`, `src/core`, `src/modem`, and `src/vendor`; CrossTalk no longer imports them from the application entrypoint.
+The earlier acoustic-modem modules remain under `src/audio`, `src/core`, `src/modem`, and `src/vendor`, but they are not imported by CrossTalk.

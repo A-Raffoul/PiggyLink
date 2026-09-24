@@ -76,7 +76,10 @@ textarea { margin-top: 20px; min-height: 215px; padding: 18px; resize: vertical;
 .room-state { display: flex; align-items: center; gap: 9px; color: #77787c; }
 .room-state > span:first-child { width: 7px; height: 7px; border-radius: 50%; background: #55565a; }
 .room-state > span:first-child.connecting { background: #e6b85c; animation: blink 1s infinite; }
+.room-state > span:first-child.preparing { background: #e6b85c; animation: blink 1s infinite; }
+.room-state > span:first-child.ready { background: #e6b85c; }
 .room-state > span:first-child.connected { background: var(--signal); box-shadow: 0 0 0 5px color-mix(in srgb, var(--signal) 13%, transparent); }
+.room-state > span:first-child.complete { background: var(--signal-b); box-shadow: 0 0 0 5px rgba(85, 214, 190, .13); }
 .room-state > span:first-child.error { background: #ff5c35; }
 @keyframes blink { 50% { opacity: .25; } }
 .identity-band { min-height: 220px; display: flex; align-items: center; justify-content: space-between; gap: 40px; border-bottom: 1px solid var(--line); }
@@ -145,6 +148,8 @@ body[data-connection="connected"] .session-button { color: var(--ink); backgroun
 .script-list b { display: block; margin-bottom: 7px; color: var(--signal-a); font-family: "DM Mono", monospace; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
 .script-list li[data-speaker="b"] b { color: var(--signal-b); }
 .script-list p { margin: 0; color: #85868a; font-size: 11px; line-height: 1.55; }
+.script-list li.is-current { background: linear-gradient(90deg, color-mix(in srgb, var(--signal) 9%, transparent), transparent); }
+.script-list li.is-current p { color: var(--ink); }
 
 @media (max-width: 1050px) {
   .live-grid { grid-template-columns: 220px 1fr; }

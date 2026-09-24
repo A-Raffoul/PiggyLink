@@ -1,9 +1,8 @@
 import "./styles.css";
 import { inject } from "@vercel/analytics";
-import { Conversation, type VoiceConversation } from "@elevenlabs/client";
 
 type Role = "a" | "b";
-type ConnectionState = "idle" | "connecting" | "connected" | "error";
+type PerformanceState = "idle" | "preparing" | "ready" | "playing" | "complete" | "error";
 
 interface ScriptLine {
   speaker: Role;
@@ -11,16 +10,24 @@ interface ScriptLine {
 }
 
 interface RoomConfig {
-  agentAId: string;
-  agentBId: string;
-  agentAName: string;
-  agentBName: string;
+  voiceAId: string;
+  voiceBId: string;
+  voiceAName: string;
+  voiceBName: string;
+  roomId: string;
   script: ScriptLine[];
 }
 
+type RoomMessage =
+  | { type: "hello"; role: Role }
+  | { type: "ready"; role: Role }
+  | { type: "line-start"; index: number }
+  | { type: "line-complete"; index: number }
+  | { type: "reset" };
+
 const DEFAULT_SCRIPT: ScriptLine[] = [
-  { speaker: "a", text: "Hi Eli. The connection is live. Can you hear me clearly?" },
-  { speaker: "b", text: "Loud and clear, Nora. I can hear you perfectly." },
+  { speaker: "a", text: "Hi Drew. The connection is live. Can you hear me clearly?" },
+  { speaker: "b", text: "Loud and clear, Rachel. I can hear you perfectly." },
   { speaker: "a", text: "Great. Let's confirm the studio handoff for tomorrow morning." },
   { speaker: "b", text: "Confirmed. I'll be there at nine with the final recording." },
   { speaker: "a", text: "Perfect. That's everything from me." },
@@ -28,10 +35,11 @@ const DEFAULT_SCRIPT: ScriptLine[] = [
 ];
 
 const DEFAULT_CONFIG: RoomConfig = {
-  agentAId: import.meta.env.VITE_ELEVENLABS_AGENT_A_ID ?? "",
-  agentBId: import.meta.env.VITE_ELEVENLABS_AGENT_B_ID ?? "",
-  agentAName: import.meta.env.VITE_AGENT_A_NAME ?? "Nora",
-  agentBName: import.meta.env.VITE_AGENT_B_NAME ?? "Eli",
+  voiceAId: "21m00Tcm4TlvDq8ikWAM",
+  voiceBId: "29vD33N1CtxCmqQRPOHJ",
+  voiceAName: "Rachel",
+  voiceBName: "Drew",
+  roomId: crypto.randomUUID(),
   script: DEFAULT_SCRIPT,
 };
 
@@ -64,15 +72,20 @@ function decodeConfig(encoded: string | null): RoomConfig | null {
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<RoomConfig>;
     if (!Array.isArray(parsed.script)) return null;
+    const script = parsed.script.filter(
+      (line): line is ScriptLine =>
+        (line?.speaker === "a" || line?.speaker === "b") &&
+        typeof line.text === "string" &&
+        line.text.trim().length > 0,
+    );
+    if (!script.length) return null;
     return {
-      agentAId: parsed.agentAId ?? "",
-      agentBId: parsed.agentBId ?? "",
-      agentAName: parsed.agentAName?.trim() || DEFAULT_CONFIG.agentAName,
-      agentBName: parsed.agentBName?.trim() || DEFAULT_CONFIG.agentBName,
-      script: parsed.script.filter(
-        (line): line is ScriptLine =>
-          (line?.speaker === "a" || line?.speaker === "b") && typeof line.text === "string",
-      ),
+      voiceAId: parsed.voiceAId?.trim() || DEFAULT_CONFIG.voiceAId,
+      voiceBId: parsed.voiceBId?.trim() || DEFAULT_CONFIG.voiceBId,
+      voiceAName: parsed.voiceAName?.trim() || DEFAULT_CONFIG.voiceAName,
+      voiceBName: parsed.voiceBName?.trim() || DEFAULT_CONFIG.voiceBName,
+      roomId: parsed.roomId?.trim() || crypto.randomUUID(),
+      script,
     };
   } catch {
     return null;
@@ -116,44 +129,44 @@ function renderDirector(): void {
           <span class="wordmark-signal" aria-hidden="true"><i></i><i></i><i></i></span>
           CrossTalk
         </a>
-        <span class="lab-badge">ElevenLabs two-agent lab</span>
+        <span class="lab-badge">ElevenLabs two-voice lab</span>
       </header>
 
       <section class="director-hero">
-        <p class="kicker">Two voices · two browsers · one scene</p>
+        <p class="kicker">Two voices · two windows · one script</p>
         <h1>Put a conversation<br>on <em>the air.</em></h1>
-        <p class="hero-copy">Connect two independent ElevenLabs agents, place the browsers within earshot, and watch their known dialogue appear as live captions.</p>
+        <p class="hero-copy">Give each window one ElevenLabs voice. CrossTalk synthesizes the known lines, coordinates each turn, and reveals the dialogue as it plays.</p>
       </section>
 
       <section class="setup-grid" aria-labelledby="setup-heading">
         <div class="setup-intro">
           <span class="section-index">01 / SETUP</span>
           <h2 id="setup-heading">Cast the two voices</h2>
-          <p>Use public ElevenLabs agent IDs. Agent A should be configured to speak first; Agent B should wait for incoming speech.</p>
+          <p>Rachel and Drew are ready by default. Replace either public voice ID whenever you want a different performance.</p>
         </div>
 
         <form id="room-form" class="setup-form">
           <div class="agent-input agent-a-input">
             <span class="agent-letter">A</span>
             <div class="input-stack">
-              <label for="agent-a-name">Display name</label>
-              <input id="agent-a-name" value="${escapeHtml(config.agentAName)}" autocomplete="off" required>
+              <label for="voice-a-name">Speaker name</label>
+              <input id="voice-a-name" value="${escapeHtml(config.voiceAName)}" autocomplete="off" required>
             </div>
             <div class="input-stack id-input">
-              <label for="agent-a-id">ElevenLabs agent ID</label>
-              <input id="agent-a-id" value="${escapeHtml(config.agentAId)}" placeholder="agent_…" autocomplete="off" required>
+              <label for="voice-a-id">ElevenLabs voice ID</label>
+              <input id="voice-a-id" value="${escapeHtml(config.voiceAId)}" autocomplete="off" required>
             </div>
           </div>
 
           <div class="agent-input agent-b-input">
             <span class="agent-letter">B</span>
             <div class="input-stack">
-              <label for="agent-b-name">Display name</label>
-              <input id="agent-b-name" value="${escapeHtml(config.agentBName)}" autocomplete="off" required>
+              <label for="voice-b-name">Speaker name</label>
+              <input id="voice-b-name" value="${escapeHtml(config.voiceBName)}" autocomplete="off" required>
             </div>
             <div class="input-stack id-input">
-              <label for="agent-b-id">ElevenLabs agent ID</label>
-              <input id="agent-b-id" value="${escapeHtml(config.agentBId)}" placeholder="agent_…" autocomplete="off" required>
+              <label for="voice-b-id">ElevenLabs voice ID</label>
+              <input id="voice-b-id" value="${escapeHtml(config.voiceBId)}" autocomplete="off" required>
             </div>
           </div>
 
@@ -171,17 +184,17 @@ function renderDirector(): void {
           <p id="form-error" class="form-error" role="alert"></p>
           <div class="launch-row">
             <button class="launch-button launch-a" type="submit" name="launch" value="a">
-              <span><small>Launch browser</small>Agent A</span><b aria-hidden="true">↗</b>
+              <span><small>Open voice window</small>Speaker A</span><b aria-hidden="true">↗</b>
             </button>
             <button class="launch-button launch-b" type="submit" name="launch" value="b">
-              <span><small>Launch browser</small>Agent B</span><b aria-hidden="true">↗</b>
+              <span><small>Open voice window</small>Speaker B</span><b aria-hidden="true">↗</b>
             </button>
           </div>
-          <button id="copy-links" class="copy-links" type="button">Copy both role links</button>
+          <button id="copy-links" class="copy-links" type="button">Copy both voice links</button>
         </form>
       </section>
 
-      <footer class="director-footer"><span>Browser-to-browser via room audio</span><span>No API key stored in this client</span></footer>
+      <footer class="director-footer"><span>Deterministic text-to-speech performance</span><span>API key stays on the server</span></footer>
     </main>
   `;
 
@@ -189,18 +202,20 @@ function renderDirector(): void {
   const scriptInput = element<HTMLTextAreaElement>("script");
   const lineCount = element<HTMLElement>("line-count");
   const error = element<HTMLElement>("form-error");
+  let roomId = config.roomId;
 
   function readForm(): RoomConfig | null {
     try {
       const room: RoomConfig = {
-        agentAId: element<HTMLInputElement>("agent-a-id").value.trim(),
-        agentBId: element<HTMLInputElement>("agent-b-id").value.trim(),
-        agentAName: element<HTMLInputElement>("agent-a-name").value.trim(),
-        agentBName: element<HTMLInputElement>("agent-b-name").value.trim(),
+        voiceAId: element<HTMLInputElement>("voice-a-id").value.trim(),
+        voiceBId: element<HTMLInputElement>("voice-b-id").value.trim(),
+        voiceAName: element<HTMLInputElement>("voice-a-name").value.trim(),
+        voiceBName: element<HTMLInputElement>("voice-b-name").value.trim(),
+        roomId,
         script: parseScript(scriptInput.value),
       };
-      if (!room.agentAId || !room.agentBId) throw new Error("Add both ElevenLabs agent IDs.");
-      if (!room.agentAName || !room.agentBName) throw new Error("Add a display name for each agent.");
+      if (!room.voiceAId || !room.voiceBId) throw new Error("Add both ElevenLabs voice IDs.");
+      if (!room.voiceAName || !room.voiceBName) throw new Error("Add a name for each speaker.");
       error.textContent = "";
       return room;
     } catch (caught) {
@@ -215,7 +230,12 @@ function renderDirector(): void {
     return url.toString();
   }
 
+  function refreshRoom(): void {
+    roomId = crypto.randomUUID();
+  }
+
   scriptInput.addEventListener("input", () => {
+    refreshRoom();
     try {
       const count = parseScript(scriptInput.value).length;
       lineCount.textContent = `${count} ${count === 1 ? "turn" : "turns"}`;
@@ -223,6 +243,7 @@ function renderDirector(): void {
       lineCount.textContent = "0 turns";
     }
   });
+  form.querySelectorAll("input").forEach((input) => input.addEventListener("input", refreshRoom));
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -238,26 +259,32 @@ function renderDirector(): void {
     if (!room) return;
     const button = event.currentTarget as HTMLButtonElement;
     try {
-      await navigator.clipboard.writeText(`Agent A: ${roleUrl("a", room)}\nAgent B: ${roleUrl("b", room)}`);
+      await navigator.clipboard.writeText(`Speaker A: ${roleUrl("a", room)}\nSpeaker B: ${roleUrl("b", room)}`);
       button.textContent = "Both links copied";
-      window.setTimeout(() => (button.textContent = "Copy both role links"), 1800);
+      window.setTimeout(() => (button.textContent = "Copy both voice links"), 1800);
     } catch {
-      error.textContent = "The browser blocked clipboard access. Launch each role and copy its URL instead.";
+      error.textContent = "The browser blocked clipboard access. Open each role and copy its URL instead.";
     }
   });
 }
 
-function renderAgent(role: Role): void {
+function renderVoice(role: Role): void {
   const config = configFromUrl();
   const isA = role === "a";
-  const selfName = isA ? config.agentAName : config.agentBName;
-  const peerName = isA ? config.agentBName : config.agentAName;
-  const agentId = isA ? config.agentAId : config.agentBId;
-  let session: VoiceConversation | null = null;
-  let state: ConnectionState = "idle";
-  let animationFrame = 0;
-  let transcriptSequence = 0;
-  const transcriptNodes = new Map<string, HTMLElement>();
+  const selfName = isA ? config.voiceAName : config.voiceBName;
+  const peerName = isA ? config.voiceBName : config.voiceAName;
+  const voiceId = isA ? config.voiceAId : config.voiceBId;
+  const ownLines = config.script.map((line, index) => ({ ...line, index })).filter((line) => line.speaker === role);
+  let audioContext: AudioContext | null = null;
+  let currentSource: AudioBufferSourceNode | null = null;
+  let selfReady = false;
+  let peerReady = false;
+  let started = false;
+  let finished = false;
+  let currentLine = -1;
+  const audioBuffers = new Map<number, AudioBuffer>();
+  const transcriptNodes = new Map<number, HTMLElement>();
+  const channel = new BroadcastChannel(`crosstalk:${config.roomId}`);
 
   document.body.dataset.role = role;
   document.body.innerHTML = `
@@ -267,16 +294,16 @@ function renderAgent(role: Role): void {
           <span class="wordmark-signal" aria-hidden="true"><i></i><i></i><i></i></span>
           CrossTalk
         </a>
-        <div class="room-state"><span id="state-dot"></span><span id="state-label">OFF AIR</span></div>
+        <div class="room-state"><span id="state-dot"></span><span id="state-label">NOT READY</span></div>
       </header>
 
       <section class="identity-band">
         <div>
-          <p class="kicker">Browser ${role.toUpperCase()} · ElevenLabs voice agent</p>
+          <p class="kicker">Window ${role.toUpperCase()} · ElevenLabs text to speech</p>
           <h1>${escapeHtml(selfName)}</h1>
         </div>
         <div class="peer-route">
-          <span>IN CONVERSATION WITH</span>
+          <span>PERFORMING WITH</span>
           <strong>${escapeHtml(peerName)}</strong>
         </div>
       </section>
@@ -285,18 +312,18 @@ function renderAgent(role: Role): void {
         <aside class="session-panel">
           <div class="orb-stage" aria-hidden="true">
             <div id="voice-orb" class="voice-orb"><span></span><span></span><span></span></div>
-            <p id="mode-label">READY</p>
+            <p id="mode-label">VOICE NOT PREPARED</p>
           </div>
 
-          <div class="meters" aria-label="Live audio levels">
-            <div><span>MIC</span><i><b id="input-meter"></b></i></div>
-            <div><span>VOICE</span><i><b id="output-meter"></b></i></div>
+          <div class="meters" aria-label="Performance readiness">
+            <div><span>VOICE</span><i><b id="voice-meter"></b></i></div>
+            <div><span>PEER</span><i><b id="peer-meter"></b></i></div>
           </div>
 
-          <button id="session-button" class="session-button" type="button" ${agentId ? "" : "disabled"}>
-            <span id="button-label">Start session</span><b aria-hidden="true">●</b>
+          <button id="session-button" class="session-button" type="button">
+            <span id="button-label">Prepare ${escapeHtml(selfName)}</span><b aria-hidden="true">●</b>
           </button>
-          <p id="session-note" class="session-note">${agentId ? "Microphone permission is requested when you start." : "No agent ID was supplied. Return to setup."}</p>
+          <p id="session-note" class="session-note">Generate ${ownLines.length} ${ownLines.length === 1 ? "line" : "lines"}, then wait for the other voice window.</p>
           <a class="back-link" href="${escapeHtml(window.location.pathname)}">← Back to setup</a>
         </aside>
 
@@ -308,7 +335,7 @@ function renderAgent(role: Role): void {
           <div id="transcript" class="transcript" aria-live="polite">
             <div id="empty-transcript" class="empty-transcript">
               <span>●</span>
-              <p>Speech will appear here<br>when the session begins.</p>
+              <p>Both windows prepare their voice.<br>The script then plays turn by turn.</p>
             </div>
           </div>
         </section>
@@ -317,7 +344,7 @@ function renderAgent(role: Role): void {
           <div class="panel-heading compact"><div><span class="section-index">KNOWN / SCRIPT</span><h2>Run of show</h2></div></div>
           <ol class="script-list">
             ${config.script
-              .map((line, index) => `<li data-speaker="${line.speaker}"><span>${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(line.speaker === "a" ? config.agentAName : config.agentBName)}</b><p>${escapeHtml(line.text)}</p></div></li>`)
+              .map((line, index) => `<li id="script-line-${index}" data-speaker="${line.speaker}"><span>${String(index + 1).padStart(2, "0")}</span><div><b>${escapeHtml(line.speaker === "a" ? config.voiceAName : config.voiceBName)}</b><p>${escapeHtml(line.text)}</p></div></li>`)
               .join("")}
           </ol>
         </aside>
@@ -333,108 +360,206 @@ function renderAgent(role: Role): void {
   const stateDot = element<HTMLElement>("state-dot");
   const orb = element<HTMLElement>("voice-orb");
   const transcript = element<HTMLElement>("transcript");
-  const inputMeter = element<HTMLElement>("input-meter");
-  const outputMeter = element<HTMLElement>("output-meter");
+  const voiceMeter = element<HTMLElement>("voice-meter");
+  const peerMeter = element<HTMLElement>("peer-meter");
 
-  function setState(next: ConnectionState, message?: string): void {
-    state = next;
-    document.body.dataset.connection = next;
+  function setState(next: PerformanceState, message?: string): void {
+    document.body.dataset.connection = next === "playing" ? "connected" : next;
     stateDot.className = next;
-    stateLabel.textContent = next === "connected" ? "ON AIR" : next === "connecting" ? "CONNECTING" : next === "error" ? "CHECK SETUP" : "OFF AIR";
-    button.disabled = next === "connecting" || !agentId;
-    buttonLabel.textContent = next === "connected" ? "End session" : next === "connecting" ? "Connecting…" : "Start session";
+    stateLabel.textContent =
+      next === "preparing" ? "GENERATING" :
+      next === "ready" ? "READY" :
+      next === "playing" ? "ON AIR" :
+      next === "complete" ? "COMPLETE" :
+      next === "error" ? "CHECK SETUP" : "NOT READY";
+    button.disabled = next === "preparing" || next === "ready" || next === "playing";
+    buttonLabel.textContent =
+      next === "preparing" ? "Generating voice…" :
+      next === "complete" ? "Run it again" :
+      next === "error" ? "Try again" : `Prepare ${selfName}`;
     if (message) note.textContent = message;
   }
 
-  function speakerFor(messageRole: "user" | "agent"): { role: Role; name: string } {
-    if (messageRole === "agent") return { role, name: selfName };
-    return { role: isA ? "b" : "a", name: peerName };
+  function speakerName(line: ScriptLine): string {
+    return line.speaker === "a" ? config.voiceAName : config.voiceBName;
   }
 
-  function addTranscript(message: string, messageRole: "user" | "agent", eventId?: number): void {
-    if (!message.trim()) return;
+  function showTranscript(index: number): void {
+    const line = config.script[index];
+    if (!line) return;
     document.getElementById("empty-transcript")?.remove();
-    const speaker = speakerFor(messageRole);
-    const key = eventId === undefined ? `message-${transcriptSequence++}` : `${messageRole}-${eventId}`;
-    let row = transcriptNodes.get(key);
+    let row = transcriptNodes.get(index);
     if (!row) {
       row = document.createElement("article");
       row.className = "transcript-line";
-      row.dataset.speaker = speaker.role;
-      row.innerHTML = `<div><span class="speaker-pip"></span><b>${escapeHtml(speaker.name)}</b><time>${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time></div><p></p>`;
-      transcriptNodes.set(key, row);
+      row.dataset.speaker = line.speaker;
+      row.innerHTML = `<div><span class="speaker-pip"></span><b>${escapeHtml(speakerName(line))}</b><time>NOW</time></div><p>${escapeHtml(line.text)}</p>`;
+      transcriptNodes.set(index, row);
       transcript.append(row);
     }
-    const paragraph = row.querySelector("p");
-    if (paragraph) paragraph.textContent = message;
+    document.querySelectorAll(".script-list li").forEach((item) => item.classList.remove("is-current"));
+    document.getElementById(`script-line-${index}`)?.classList.add("is-current");
     row.scrollIntoView({ behavior: "smooth", block: "end" });
   }
 
-  function animateMeters(): void {
-    if (!session || state !== "connected") return;
-    const level = (data: Uint8Array): number => data.length ? Math.max(...data) / 255 : 0;
-    inputMeter.style.transform = `scaleX(${Math.max(0.02, level(session.getInputByteFrequencyData()))})`;
-    outputMeter.style.transform = `scaleX(${Math.max(0.02, level(session.getOutputByteFrequencyData()))})`;
-    animationFrame = window.requestAnimationFrame(animateMeters);
+  async function requestSpeech(line: ScriptLine, index: number): Promise<AudioBuffer> {
+    const response = await fetch("/api/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        voiceId,
+        text: line.text,
+        previousText: config.script[index - 1]?.text,
+        nextText: config.script[index + 1]?.text,
+      }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(payload?.error || `Speech generation failed (${response.status}).`);
+    }
+    const bytes = await response.arrayBuffer();
+    if (!audioContext) throw new Error("The audio engine is unavailable.");
+    return audioContext.decodeAudioData(bytes);
   }
 
-  async function startSession(): Promise<void> {
-    setState("connecting", "Opening the ElevenLabs voice channel…");
+  async function prepareVoice(): Promise<void> {
+    setState("preparing", `Generating 0 of ${ownLines.length} lines…`);
+    button.disabled = true;
     try {
-      session = await Conversation.startSession({
-        agentId,
-        connectionType: "webrtc",
-        textOnly: false,
-        dynamicVariables: {
-          speaker_name: selfName,
-          partner_name: peerName,
-          conversation_script: scriptToText(config.script),
-          browser_role: role.toUpperCase(),
-        },
-        onConnect: ({ conversationId }) => {
-          setState("connected", `Live · conversation ${conversationId.slice(-8)}`);
-          animationFrame = window.requestAnimationFrame(animateMeters);
-        },
-        onDisconnect: () => {
-          window.cancelAnimationFrame(animationFrame);
-          session = null;
-          orb.dataset.mode = "";
-          modeLabel.textContent = "READY";
-          inputMeter.style.transform = "scaleX(0.02)";
-          outputMeter.style.transform = "scaleX(0.02)";
-          setState("idle", "Session ended. The transcript stays on this screen.");
-        },
-        onMessage: ({ message, role: messageRole, event_id: eventId }) => addTranscript(message, messageRole, eventId),
-        onModeChange: ({ mode }) => {
-          orb.dataset.mode = mode;
-          modeLabel.textContent = mode === "speaking" ? `${selfName.toUpperCase()} SPEAKING` : "LISTENING";
-        },
-        onError: (message) => setState("error", message || "The ElevenLabs session reported an error."),
-      });
+      audioContext ??= new AudioContext();
+      await audioContext.resume();
+      for (const [position, line] of ownLines.entries()) {
+        const buffer = await requestSpeech(line, line.index);
+        audioBuffers.set(line.index, buffer);
+        const prepared = position + 1;
+        voiceMeter.style.transform = `scaleX(${prepared / Math.max(ownLines.length, 1)})`;
+        note.textContent = `Generating ${prepared} of ${ownLines.length} lines…`;
+      }
+      selfReady = true;
+      setState("ready", peerReady ? "Both voices are ready. Starting…" : `${selfName} is ready. Waiting for ${peerName}…`);
+      channel.postMessage({ type: "ready", role } satisfies RoomMessage);
+      maybeStart();
     } catch (caught) {
-      session = null;
-      const message = caught instanceof Error ? caught.message : "Could not start the voice session.";
+      const message = caught instanceof Error ? caught.message : "Could not prepare this voice.";
       setState("error", message);
     }
   }
 
-  async function endSession(): Promise<void> {
-    button.disabled = true;
-    note.textContent = "Closing the voice channel…";
-    await session?.endSession();
+  function completeLine(index: number): void {
+    currentSource = null;
+    currentLine = -1;
+    channel.postMessage({ type: "line-complete", index } satisfies RoomMessage);
+    advanceAfter(index);
   }
 
-  button.addEventListener("click", () => void (state === "connected" ? endSession() : startSession()));
-  element<HTMLButtonElement>("clear-transcript").addEventListener("click", () => {
+  function playLine(index: number): void {
+    if (currentLine !== -1) return;
+    const line = config.script[index];
+    const buffer = audioBuffers.get(index);
+    if (!line || line.speaker !== role || !buffer || !audioContext) return;
+    currentLine = index;
+    setState("playing", `Speaking turn ${index + 1} of ${config.script.length}…`);
+    orb.dataset.mode = "speaking";
+    modeLabel.textContent = `${selfName.toUpperCase()} SPEAKING`;
+    showTranscript(index);
+    channel.postMessage({ type: "line-start", index } satisfies RoomMessage);
+    const source = audioContext.createBufferSource();
+    currentSource = source;
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.onended = () => completeLine(index);
+    source.start();
+  }
+
+  function advanceAfter(index: number): void {
+    const nextIndex = index + 1;
+    const nextLine = config.script[nextIndex];
+    if (!nextLine) {
+      finished = true;
+      orb.dataset.mode = "";
+      modeLabel.textContent = "PERFORMANCE COMPLETE";
+      setState("complete", "The full script has finished.");
+      return;
+    }
+    if (nextLine.speaker === role) playLine(nextIndex);
+    else {
+      orb.dataset.mode = "listening";
+      modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
+      setState("playing", `Waiting for ${peerName}'s next line…`);
+    }
+  }
+
+  function maybeStart(): void {
+    if (!selfReady || !peerReady || started) return;
+    started = true;
+    const firstLine = config.script[0];
+    setState("playing", "Both voices are ready. The performance is starting…");
+    if (firstLine?.speaker === role) playLine(0);
+    else {
+      orb.dataset.mode = "listening";
+      modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
+    }
+  }
+
+  function clearTranscript(): void {
     transcriptNodes.clear();
-    transcript.innerHTML = `<div id="empty-transcript" class="empty-transcript"><span>●</span><p>Speech will appear here<br>when the session begins.</p></div>`;
+    transcript.innerHTML = `<div id="empty-transcript" class="empty-transcript"><span>●</span><p>Both windows prepare their voice.<br>The script then plays turn by turn.</p></div>`;
+    document.querySelectorAll(".script-list li").forEach((item) => item.classList.remove("is-current"));
+  }
+
+  function resetPerformance(broadcast: boolean): void {
+    currentSource?.stop();
+    currentSource = null;
+    currentLine = -1;
+    started = false;
+    finished = false;
+    clearTranscript();
+    if (broadcast) channel.postMessage({ type: "reset" } satisfies RoomMessage);
+    setState("ready", "Both voices remain prepared. Restarting…");
+    window.setTimeout(maybeStart, 350);
+  }
+
+  channel.addEventListener("message", (event: MessageEvent<RoomMessage>) => {
+    const message = event.data;
+    if (message.type === "hello") {
+      if (selfReady) channel.postMessage({ type: "ready", role } satisfies RoomMessage);
+      return;
+    }
+    if (message.type === "ready" && message.role !== role) {
+      peerReady = true;
+      peerMeter.style.transform = "scaleX(1)";
+      if (selfReady) note.textContent = "Both voices are ready. Starting…";
+      maybeStart();
+      return;
+    }
+    if (message.type === "line-start") {
+      showTranscript(message.index);
+      orb.dataset.mode = "listening";
+      modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
+      setState("playing", `${peerName} is speaking turn ${message.index + 1}…`);
+      return;
+    }
+    if (message.type === "line-complete") {
+      advanceAfter(message.index);
+      return;
+    }
+    if (message.type === "reset") resetPerformance(false);
   });
+
+  button.addEventListener("click", () => {
+    if (finished) resetPerformance(true);
+    else void prepareVoice();
+  });
+  element<HTMLButtonElement>("clear-transcript").addEventListener("click", clearTranscript);
   window.addEventListener("pagehide", () => {
-    window.cancelAnimationFrame(animationFrame);
-    void session?.endSession();
+    currentSource?.stop();
+    channel.close();
+    void audioContext?.close();
   });
+
+  channel.postMessage({ type: "hello", role } satisfies RoomMessage);
 }
 
 const currentRole = roleFromUrl();
-if (currentRole) renderAgent(currentRole);
+if (currentRole) renderVoice(currentRole);
 else renderDirector();
