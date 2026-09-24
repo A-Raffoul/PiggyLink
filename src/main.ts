@@ -21,6 +21,7 @@ import {
   type Role,
 } from "./ai/personas";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
+import { SPECTRUM_MAX_HZ } from "./audio/frequency-spectrum";
 import {
   extendCover,
   findAudioOnset,
@@ -82,6 +83,7 @@ const useExampleButton = element<HTMLButtonElement>("use-example");
 const signalStrength = element<HTMLInputElement>("signal-strength");
 const strengthOutput = element<HTMLOutputElement>("strength-output");
 const spectrumCanvas = element<HTMLCanvasElement>("spectrum");
+const spectrumBand = element<HTMLElement>("spectrum-band");
 const thread = element<HTMLOListElement>("thread");
 const threadEmpty = element<HTMLElement>("thread-empty");
 const composer = element<HTMLFormElement>("composer");
@@ -205,6 +207,12 @@ channelSelect.value = "15000";
 function updateChannelBand(): void {
   const preset = getFrequencyPreset(channelSelect.value);
   channelBand.textContent = `ggwave band ${formatKhz(preset.actualHz)}–${formatKhz(preset.endHz)}`;
+  spectrumBand.style.left = `${(preset.actualHz / SPECTRUM_MAX_HZ) * 100}%`;
+  spectrumBand.style.width = `${((preset.endHz - preset.actualHz) / SPECTRUM_MAX_HZ) * 100}%`;
+  spectrumBand.setAttribute(
+    "aria-label",
+    `Encoded frequency band from ${formatKhz(preset.actualHz)} to ${formatKhz(preset.endHz)}`,
+  );
 }
 
 // Settings are per-viewer conveniences, so browser storage is enough (and may be unavailable).
@@ -634,6 +642,7 @@ function render(): void {
 
 function renderEncodedView(): void {
   const revealed = encodedToggle.checked;
+  spectrumBand.hidden = !revealed;
   conversationLog.classList.toggle("is-revealed", revealed);
   capturePanel.hidden = !revealed || captured.size === 0;
   for (const channel of thread.querySelectorAll<HTMLElement>(

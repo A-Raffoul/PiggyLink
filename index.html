@@ -166,7 +166,7 @@
                 type="checkbox"
                 role="switch"
                 autocomplete="off"
-                aria-controls="conversation-log current-encoded-channel" /><span
+                aria-controls="conversation-log current-encoded-channel spectrum-band" /><span
                 class="switch-track"
                 aria-hidden="true"
               ></span
@@ -224,11 +224,16 @@
             aria-label="Live frequency spectrum"
           >
             <div class="signal-heading">Frequency</div>
-            <canvas
-              id="spectrum"
-              role="img"
-              aria-label="Live frequency spectrum from 0 to 24 kilohertz"
-            ></canvas>
+            <div class="spectrum-plot">
+              <canvas
+                id="spectrum"
+                role="img"
+                aria-label="Live frequency spectrum from 0 to 24 kilohertz"
+              ></canvas>
+              <div id="spectrum-band" class="spectrum-band" role="img" hidden>
+                <span aria-hidden="true">Encoded</span>
+              </div>
+            </div>
             <div class="spectrum-axis" aria-hidden="true">
               <span>0</span><span>4</span><span>8</span><span>12</span
               ><span>16</span><span>20</span><span>24 kHz</span>
