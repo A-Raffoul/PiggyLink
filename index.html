@@ -160,6 +160,29 @@
           </div>
         </div>
         <section
+          id="current-message"
+          class="current-message"
+          aria-label="Current message"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div id="current-direction" class="current-direction">Listening…</div>
+          <div id="current-content" class="current-content">
+            <div class="current-channel">
+              <span class="current-channel-label">Spoken</span>
+              <p id="current-spoken">Waiting for the first message.</p>
+            </div>
+            <div
+              id="current-encoded-channel"
+              class="current-channel current-encoded-channel"
+              hidden
+            >
+              <span class="current-channel-label">Encoded</span>
+              <p id="current-encoded">Waiting for the first message.</p>
+            </div>
+          </div>
+        </section>
+        <section
           id="signal-panel"
           class="signal-panel"
           aria-label="Live frequency spectrum"
@@ -180,16 +203,11 @@
           >
             <div class="card-heading">
               <div>
-                <h2 id="spoken-title">Spoken</h2>
+                <h2 id="spoken-title">Conversation log</h2>
               </div>
               <span class="channel-symbol" aria-hidden="true">≋</span>
             </div>
-            <ol
-              id="thread"
-              class="thread"
-              aria-live="polite"
-              aria-relevant="additions text"
-            >
+            <ol id="thread" class="thread">
               <li id="thread-empty" class="thread-empty">
                 <span class="empty-line" aria-hidden="true"></span
                 ><strong>Listening…</strong>
@@ -204,19 +222,14 @@
           >
             <div class="card-heading">
               <div>
-                <h2 id="encoded-title">Encoded</h2>
+                <h2 id="encoded-title">Encoded log</h2>
               </div>
               <span class="channel-symbol" aria-hidden="true">⌁</span>
             </div>
             <div id="link-banner" class="visually-hidden" hidden>
               <span class="tiny-dot"></span> Acoustic message received
             </div>
-            <ol
-              id="encoded-thread"
-              class="thread encoded-thread"
-              aria-live="polite"
-              aria-relevant="additions text"
-            >
+            <ol id="encoded-thread" class="thread encoded-thread">
               <li id="encoded-empty" class="thread-empty">
                 <span class="empty-line" aria-hidden="true"></span
                 ><strong>Listening…</strong>

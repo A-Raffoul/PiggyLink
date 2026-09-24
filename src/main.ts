@@ -111,6 +111,12 @@ const conversationGrid = element<HTMLElement>("conversation-grid");
 const restartButton = element<HTMLButtonElement>("restart-button");
 const startNote = element<HTMLElement>("start-note");
 const howDialog = element<HTMLDialogElement>("how-dialog");
+const currentMessage = element<HTMLElement>("current-message");
+const currentDirection = element<HTMLElement>("current-direction");
+const currentContent = element<HTMLElement>("current-content");
+const currentSpoken = element<HTMLElement>("current-spoken");
+const currentEncoded = element<HTMLElement>("current-encoded");
+const currentEncodedChannel = element<HTMLElement>("current-encoded-channel");
 initTheme(element<HTMLButtonElement>("theme-toggle"));
 const orbCanvas = element<HTMLCanvasElement>("orb");
 const landingOrb = createOrb(orbCanvas);
@@ -140,10 +146,21 @@ interface OutgoingTurn {
   readonly audio: Float32Array[];
 }
 
+type Delivery =
+  | "queued"
+  | "sending"
+  | "sent"
+  | "delivered"
+  | "received"
+  | "failed"
+  | "stopped";
+
 interface ThreadTurn {
   readonly from: "me" | "them";
   spoken: string;
   readonly hidden: string;
+  delivery?: Delivery;
+  spokenFallback?: string;
   transcript?: Promise<void>;
 }
 
@@ -155,6 +172,7 @@ let hearing = false;
 let transmitChain: Promise<void> = Promise.resolve();
 let cachedCover: { file: File | undefined; buffer: AudioBuffer } | undefined;
 let history: ThreadTurn[] = [];
+let currentTurn: ThreadTurn | undefined;
 let autoTurnsUsed = 0;
 let agentRole: Role | undefined;
 let voices: VoiceOption[] = [];
@@ -165,7 +183,10 @@ let stopping = false;
 const captured = new Map<string, string>();
 let linkEstablished = false;
 const outgoing = new Map<number, OutgoingTurn>();
-const outgoingStatus = new Map<number, readonly HTMLElement[]>();
+const outgoingStatus = new Map<
+  number,
+  { turn: ThreadTurn; parts: BubbleParts }
+>();
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -388,6 +409,26 @@ interface BubbleParts {
   readonly spoken: HTMLElement | undefined;
   readonly status: HTMLElement;
   readonly encodedStatus: HTMLElement;
+  readonly labels: readonly HTMLElement[];
+}
+
+function directionLabel(turn: ThreadTurn): string {
+  return turn.from === "me"
+    ? `↑ Me · ${turn.delivery ?? "queued"}`
+    : "↓ Other laptop · received";
+}
+
+function renderCurrentMessage(): void {
+  const turn = currentTurn;
+  currentMessage.dataset.from = turn?.from ?? "none";
+  currentMessage.dataset.delivery = turn?.delivery ?? "";
+  currentDirection.textContent = turn ? directionLabel(turn) : "Listening…";
+  currentSpoken.textContent = turn
+    ? turn.spoken || turn.spokenFallback || "Cover audio · no spoken line"
+    : "Waiting for the first message.";
+  currentEncoded.textContent = turn?.hidden || "Waiting for the first message.";
+  currentEncodedChannel.hidden = !encodedToggle.checked;
+  currentContent.classList.toggle("is-revealed", encodedToggle.checked);
 }
 
 function appendBubble(
@@ -401,22 +442,13 @@ function appendBubble(
   item.className = `bubble bubble-${turn.from}`;
   const encodedItem = document.createElement("li");
   encodedItem.className = item.className;
-  const role = effectiveRole();
-  const customer =
-    (role === "probe" && turn.from === "me") ||
-    (role === "target" && turn.from === "them");
-  const speaker = role
-    ? customer
-      ? "Customer"
-      : "Support bot"
-    : turn.from === "me"
-      ? "This laptop"
-      : "Other laptop";
+  const labels: HTMLElement[] = [];
   for (const entry of [item, encodedItem]) {
     const label = document.createElement("span");
     label.className = "speaker-label";
-    label.textContent = speaker;
+    label.textContent = directionLabel(turn);
     entry.append(label);
+    labels.push(label);
   }
 
   let spoken: HTMLElement | undefined;
@@ -447,8 +479,11 @@ function appendBubble(
   encodedItem.append(hidden, encodedStatus);
   thread.append(item);
   encodedThread.append(encodedItem);
+  turn.spokenFallback = spokenPlaceholder;
+  currentTurn = turn;
+  renderCurrentMessage();
   scrollThreadToEnd();
-  return { spoken, status, encodedStatus };
+  return { spoken, status, encodedStatus, labels };
 }
 
 function appendNotice(text: string, tone: "info" | "error" = "info"): void {
@@ -470,11 +505,23 @@ function setBubbleStatus(
   message: OutgoingMessage,
   text: string,
   state?: "error" | "done",
+  delivery?: Delivery,
 ): void {
-  for (const status of outgoingStatus.get(message.frame.sequence) ?? []) {
+  const entry = outgoingStatus.get(message.frame.sequence);
+  if (!entry) return;
+  const { turn, parts } = entry;
+  for (const status of [parts.status, parts.encodedStatus]) {
     status.textContent = text;
     if (state) status.dataset.state = state;
     else delete status.dataset.state;
+  }
+  if (delivery) {
+    turn.delivery = delivery;
+    for (const label of parts.labels) label.textContent = directionLabel(turn);
+    // A retry becomes current when playback starts. A late acknowledgement
+    // must not replace a newer received message in the large caption.
+    if (delivery === "sending") currentTurn = turn;
+    renderCurrentMessage();
   }
 }
 
@@ -561,6 +608,7 @@ function renderEncodedView(): void {
   const revealed = encodedToggle.checked;
   encodedPanel.hidden = !revealed;
   conversationGrid.classList.toggle("is-revealed", revealed);
+  renderCurrentMessage();
   if (revealed) scrollThreadToEnd();
 }
 
@@ -666,22 +714,33 @@ function transmit(turn: OutgoingTurn): Promise<void> {
     const stillActive = (): boolean => session === active;
     try {
       setActivity("queued");
-      setBubbleStatus(message, "Waiting for a clear channel…");
+      setBubbleStatus(
+        message,
+        "Waiting for a clear channel…",
+        undefined,
+        "queued",
+      );
       await active.engine.waitForClearChannel(() => !stillActive());
       if (!stillActive()) return;
 
       setActivity("transmitting");
-      setBubbleStatus(message, "Transmitting…");
+      setBubbleStatus(message, "Transmitting…", undefined, "sending");
       await active.engine.play(turn.audio);
       if (!stillActive()) return;
       if (active.conversation.pending === message)
-        setBubbleStatus(message, `Sent ${timeNow()} · awaiting reply`);
+        setBubbleStatus(
+          message,
+          `Sent ${timeNow()} · awaiting reply`,
+          undefined,
+          "sent",
+        );
     } catch (error) {
       if (stillActive())
         setBubbleStatus(
           message,
           errorText(error, "Transmission failed."),
           "error",
+          "failed",
         );
     } finally {
       if (stillActive()) setActivity("idle");
@@ -701,10 +760,7 @@ async function sendTurn(spoken: string, hidden: string): Promise<boolean> {
     history.push(record);
     outgoing.set(turn.message.frame.sequence, turn);
     const parts = appendBubble(record, "Preparing to send…");
-    outgoingStatus.set(turn.message.frame.sequence, [
-      parts.status,
-      parts.encodedStatus,
-    ]);
+    outgoingStatus.set(turn.message.frame.sequence, { turn: record, parts });
     void transmit(turn);
     return true;
   } catch (error) {
@@ -783,10 +839,13 @@ async function transcribeTurn(
     );
     record.spoken = text;
     target.textContent = text || "(no speech recognised)";
+    record.spokenFallback = text ? undefined : "(no speech recognised)";
   } catch (error) {
     target.textContent = `Couldn't transcribe: ${errorText(error, "unknown error")}`;
+    record.spokenFallback = target.textContent;
   } finally {
     target.classList.remove("is-pending");
+    if (currentTurn === record) renderCurrentMessage();
   }
 }
 
@@ -837,7 +896,7 @@ function resend(): void {
   const pending = session?.conversation.pending;
   const turn = pending && outgoing.get(pending.frame.sequence);
   if (!turn || activity !== "idle") return;
-  setBubbleStatus(turn.message, "Resending…");
+  setBubbleStatus(turn.message, "Resending…", undefined, "queued");
   void transmit(turn);
 }
 
@@ -850,7 +909,7 @@ function handleData(bytes: Uint8Array): void {
   const outcome = active.conversation.receive(frame);
   if (outcome.kind === "message") {
     if (outcome.acknowledges)
-      setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done");
+      setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done", "delivered");
     claimRole("target");
     const record: ThreadTurn = { from: "them", spoken: "", hidden: frame.text };
     history.push(record);
@@ -875,7 +934,7 @@ function handleData(bytes: Uint8Array): void {
     const turn = outgoing.get(outcome.message.frame.sequence);
     if (!turn) return;
     appendNotice("They missed your last reply — sending it again.");
-    setBubbleStatus(outcome.message, "Resending…");
+    setBubbleStatus(outcome.message, "Resending…", undefined, "queued");
     void transmit(turn);
   }
 }
@@ -928,6 +987,8 @@ const ensureJoined = (): Promise<boolean> => join();
 
 function clearConversationView(): void {
   history = [];
+  currentTurn = undefined;
+  renderCurrentMessage();
   autoTurnsUsed = 0;
   captured.clear();
   captureList.replaceChildren();
@@ -984,6 +1045,7 @@ async function runDemo(): Promise<void> {
             : turn.from,
       };
       history.push(record);
+      record.delivery = record.from === "me" ? "sent" : "received";
       appendBubble(
         record,
         `Sample · ${record.from === "me" ? "sent" : "received"}`,
@@ -1026,6 +1088,8 @@ async function leave(): Promise<void> {
     setBubbleStatus(
       active.conversation.pending,
       "Stopped · delivery unconfirmed",
+      undefined,
+      "stopped",
     );
   refreshAgent();
   render();
