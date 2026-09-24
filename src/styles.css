@@ -628,12 +628,19 @@ input[type="range"] {
 footer {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 8px 20px;
   padding: 24px 4px 36px;
   color: #53635b;
   font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.build-info {
+  color: #6f8078;
+  font-family: var(--mono);
+  text-transform: none;
 }
 
 .visually-hidden {

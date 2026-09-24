@@ -340,4 +340,18 @@ composer.addEventListener("submit", (event) => {
 resendButton.addEventListener("click", resend);
 window.addEventListener("pagehide", () => void leave());
 
+function showBuildInfo(): void {
+  const builtAt = new Date(__BUILD_TIME__).toLocaleString([], {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const commit = import.meta.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
+  const branch = import.meta.env.VERCEL_GIT_COMMIT_REF;
+  const source = commit ? ` · ${branch ? `${branch}@` : ""}${commit}` : " · local build";
+  element<HTMLElement>("build-info").textContent = `Updated ${builtAt}${source}`;
+}
+
 updateChannelBand();
+showBuildInfo();
