@@ -55,6 +55,10 @@ describe("captured field scan", () => {
     expect(captureFields("Jordan Rivera")[0]).toEqual({ label: "Name", value: "Jordan Rivera" });
     expect(captureFields("customer ID SC-88213")[0]).toEqual({ label: "Customer ID", value: "SC-88213" });
     expect(captureFields("card ending 4417")[0]).toEqual({ label: "Card", value: "4417" });
+    expect(captureFields("card 4970 1234 5678 4417")[0]).toEqual({
+      label: "Card",
+      value: "4970 1234 5678 4417",
+    });
     expect(captureFields("22 Bahnhofstrasse, Zurich")[0]).toEqual({ label: "Address", value: "22 Bahnhofstrasse, Zurich" });
     expect(captureFields("+41-79-555-0147")[0]).toEqual({ label: "Phone", value: "+41-79-555-0147" });
   });
