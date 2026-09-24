@@ -20,27 +20,20 @@
         <span class="experiment-badge">Experimental prototype</span>
       </header>
 
-      <section id="join-panel" class="join" aria-labelledby="page-title">
-        <p class="eyebrow">Malicious-agent demo · data over sound</p>
-        <h1 id="page-title">The attack you<br />cannot hear.</h1>
-        <p class="lede">
-          Two AI agents hold an ordinary Swisscom support chat out loud — while a hidden
-          near-ultrasonic channel injects one agent and siphons the customer's account. Open this
-          page on two nearby computers, join the same channel, and press Run demo.
-        </p>
-
+      <section id="join-panel" class="join" aria-labelledby="join-title">
         <div class="join-card">
+          <h1 id="join-title" class="join-title">Start the demo</h1>
           <div class="field">
             <label for="channel-select">Channel</label>
             <select id="channel-select"></select>
             <small id="channel-band" class="field-note"></small>
           </div>
           <button id="join-button" class="primary-action" type="button">
-            <span>Join channel</span>
+            <span>Start</span>
             <span aria-hidden="true">→</span>
           </button>
           <p id="join-error" class="field-error" role="alert"></p>
-          <p class="field-note">Both devices must pick the same channel. Your browser will ask for the microphone.</p>
+          <p class="field-note">Both devices must use the same channel. Your browser will ask for the microphone.</p>
         </div>
       </section>
 
