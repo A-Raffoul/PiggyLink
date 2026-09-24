@@ -1,5 +1,5 @@
-import { HttpError, requireEnv } from "./http";
-import { WRITER_INSTRUCTIONS } from "./turn";
+import { HttpError, requireEnv } from "./http.js";
+import { WRITER_INSTRUCTIONS } from "./turn.js";
 
 const BASE_URL = "https://api.elevenlabs.io";
 const AGENT_NAME = "SottoLink turn writer";

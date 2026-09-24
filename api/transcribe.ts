@@ -1,5 +1,5 @@
-import { transcribe } from "./_lib/elevenlabs";
-import { HttpError, json, route } from "./_lib/http";
+import { transcribe } from "./_lib/elevenlabs.js";
+import { HttpError, json, route } from "./_lib/http.js";
 
 export const config = { maxDuration: 30 };
 

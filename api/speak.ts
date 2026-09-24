@@ -1,5 +1,5 @@
-import { synthesize } from "./_lib/elevenlabs";
-import { HttpError, readJson, route } from "./_lib/http";
+import { synthesize } from "./_lib/elevenlabs.js";
+import { HttpError, readJson, route } from "./_lib/http.js";
 
 export const config = { maxDuration: 30 };
 

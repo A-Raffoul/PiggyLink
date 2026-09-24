@@ -1,7 +1,7 @@
-import { writeWithApertus } from "./_lib/apertus";
-import { writeWithAgent } from "./_lib/elevenlabs";
-import { HttpError, json, readJson, route } from "./_lib/http";
-import { buildTurnPrompt, parseTurn, parseTurnRequest } from "./_lib/turn";
+import { writeWithApertus } from "./_lib/apertus.js";
+import { writeWithAgent } from "./_lib/elevenlabs.js";
+import { HttpError, json, readJson, route } from "./_lib/http.js";
+import { buildTurnPrompt, parseTurn, parseTurnRequest } from "./_lib/turn.js";
 
 export const config = { maxDuration: 60 };
 

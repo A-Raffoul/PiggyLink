@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTurnPrompt, parseTurn, parseTurnRequest, truncateUtf8 } from "./turn";
+import { buildTurnPrompt, parseTurn, parseTurnRequest, truncateUtf8 } from "./turn.js";
 
 describe("turn requests", () => {
   it("validates and normalises the request", () => {
