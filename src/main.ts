@@ -137,7 +137,7 @@ for (const preset of FREQUENCY_PRESETS) {
   option.textContent = `${preset.label} · ${formatKhz(preset.actualHz)}–${formatKhz(preset.endHz)}`;
   channelSelect.append(option);
 }
-channelSelect.value = "18000";
+channelSelect.value = "15000";
 
 function updateChannelBand(): void {
   const preset = getFrequencyPreset(channelSelect.value);
