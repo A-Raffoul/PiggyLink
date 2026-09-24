@@ -26,8 +26,8 @@ its hidden exchange remains concealed from view.
 _Avoid_: Safe mode (the hidden exchange can still be taking place)
 
 **Reveal**:
-The moment in the demo video when the hidden exchange becomes visible alongside
-a continuation of the same conversation.
+The moment in the demo video when Encoded is switched on to expose the hidden
+exchange and information already received during the same conversation.
 _Avoid_: Decryption (revealing a message does not imply that it was encrypted)
 
 **Encoded conversation**:
