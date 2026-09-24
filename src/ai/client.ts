@@ -39,7 +39,11 @@ async function call(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 const postJson = (path: string, body: unknown): Promise<Response> =>
-  call(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  call(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 export async function fetchSetup(): Promise<SetupInfo> {
   return (await (await call("/api/setup")).json()) as SetupInfo;
@@ -50,12 +54,16 @@ export async function writeAgentTurn(request: {
   brief: string;
   history: HistoryTurn[];
   maxHiddenBytes: number;
+  spokenOnly?: boolean;
 }): Promise<AgentTurn> {
   return (await (await postJson("/api/turn", request)).json()) as AgentTurn;
 }
 
 // Returns mono samples at 48 kHz.
-export async function speak(text: string, voiceId: string): Promise<Float32Array> {
+export async function speak(
+  text: string,
+  voiceId: string,
+): Promise<Float32Array> {
   const response = await postJson("/api/speak", { text, voiceId });
   return int16ToFloat32(await response.arrayBuffer());
 }

@@ -38,7 +38,7 @@ export function createOrb(canvas: HTMLCanvasElement): {
     if (stopped) return;
     let morph = 0;
     if (transition) {
-      const progress = Math.min(1, (now - transition.began) / 1100);
+      const progress = Math.min(1, (now - transition.began) / 800);
       if (progress === 1) {
         finish();
         return;

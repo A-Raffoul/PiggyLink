@@ -10,11 +10,16 @@ export interface OutgoingMessage {
 
 export type ReceiveOutcome =
   | { readonly kind: "own" }
-  | { readonly kind: "message"; readonly frame: ChatFrame; readonly acknowledges: OutgoingMessage | undefined }
+  | {
+      readonly kind: "message";
+      readonly frame: ChatFrame;
+      readonly acknowledges: OutgoingMessage | undefined;
+    }
   | { readonly kind: "duplicate" }
   | { readonly kind: "resend-reply"; readonly message: OutgoingMessage };
 
-const keyOf = (frame: ChatFrame): string => `${frame.senderId}:${frame.sequence}`;
+const keyOf = (frame: ChatFrame): string =>
+  `${frame.senderId}:${frame.sequence}`;
 
 // Strict turn-taking: sending passes the turn, and a new message from the peer hands it back.
 export class Conversation {
@@ -39,13 +44,36 @@ export class Conversation {
   }
 
   send(text: string, speechLead = 0): OutgoingMessage {
-    if (this.turnState !== "mine") throw new Error("Wait for a reply before sending again.");
-    const frame = { senderId: this.deviceId, sequence: this.nextSequence, speechLead, text };
-    const message = { frame, wire: encodeFrame(frame), inReplyTo: this.lastAcceptedKey };
+    if (this.turnState !== "mine")
+      throw new Error("Wait for a reply before sending again.");
+    const frame = {
+      senderId: this.deviceId,
+      sequence: this.nextSequence,
+      speechLead,
+      text,
+    };
+    const message = {
+      frame,
+      wire: encodeFrame(frame),
+      inReplyTo: this.lastAcceptedKey,
+    };
     this.nextSequence = (this.nextSequence + 1) % SEQUENCE_MODULO;
     this.lastSent = message;
     this.turnState = "theirs";
     return message;
+  }
+
+  // Ordinary speech has no modem sequence and cannot acknowledge packet delivery.
+  receiveSpeech(): void {
+    this.lastAcceptedKey = undefined;
+    this.turnState = "mine";
+  }
+
+  sendSpeech(): void {
+    if (this.turnState !== "mine")
+      throw new Error("Wait for a reply before sending again.");
+    this.lastSent = undefined;
+    this.turnState = "theirs";
   }
 
   receive(frame: ChatFrame): ReceiveOutcome {
@@ -54,13 +82,15 @@ export class Conversation {
     const key = keyOf(frame);
     if (this.seen.has(key)) {
       // The peer re-sent a message we already answered, so our answer never reached them.
-      if (this.lastSent && this.lastSent.inReplyTo === key) return { kind: "resend-reply", message: this.lastSent };
+      if (this.lastSent && this.lastSent.inReplyTo === key)
+        return { kind: "resend-reply", message: this.lastSent };
       return { kind: "duplicate" };
     }
 
     this.seen.add(key);
     this.lastAcceptedKey = key;
-    const acknowledges = this.turnState === "theirs" ? this.lastSent : undefined;
+    const acknowledges =
+      this.turnState === "theirs" ? this.lastSent : undefined;
     this.turnState = "mine";
     return { kind: "message", frame, acknowledges };
   }

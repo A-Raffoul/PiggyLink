@@ -6,6 +6,28 @@ function pair(): [Conversation, Conversation] {
 }
 
 describe("turn-taking conversation", () => {
+  it("lets ordinary speech hand back the turn without a modem acknowledgement", () => {
+    const [assistant] = pair();
+    assistant.send("packet");
+    assistant.receiveSpeech();
+    expect(assistant.turn).toBe("mine");
+    expect(assistant.pending).toBeUndefined();
+    assistant.sendSpeech();
+    expect(assistant.turn).toBe("theirs");
+    expect(assistant.pending).toBeUndefined();
+    expect(() => assistant.sendSpeech()).toThrow("Wait for a reply");
+    assistant.receiveSpeech();
+    expect(assistant.send("encoded again").frame.sequence).toBe(1);
+  });
+
+  it("does not replay a spoken answer as a reply to an older encoded message", () => {
+    const [sender, assistant] = pair();
+    const packet = sender.send("hello");
+    assistant.receive(packet.frame);
+    assistant.receiveSpeech();
+    assistant.sendSpeech();
+    expect(assistant.receive(packet.frame)).toEqual({ kind: "duplicate" });
+  });
   it("alternates turns between the two devices", () => {
     const [alice, bob] = pair();
     expect(alice.turn).toBe("mine");
@@ -14,7 +36,10 @@ describe("turn-taking conversation", () => {
     expect(alice.turn).toBe("theirs");
     expect(() => alice.send("again")).toThrow("Wait for a reply");
 
-    expect(bob.receive(hello.frame)).toMatchObject({ kind: "message", frame: { text: "hello" } });
+    expect(bob.receive(hello.frame)).toMatchObject({
+      kind: "message",
+      frame: { text: "hello" },
+    });
     expect(bob.turn).toBe("mine");
 
     const reply = bob.send("hi back");
@@ -46,9 +71,15 @@ describe("turn-taking conversation", () => {
 
     // Alice never heard the reply and presses Resend.
     expect(alice.pending).toBe(hello);
-    expect(bob.receive(hello.frame)).toEqual({ kind: "resend-reply", message: reply });
+    expect(bob.receive(hello.frame)).toEqual({
+      kind: "resend-reply",
+      message: reply,
+    });
 
-    expect(alice.receive(reply.frame)).toMatchObject({ kind: "message", acknowledges: hello });
+    expect(alice.receive(reply.frame)).toMatchObject({
+      kind: "message",
+      acknowledges: hello,
+    });
   });
 
   it("recovers when both devices send at the same time", () => {

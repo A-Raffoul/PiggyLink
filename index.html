@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#07060e" />
     <meta
       name="description"
@@ -41,8 +44,28 @@
           >PiggyLink<span class="brand-dot">.</span></a
         >
         <nav aria-label="Main navigation">
-          <button id="how-toggle" class="nav-action" type="button">
-            How it works <span aria-hidden="true">↗</span>
+          <button
+            id="how-toggle"
+            class="nav-action"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="how-dialog"
+            aria-label="How it works"
+          >
+            <span class="how-label">How it works</span>
+            <svg
+              class="how-icon"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 3v1" />
+            </svg>
           </button>
           <button
             id="theme-toggle"
@@ -87,6 +110,7 @@
             aria-controls="settings-panel"
             aria-expanded="false"
             aria-label="Setup"
+            title="Setup"
           >
             <svg
               width="16"
@@ -111,7 +135,7 @@
       >
         <h1 id="landing-title" class="visually-hidden">Start a conversation</h1>
         <div class="spectral-orb" aria-hidden="true">
-          <canvas id="orb"></canvas>
+          <canvas id="orb" aria-hidden="true"></canvas>
         </div>
         <div class="landing-actions">
           <button id="run-demo" class="primary-action" type="button">
@@ -141,7 +165,8 @@
                 id="encoded-toggle"
                 type="checkbox"
                 role="switch"
-                aria-controls="encoded-panel" /><span
+                autocomplete="off"
+                aria-controls="conversation-log current-encoded-channel" /><span
                 class="switch-track"
                 aria-hidden="true"
               ></span
@@ -159,91 +184,82 @@
             </button>
           </div>
         </div>
-        <section
-          id="current-message"
-          class="current-message"
-          aria-label="Current message"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <div id="current-direction" class="current-direction">Listening…</div>
-          <div id="current-content" class="current-content">
-            <div class="current-channel">
-              <span class="current-channel-label">Spoken</span>
-              <p id="current-spoken">Waiting for the first message.</p>
+        <div class="signal-stage">
+          <section
+            id="current-message"
+            class="current-message"
+            aria-label="Current message"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-hidden="true"
+            inert
+          >
+            <div id="current-direction" class="current-direction">
+              Listening…
             </div>
             <div
-              id="current-encoded-channel"
-              class="current-channel current-encoded-channel"
-              hidden
+              id="current-content"
+              class="current-content"
+              role="region"
+              aria-label="Current message content"
+              tabindex="0"
             >
-              <span class="current-channel-label">Encoded</span>
-              <p id="current-encoded">Waiting for the first message.</p>
-            </div>
-          </div>
-        </section>
-        <section
-          id="signal-panel"
-          class="signal-panel"
-          aria-label="Live frequency spectrum"
-        >
-          <div class="signal-heading">
-            <span><span class="signal-dot"></span> Frequency</span>
-          </div>
-          <canvas id="spectrum" aria-label="Live frequency spectrum"></canvas>
-          <div class="spectrum-axis" aria-hidden="true">
-            <span>0</span><span>4</span><span>8</span><span>12</span
-            ><span>16</span><span>20</span><span>24 kHz</span>
-          </div>
-        </section>
-        <div id="conversation-grid" class="conversation-grid">
-          <section
-            class="conversation-card spoken-card"
-            aria-labelledby="spoken-title"
-          >
-            <div class="card-heading">
-              <div>
-                <h2 id="spoken-title">Conversation log</h2>
+              <div class="current-channel">
+                <span class="current-channel-label">Spoken</span>
+                <p id="current-spoken">Waiting for the first message.</p>
               </div>
-              <span class="channel-symbol" aria-hidden="true">≋</span>
+              <div
+                id="current-encoded-channel"
+                class="current-channel current-encoded-channel"
+                hidden
+              >
+                <span class="current-channel-label">Encoded</span>
+                <p id="current-encoded">Waiting for the first message.</p>
+              </div>
             </div>
-            <ol id="thread" class="thread">
-              <li id="thread-empty" class="thread-empty">
-                <span class="empty-line" aria-hidden="true"></span
-                ><strong>Listening…</strong>
-              </li>
-            </ol>
           </section>
           <section
-            id="encoded-panel"
-            class="conversation-card encoded-card"
-            aria-labelledby="encoded-title"
-            hidden
+            id="signal-panel"
+            class="signal-panel"
+            aria-label="Live frequency spectrum"
           >
-            <div class="card-heading">
-              <div>
-                <h2 id="encoded-title">Encoded log</h2>
-              </div>
-              <span class="channel-symbol" aria-hidden="true">⌁</span>
+            <div class="signal-heading">Frequency</div>
+            <canvas
+              id="spectrum"
+              role="img"
+              aria-label="Live frequency spectrum from 0 to 24 kilohertz"
+            ></canvas>
+            <div class="spectrum-axis" aria-hidden="true">
+              <span>0</span><span>4</span><span>8</span><span>12</span
+              ><span>16</span><span>20</span><span>24 kHz</span>
             </div>
-            <div id="link-banner" class="visually-hidden" hidden>
-              <span class="tiny-dot"></span> Acoustic message received
-            </div>
-            <ol id="encoded-thread" class="thread encoded-thread">
-              <li id="encoded-empty" class="thread-empty">
-                <span class="empty-line" aria-hidden="true"></span
-                ><strong>Listening…</strong>
-              </li>
-            </ol>
-            <details id="capture-panel" class="capture-panel" hidden>
-              <summary>
-                Demo data
-                <span id="capture-count">0 fields received</span>
-              </summary>
-              <ul id="capture-list" class="capture-list"></ul>
-            </details>
           </section>
         </div>
+        <section
+          id="conversation-log"
+          class="conversation-card conversation-log"
+          aria-labelledby="history-title"
+        >
+          <div class="card-heading">
+            <h2 id="history-title">Conversation</h2>
+          </div>
+          <div id="link-banner" class="visually-hidden" hidden>
+            Acoustic message received
+          </div>
+          <ol id="thread" class="thread" aria-labelledby="history-title">
+            <li id="thread-empty" class="thread-empty">
+              <span class="empty-line" aria-hidden="true"></span
+              ><strong>Listening…</strong>
+            </li>
+          </ol>
+          <details id="capture-panel" class="capture-panel" hidden>
+            <summary>
+              Demo data
+              <span id="capture-count">0 fields received</span>
+            </summary>
+            <ul id="capture-list" class="capture-list"></ul>
+          </details>
+        </section>
         <div id="waiting-bar" class="waiting-bar" hidden>
           <button id="resend-button" class="text-action" type="button">
             Resend
@@ -268,17 +284,17 @@
       </div>
       <h2 id="how-title">How it works</h2>
       <p class="dialog-intro">
-        Spoken audio carries a second, encoded conversation. The nearby laptop
-        decodes it.
+        Devices can exchange spoken audio with an encoded message alongside it.
+        You can also speak directly to the assistant.
       </p>
       <ol class="how-steps">
         <li>
           <span>01</span>
           <div>
-            <p>Open one role on each laptop. Place them side by side.</p>
+            <p>Open one role on each device. Place them side by side.</p>
             <div class="role-links">
-              <a href="?role=target">Support laptop ↗</a
-              ><a href="?role=probe">Customer laptop ↗</a>
+              <a href="?role=target">Support device ↗</a
+              ><a href="?role=probe">Customer device ↗</a>
             </div>
           </div>
         </li>
@@ -286,6 +302,9 @@
           <span>02</span>
           <div>
             <p>Start support, then customer. Allow microphone access.</p>
+            <p>
+              To talk yourself, start Support and speak after a short pause.
+            </p>
           </div>
         </li>
         <li>
@@ -391,7 +410,7 @@
               step="1"
               value="8"
             /><small class="field-note"
-              >Turns sent by this laptop before pausing.</small
+              >Turns sent by this device before pausing.</small
             >
           </div>
           <div class="field field-wide">

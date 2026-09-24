@@ -30,6 +30,15 @@ export const previewTurns: readonly HistoryTurn[] = [
   },
 ];
 
+export const previewSpokenTurns: readonly HistoryTurn[] = [
+  { from: "me", spoken: "Does my plan include roaming in Europe?", hidden: "" },
+  {
+    from: "them",
+    spoken: "Yes, your plan includes roaming in Europe.",
+    hidden: "",
+  },
+];
+
 export function drawPreviewSpectrum(
   canvas: HTMLCanvasElement,
   preset: FrequencyPreset,

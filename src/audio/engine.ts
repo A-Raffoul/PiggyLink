@@ -3,6 +3,7 @@ import { createUltrasoundDecoder } from "../modem/ggwave";
 import { ChannelSense } from "./channel";
 import { AudioRing } from "./pcm";
 import { renderSpectrum } from "./spectrum";
+import { SpeechDetector } from "./speech";
 
 const MAX_WAIT_FOR_CLEAR_MS = 10_000;
 const RECORDING_SECONDS = 45;
@@ -21,12 +22,29 @@ interface EngineOptions {
   readonly canvas: HTMLCanvasElement;
   readonly onData: (data: Uint8Array) => void;
   readonly onBusyChange: (busy: boolean) => void;
+  readonly onSpeech?: (samples: Float32Array) => void;
+  readonly canListenForSpeech?: () => boolean;
 }
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function startAcousticEngine(options: EngineOptions): Promise<AcousticEngine> {
-  const audioContext = new AudioContext({ sampleRate: 48_000 });
+export async function startAcousticEngine(
+  options: EngineOptions,
+): Promise<AcousticEngine> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(
+      "Microphone access requires HTTPS (or localhost) in a supported browser.",
+    );
+  }
+  let audioContext: AudioContext;
+  try {
+    audioContext = new AudioContext({ sampleRate: 48_000 });
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "NotSupportedError")
+      throw error;
+    audioContext = new AudioContext();
+  }
   await audioContext.resume();
 
   let stream: MediaStream;
@@ -46,7 +64,10 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
     throw error;
   }
 
-  const decoder = await createUltrasoundDecoder(options.preset, audioContext.sampleRate).catch(async (error) => {
+  const decoder = await createUltrasoundDecoder(
+    options.preset,
+    audioContext.sampleRate,
+  ).catch(async (error) => {
     for (const track of stream.getTracks()) track.stop();
     await audioContext.close();
     throw error;
@@ -68,24 +89,30 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
 
   const hzPerBin = audioContext.sampleRate / bandAnalyser.fftSize;
   const firstBin = Math.floor(options.preset.actualHz / hzPerBin);
-  const lastBin = Math.min(bandAnalyser.frequencyBinCount - 1, Math.ceil(options.preset.endHz / hzPerBin));
+  const lastBin = Math.min(
+    bandAnalyser.frequencyBinCount - 1,
+    Math.ceil(options.preset.endHz / hzPerBin),
+  );
   const bins = new Float32Array(bandAnalyser.frequencyBinCount);
   const channel = new ChannelSense();
+  const speech = new SpeechDetector();
+  const firstSpeechBin = Math.max(1, Math.floor(150 / hzPerBin));
+  const lastSpeechBin = Math.min(bins.length - 1, Math.ceil(4_000 / hzPerBin));
   let busy = false;
+  let hearing = false;
   let playing: AudioBufferSourceNode | undefined;
   let closed = false;
-  const recording = new AudioRing(Math.round(RECORDING_SECONDS * audioContext.sampleRate));
+  const recording = new AudioRing(
+    Math.round(RECORDING_SECONDS * audioContext.sampleRate),
+  );
 
   const senseChannel = (): void => {
     bandAnalyser.getFloatFrequencyData(bins);
     let power = 0;
-    for (let bin = firstBin; bin <= lastBin; bin += 1) power += 10 ** ((bins[bin] ?? -Infinity) / 10);
+    for (let bin = firstBin; bin <= lastBin; bin += 1)
+      power += 10 ** ((bins[bin] ?? -Infinity) / 10);
     const level = 10 * Math.log10(power / (lastBin - firstBin + 1));
-    const nextBusy = channel.update(level, performance.now(), playing !== undefined);
-    if (nextBusy !== busy) {
-      busy = nextBusy;
-      options.onBusyChange(busy);
-    }
+    busy = channel.update(level, performance.now(), playing !== undefined);
   };
 
   processor.onaudioprocess = (event): void => {
@@ -95,9 +122,37 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
     recording.push(samples);
     const decoded = decoder.decode(samples);
     if (decoded) options.onData(decoded);
+    if (options.onSpeech) {
+      let power = 0;
+      for (let bin = firstSpeechBin; bin <= lastSpeechBin; bin++)
+        power += 10 ** ((bins[bin] ?? -Infinity) / 10);
+      const level =
+        10 * Math.log10(power / (lastSpeechBin - firstSpeechBin + 1));
+      const seconds = speech.update(
+        level,
+        performance.now(),
+        busy ||
+          playing !== undefined ||
+          Boolean(decoded) ||
+          options.canListenForSpeech?.() === false,
+      );
+      if (seconds !== undefined)
+        options.onSpeech(
+          recording.latest(Math.ceil(seconds * audioContext.sampleRate)),
+        );
+    }
+    const nextHearing = busy || speech.active;
+    if (nextHearing !== hearing) {
+      hearing = nextHearing;
+      options.onBusyChange(hearing);
+    }
   };
 
-  const spectrum = renderSpectrum(options.canvas, displayAnalyser, options.preset);
+  const spectrum = renderSpectrum(
+    options.canvas,
+    displayAnalyser,
+    options.preset,
+  );
 
   return {
     sampleRate: audioContext.sampleRate,
@@ -112,8 +167,14 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
 
     play(channels) {
       const length = channels[0]?.length ?? 0;
-      const buffer = audioContext.createBuffer(channels.length, length, audioContext.sampleRate);
-      channels.forEach((channel, index) => buffer.getChannelData(index).set(channel));
+      const buffer = audioContext.createBuffer(
+        channels.length,
+        length,
+        audioContext.sampleRate,
+      );
+      channels.forEach((channel, index) =>
+        buffer.getChannelData(index).set(channel),
+      );
       const node = audioContext.createBufferSource();
       node.buffer = buffer;
       node.connect(audioContext.destination);

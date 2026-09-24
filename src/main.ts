@@ -104,16 +104,12 @@ const linkBanner = element<HTMLElement>("link-banner");
 const landingPanel = element<HTMLElement>("landing-panel");
 const chatPanel = element<HTMLElement>("chat-panel");
 const encodedToggle = element<HTMLInputElement>("encoded-toggle");
-const encodedPanel = element<HTMLElement>("encoded-panel");
-const encodedThread = element<HTMLOListElement>("encoded-thread");
-const encodedEmpty = element<HTMLElement>("encoded-empty");
-const conversationGrid = element<HTMLElement>("conversation-grid");
+const conversationLog = element<HTMLElement>("conversation-log");
 const restartButton = element<HTMLButtonElement>("restart-button");
 const startNote = element<HTMLElement>("start-note");
 const howDialog = element<HTMLDialogElement>("how-dialog");
 const currentMessage = element<HTMLElement>("current-message");
 const currentDirection = element<HTMLElement>("current-direction");
-const currentContent = element<HTMLElement>("current-content");
 const currentSpoken = element<HTMLElement>("current-spoken");
 const currentEncoded = element<HTMLElement>("current-encoded");
 const currentEncodedChannel = element<HTMLElement>("current-encoded-channel");
@@ -129,6 +125,7 @@ const SETTINGS_KEY = "sotto.settings.v3";
 
 type Activity =
   | "idle"
+  | "transcribing"
   | "thinking"
   | "voicing"
   | "preparing"
@@ -173,6 +170,10 @@ let transmitChain: Promise<void> = Promise.resolve();
 let cachedCover: { file: File | undefined; buffer: AudioBuffer } | undefined;
 let history: ThreadTurn[] = [];
 let currentTurn: ThreadTurn | undefined;
+let currentMessageTimer: ReturnType<typeof setTimeout> | undefined;
+const CURRENT_MESSAGE_MS = 4_000;
+let speechTranscribing = false;
+let encodedReceiveVersion = 0;
 let autoTurnsUsed = 0;
 let agentRole: Role | undefined;
 let voices: VoiceOption[] = [];
@@ -397,25 +398,18 @@ function timeNow(): string {
   });
 }
 
-function scrollThreadToEnd(): void {
-  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? "instant"
-    : "smooth";
-  for (const list of [thread, encodedThread])
-    list.scrollTo({ top: list.scrollHeight, behavior });
-}
-
 interface BubbleParts {
   readonly spoken: HTMLElement | undefined;
   readonly status: HTMLElement;
-  readonly encodedStatus: HTMLElement;
-  readonly labels: readonly HTMLElement[];
+  readonly label: HTMLElement;
 }
 
 function directionLabel(turn: ThreadTurn): string {
   return turn.from === "me"
-    ? `↑ Me · ${turn.delivery ?? "queued"}`
-    : "↓ Other laptop · received";
+    ? `↑ This device · ${turn.delivery ?? "queued"}`
+    : turn.hidden
+      ? "↓ Other device · received"
+      : "↓ Voice · received";
 }
 
 function renderCurrentMessage(): void {
@@ -426,10 +420,43 @@ function renderCurrentMessage(): void {
   currentSpoken.textContent = turn
     ? turn.spoken || turn.spokenFallback || "Cover audio · no spoken line"
     : "Waiting for the first message.";
-  currentEncoded.textContent = turn?.hidden || "Waiting for the first message.";
-  currentEncodedChannel.hidden = !encodedToggle.checked;
-  currentContent.classList.toggle("is-revealed", encodedToggle.checked);
+  const showEncoded = encodedToggle.checked && Boolean(turn?.hidden);
+  currentEncoded.textContent = showEncoded ? turn!.hidden : "";
+  currentEncodedChannel.hidden = !showEncoded;
 }
+
+function dismissCurrentMessage(): void {
+  clearTimeout(currentMessageTimer);
+  currentMessage.classList.remove("is-visible");
+  currentMessage.setAttribute("aria-hidden", "true");
+  currentMessage.inert = true;
+}
+
+function scheduleCurrentMessageDismissal(): void {
+  clearTimeout(currentMessageTimer);
+  // Keep text available while a keyboard user is reading the scroll region.
+  if (currentMessage.contains(document.activeElement)) return;
+  currentMessageTimer = setTimeout(dismissCurrentMessage, CURRENT_MESSAGE_MS);
+}
+
+function flashCurrentMessage(turn: ThreadTurn): void {
+  currentTurn = turn;
+  renderCurrentMessage();
+  currentMessage.inert = false;
+  currentMessage.setAttribute("aria-hidden", "false");
+  currentMessage.classList.add("is-visible");
+  scheduleCurrentMessageDismissal();
+}
+
+currentMessage.addEventListener("focusin", () =>
+  clearTimeout(currentMessageTimer),
+);
+currentMessage.addEventListener("focusout", () => {
+  queueMicrotask(() => {
+    if (currentMessage.classList.contains("is-visible"))
+      scheduleCurrentMessageDismissal();
+  });
+});
 
 function appendBubble(
   turn: ThreadTurn,
@@ -437,19 +464,15 @@ function appendBubble(
   spokenPlaceholder?: string,
 ): BubbleParts {
   threadEmpty.hidden = true;
-  encodedEmpty.hidden = true;
   const item = document.createElement("li");
   item.className = `bubble bubble-${turn.from}`;
-  const encodedItem = document.createElement("li");
-  encodedItem.className = item.className;
-  const labels: HTMLElement[] = [];
-  for (const entry of [item, encodedItem]) {
-    const label = document.createElement("span");
-    label.className = "speaker-label";
-    label.textContent = directionLabel(turn);
-    entry.append(label);
-    labels.push(label);
-  }
+  const label = document.createElement("span");
+  label.className = "speaker-label";
+  label.textContent = directionLabel(turn);
+  const pair = document.createElement("div");
+  pair.className = "bubble-pair";
+  const spokenChannel = document.createElement("div");
+  spokenChannel.className = "bubble-channel spoken-channel";
 
   let spoken: HTMLElement | undefined;
   if (turn.spoken || spokenPlaceholder) {
@@ -457,33 +480,38 @@ function appendBubble(
     spoken.className = "bubble-spoken";
     spoken.textContent = turn.spoken || spokenPlaceholder || "";
     if (!turn.spoken) spoken.classList.add("is-pending");
-    item.append(spoken);
+    spokenChannel.append(spoken);
   } else {
     const cover = document.createElement("p");
     cover.className = "bubble-spoken";
     cover.textContent = "Cover audio · no spoken line";
-    item.append(cover);
+    spokenChannel.append(cover);
   }
 
   const injection = isInjection(turn.hidden);
-  if (injection) encodedItem.classList.add("is-injection");
+  if (injection) item.classList.add("is-injection");
+  const encodedChannel = document.createElement("div");
+  encodedChannel.className = "bubble-channel encoded-channel";
+  encodedChannel.hidden = !encodedToggle.checked;
+  const encodedLabel = document.createElement("span");
+  encodedLabel.className = "bubble-channel-label";
+  encodedLabel.textContent = "Encoded";
   const hidden = document.createElement("p");
   hidden.className = "bubble-hidden";
   hidden.append(document.createTextNode(turn.hidden));
 
   const status = document.createElement("small");
   status.textContent = meta;
-  const encodedStatus = document.createElement("small");
-  encodedStatus.textContent = meta;
-  item.append(status);
-  encodedItem.append(hidden, encodedStatus);
+  encodedChannel.append(encodedLabel, hidden);
+  pair.append(spokenChannel);
+  if (turn.hidden) pair.append(encodedChannel);
+  item.append(label, pair, status);
   thread.append(item);
-  encodedThread.append(encodedItem);
   turn.spokenFallback = spokenPlaceholder;
-  currentTurn = turn;
-  renderCurrentMessage();
-  scrollThreadToEnd();
-  return { spoken, status, encodedStatus, labels };
+  // Outgoing captions begin with playback, not while waiting for a clear channel.
+  if (turn.from === "them" || turn.delivery === "sent")
+    flashCurrentMessage(turn);
+  return { spoken, status, label };
 }
 
 function appendNotice(text: string, tone: "info" | "error" = "info"): void {
@@ -498,7 +526,6 @@ function appendNotice(text: string, tone: "info" | "error" = "info"): void {
   item.dataset.tone = tone;
   item.textContent = text;
   thread.append(item);
-  scrollThreadToEnd();
 }
 
 function setBubbleStatus(
@@ -510,18 +537,16 @@ function setBubbleStatus(
   const entry = outgoingStatus.get(message.frame.sequence);
   if (!entry) return;
   const { turn, parts } = entry;
-  for (const status of [parts.status, parts.encodedStatus]) {
-    status.textContent = text;
-    if (state) status.dataset.state = state;
-    else delete status.dataset.state;
-  }
+  parts.status.textContent = text;
+  if (state) parts.status.dataset.state = state;
+  else delete parts.status.dataset.state;
   if (delivery) {
     turn.delivery = delivery;
-    for (const label of parts.labels) label.textContent = directionLabel(turn);
+    parts.label.textContent = directionLabel(turn);
     // A retry becomes current when playback starts. A late acknowledgement
     // must not replace a newer received message in the large caption.
-    if (delivery === "sending") currentTurn = turn;
-    renderCurrentMessage();
+    if (delivery === "sending") flashCurrentMessage(turn);
+    else if (currentTurn === turn) renderCurrentMessage();
   }
 }
 
@@ -534,7 +559,9 @@ function render(): void {
   const myTurn = conversation?.turn === "mine";
   const busy = activity !== "idle";
   const bytes = utf8ByteLength(hiddenInput.value.trim());
-  const validHidden = bytes > 0 && bytes <= MAX_MESSAGE_BYTES;
+  const validHidden =
+    bytes <= MAX_MESSAGE_BYTES &&
+    (bytes > 0 || spokenInput.value.trim().length > 0);
   const validSpoken = spokenInput.value.trim().length <= MAX_SPOKEN_CHARS;
 
   const started = !!session || previewRunning;
@@ -571,7 +598,7 @@ function render(): void {
   agentBrief.disabled = started;
   chatPanel.dataset.speaking = String(activity === "transmitting" || hearing);
   clearButton.disabled = busy || history.length === 0;
-  waitingBar.hidden = !session || myTurn;
+  waitingBar.hidden = !conversation?.pending;
   resendButton.disabled = busy;
   autoCount.textContent = autoReplyInput.checked
     ? `${autoTurnsUsed}/${maxAutoTurns()}`
@@ -579,6 +606,7 @@ function render(): void {
 
   const labels: Record<Activity, string> = {
     idle: myTurn ? "Listening" : "Waiting…",
+    transcribing: "Transcribing…",
     thinking: "Thinking…",
     voicing: "Preparing…",
     preparing: "Preparing…",
@@ -606,10 +634,13 @@ function render(): void {
 
 function renderEncodedView(): void {
   const revealed = encodedToggle.checked;
-  encodedPanel.hidden = !revealed;
-  conversationGrid.classList.toggle("is-revealed", revealed);
+  conversationLog.classList.toggle("is-revealed", revealed);
+  capturePanel.hidden = !revealed || captured.size === 0;
+  for (const channel of thread.querySelectorAll<HTMLElement>(
+    ".encoded-channel",
+  ))
+    channel.hidden = !revealed;
   renderCurrentMessage();
-  if (revealed) scrollThreadToEnd();
 }
 
 function setActivity(next: Activity): void {
@@ -631,6 +662,16 @@ async function coverFor(engine: AcousticEngine): Promise<Float32Array[]> {
   );
 }
 
+async function spokenAudio(
+  engine: AcousticEngine,
+  text: string,
+): Promise<Float32Array> {
+  const samples = await speak(text, voiceSelect.value);
+  // decodeAudioData resamples to the actual context rate, including native iPhone rates.
+  const buffer = await engine.decodeAudio(encodeWav(samples, 48_000));
+  return buffer.getChannelData(0);
+}
+
 // Builds the exact audio for the next turn before committing it, so a failure never uses up the turn.
 async function prepareTurn(
   active: Session,
@@ -649,7 +690,7 @@ async function prepareTurn(
   let cover: Float32Array[];
   if (spoken) {
     setActivity("voicing");
-    cover = [await speak(spoken, voiceSelect.value)];
+    cover = [await spokenAudio(engine, spoken)];
   } else {
     cover = await coverFor(engine);
   }
@@ -753,6 +794,7 @@ function transmit(turn: OutgoingTurn): Promise<void> {
 async function sendTurn(spoken: string, hidden: string): Promise<boolean> {
   const active = session;
   if (!active) return false;
+  if (!hidden) return sendSpokenTurn(active, spoken);
   try {
     const turn = await prepareTurn(active, spoken, hidden);
     if (session !== active) return false;
@@ -775,10 +817,53 @@ async function sendTurn(spoken: string, hidden: string): Promise<boolean> {
   }
 }
 
+async function sendSpokenTurn(
+  active: Session,
+  spoken: string,
+): Promise<boolean> {
+  let record: ThreadTurn | undefined;
+  let parts: BubbleParts | undefined;
+  try {
+    setActivity("voicing");
+    const audio = await spokenAudio(active.engine, spoken);
+    if (session !== active) return false;
+    setActivity("queued");
+    await active.engine.waitForClearChannel(() => session !== active);
+    if (session !== active) return false;
+    active.conversation.sendSpeech();
+    record = { from: "me", spoken, hidden: "", delivery: "sending" };
+    history.push(record);
+    parts = appendBubble(record, "Speaking…");
+    setActivity("transmitting");
+    flashCurrentMessage(record);
+    await active.engine.play([audio]);
+    record.delivery = session === active ? "sent" : "stopped";
+    parts.label.textContent = directionLabel(record);
+    if (currentTurn === record) renderCurrentMessage();
+    return session === active;
+  } catch (error) {
+    if (session !== active) return false;
+    if (record && parts) {
+      record.delivery = "failed";
+      parts.label.textContent = directionLabel(record);
+      parts.status.textContent = errorText(error, "Speech playback failed.");
+      parts.status.dataset.state = "error";
+      active.conversation.receiveSpeech();
+    } else
+      appendNotice(
+        `Couldn't speak: ${errorText(error, "unknown error")}`,
+        "error",
+      );
+    return false;
+  } finally {
+    if (session === active) setActivity("idle");
+  }
+}
+
 async function sendManual(): Promise<void> {
   const spoken = spokenInput.value.trim();
   const hidden = hiddenInput.value.trim();
-  if (!hidden) return;
+  if (!hidden && !spoken) return;
   if (!(await ensureJoined()) || !canAct()) return;
   claimRole("probe");
   if (spoken && !ensureAi(true)) return;
@@ -808,6 +893,7 @@ async function agentTurn(): Promise<void> {
         ({ from, spoken, hidden }): HistoryTurn => ({ from, spoken, hidden }),
       ),
       maxHiddenBytes: MAX_MESSAGE_BYTES,
+      spokenOnly: history.at(-1)?.hidden === "",
     };
     const turn = await writeAgentTurn(request);
     if (session !== active) return;
@@ -845,7 +931,8 @@ async function transcribeTurn(
     record.spokenFallback = target.textContent;
   } finally {
     target.classList.remove("is-pending");
-    if (currentTurn === record) renderCurrentMessage();
+    if (currentTurn === record && session === active)
+      flashCurrentMessage(record);
   }
 }
 
@@ -862,7 +949,13 @@ async function maybeAutoReply(
   }
   await record.transcript;
   await sleep(150);
-  if (session !== active || !autoReplyInput.checked || !canAct()) return;
+  if (
+    session !== active ||
+    history.at(-1) !== record ||
+    !autoReplyInput.checked ||
+    !canAct()
+  )
+    return;
   autoTurnsUsed += 1;
   await agentTurn();
 }
@@ -886,7 +979,7 @@ function recordCapture(hidden: string): void {
     added = true;
   }
   if (added) {
-    capturePanel.hidden = false;
+    capturePanel.hidden = !encodedToggle.checked;
     const n = captured.size;
     captureCount.textContent = `${n} field${n === 1 ? "" : "s"} received`;
   }
@@ -908,6 +1001,7 @@ function handleData(bytes: Uint8Array): void {
 
   const outcome = active.conversation.receive(frame);
   if (outcome.kind === "message") {
+    encodedReceiveVersion += 1;
     if (outcome.acknowledges)
       setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done", "delivered");
     claimRole("target");
@@ -939,6 +1033,55 @@ function handleData(bytes: Uint8Array): void {
   }
 }
 
+async function handleSpeech(samples: Float32Array): Promise<void> {
+  const active = session;
+  if (!active || speechTranscribing || activity !== "idle") return;
+  const receivedVersion = encodedReceiveVersion;
+  let received: ThreadTurn | undefined;
+  speechTranscribing = true;
+  setActivity("transcribing");
+  try {
+    const factor = Math.max(
+      1,
+      Math.round(active.engine.sampleRate / STT_SAMPLE_RATE),
+    );
+    const text = (
+      await transcribe(
+        encodeWav(
+          downsample(samples, factor),
+          active.engine.sampleRate / factor,
+        ),
+      )
+    ).trim();
+    // A modem frame arriving during recognition owns this audio, avoiding a second plain turn.
+    if (
+      session !== active ||
+      receivedVersion !== encodedReceiveVersion ||
+      !text
+    )
+      return;
+    received = { from: "them", spoken: text, hidden: "", delivery: "received" };
+    active.conversation.receiveSpeech();
+    claimRole("target");
+    history.push(received);
+    appendBubble(received, `${timeNow()} · speech`);
+  } catch (error) {
+    if (session === active && receivedVersion === encodedReceiveVersion)
+      appendNotice(
+        `Couldn't transcribe speech: ${errorText(error, "Try speaking again.")}`,
+        "error",
+      );
+  } finally {
+    if (session === active) {
+      speechTranscribing = false;
+      setActivity("idle");
+      const latest =
+        receivedVersion !== encodedReceiveVersion ? history.at(-1) : received;
+      if (latest?.from === "them") void maybeAutoReply(active, latest);
+    }
+  }
+}
+
 async function startEngine(): Promise<boolean> {
   joining = true;
   render();
@@ -948,6 +1091,8 @@ async function startEngine(): Promise<boolean> {
       preset,
       canvas: spectrumCanvas,
       onData: handleData,
+      onSpeech: (samples) => void handleSpeech(samples),
+      canListenForSpeech: () => activity === "idle" && !speechTranscribing,
       onBusyChange(busy) {
         hearing = busy;
         render();
@@ -988,6 +1133,7 @@ const ensureJoined = (): Promise<boolean> => join();
 function clearConversationView(): void {
   history = [];
   currentTurn = undefined;
+  dismissCurrentMessage();
   renderCurrentMessage();
   autoTurnsUsed = 0;
   captured.clear();
@@ -1000,10 +1146,7 @@ function clearConversationView(): void {
   outgoingStatus.clear();
   for (const item of [...thread.children])
     if (item !== threadEmpty) item.remove();
-  for (const item of [...encodedThread.children])
-    if (item !== encodedEmpty) item.remove();
   threadEmpty.hidden = false;
-  encodedEmpty.hidden = false;
   spokenInput.value = "";
   hiddenInput.value = "";
 }
@@ -1032,9 +1175,12 @@ async function runDemo(): Promise<void> {
     previewRunning = true;
     hasStarted = true;
     render();
-    const { previewTurns, drawPreviewSpectrum } = await import("./ui/preview");
+    const { previewTurns, previewSpokenTurns, drawPreviewSpectrum } =
+      await import("./ui/preview");
     if (!previewRunning) return;
-    for (const turn of previewTurns) {
+    for (const turn of pageParams.get("speech") === "1"
+      ? previewSpokenTurns
+      : previewTurns) {
       const record: ThreadTurn = {
         ...turn,
         from:
@@ -1071,6 +1217,7 @@ async function runDemo(): Promise<void> {
 }
 
 async function leave(): Promise<void> {
+  dismissCurrentMessage();
   if (previewMode) {
     previewRunning = false;
     stopPreviewDrawing?.();
@@ -1081,6 +1228,7 @@ async function leave(): Promise<void> {
   if (!active) return;
   stopping = true;
   session = undefined;
+  speechTranscribing = false;
   activity = "idle";
   hearing = false;
   autoReplyInput.checked = false;
@@ -1147,6 +1295,7 @@ element<HTMLButtonElement>("how-close").addEventListener("click", () =>
   howDialog.close(),
 );
 encodedToggle.addEventListener("change", renderEncodedView);
+window.addEventListener("pageshow", renderEncodedView);
 restartButton.addEventListener("click", () => void runDemo());
 agentSelect.addEventListener("change", () => {
   voiceChosen = false;

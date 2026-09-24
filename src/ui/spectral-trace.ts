@@ -26,8 +26,8 @@ export function drawSpectralTrace(
   }
   if (morph === 0) path.closePath();
   context.save();
-  // A single crisp stroke with contrast against both page themes.
-  context.strokeStyle = "#d63862";
+  // CSS supplies the crisp trace color, including the browser's forced colors.
+  context.strokeStyle = getComputedStyle(context.canvas).color;
   context.lineWidth = 3;
   context.lineJoin = "round";
   context.lineCap = "round";

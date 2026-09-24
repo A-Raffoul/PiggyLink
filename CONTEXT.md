@@ -2,7 +2,7 @@
 
 An educational demonstration of two agents exchanging spoken conversation and
 hidden messages through sound, using fictional account details, presented in
-a video of two nearby laptops.
+a video of two nearby devices.
 
 ## Language
 
@@ -34,6 +34,16 @@ _Avoid_: Decryption (revealing a message does not imply that it was encrypted)
 The exchange of text carried by high-frequency sound alongside the agents'
 spoken lines.
 _Avoid_: Encrypted conversation (the messages are not encrypted)
+
+**Spoken-only turn**:
+An utterance received through the microphone without a decoded message, or the
+spoken reply to it. It has no encoded counterpart and no modem sequence number.
+The interface labels incoming speech as Voice because its source is unidentified.
+
+**Device**:
+The computer or phone running one instance of the page. This device is the local
+instance; Other device is the peer identified by a decoded message.
+_Avoid_: Laptop (the interface also supports phone-sized screens)
 
 **Live spectrum**:
 A crisp line showing the latest sound energy across frequency, with no
