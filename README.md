@@ -1,13 +1,13 @@
 # CrossTalk
 
-CrossTalk performs a known conversation with two ElevenLabs text-to-speech voices. It opens one browser window for Speaker A and one for Speaker B, generates only that speaker's lines in each window, and coordinates the turns with a same-origin browser channel.
+CrossTalk performs a known conversation with two ElevenLabs text-to-speech voices. It opens one browser for Speaker A and one for Speaker B, generates only that speaker's lines in each browser, and coordinates turns acoustically: each microphone detects the other voice and hands off after the line ends.
 
 Rachel and Drew are preconfigured as the default voices:
 
 - Rachel: `21m00Tcm4TlvDq8ikWAM`
 - Drew: `29vD33N1CtxCmqQRPOHJ`
 
-No agent IDs, microphones, speech recognition, or LLM-generated replies are involved.
+No agent IDs, speech recognition, or LLM-generated replies are involved. Microphones are used only for local sound-and-silence detection; recorded audio is not uploaded.
 
 ## Configure Vercel
 
@@ -37,12 +37,12 @@ npx vercel dev
 ## Performance flow
 
 1. Enter or keep the two voice IDs and edit the known script.
-2. Open both role links in two windows of the same browser.
-3. Click **Prepare** in each window. Each window generates only its speaker's audio.
-4. Once both are ready, the first speaker starts automatically.
-5. Every completed audio clip signals the other window to play the next turn. Both windows display the same live transcript.
+2. Open the two role links in separate browsers or devices and place their speakers and microphones within earshot.
+3. Prepare the non-opening speaker first and allow microphone access. It will begin listening.
+4. Prepare the opening speaker, then press **Start conversation**.
+5. Each browser detects the expected peer line and 850 ms of trailing silence, then plays its own next line. Both browsers display the known text as it is heard or played.
 
-The two windows must share a browser storage partition for `BroadcastChannel` coordination. Two windows or tabs in the same browser work; unrelated browser applications or devices need a network-backed room service.
+Use speakers rather than headphones. A quiet room and moderate playback volume give the sound detector the clearest handoffs. The microphone meter should visibly move while the other browser is speaking.
 
 ## API behavior
 

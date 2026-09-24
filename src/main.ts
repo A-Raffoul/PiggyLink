@@ -18,13 +18,6 @@ interface RoomConfig {
   script: ScriptLine[];
 }
 
-type RoomMessage =
-  | { type: "hello"; role: Role }
-  | { type: "ready"; role: Role }
-  | { type: "line-start"; index: number }
-  | { type: "line-complete"; index: number }
-  | { type: "reset" };
-
 const DEFAULT_SCRIPT: ScriptLine[] = [
   { speaker: "a", text: "Hi Drew. The connection is live. Can you hear me clearly?" },
   { speaker: "b", text: "Loud and clear, Rachel. I can hear you perfectly." },
@@ -142,7 +135,7 @@ function renderDirector(): void {
         <div class="setup-intro">
           <span class="section-index">01 / SETUP</span>
           <h2 id="setup-heading">Cast the two voices</h2>
-          <p>Rachel and Drew are ready by default. Replace either public voice ID whenever you want a different performance.</p>
+          <p>Rachel and Drew are ready by default. Open both roles near each other, prepare the non-opening speaker first, then start the opening voice.</p>
         </div>
 
         <form id="room-form" class="setup-form">
@@ -275,16 +268,25 @@ function renderVoice(role: Role): void {
   const peerName = isA ? config.voiceBName : config.voiceAName;
   const voiceId = isA ? config.voiceAId : config.voiceBId;
   const ownLines = config.script.map((line, index) => ({ ...line, index })).filter((line) => line.speaker === role);
+  const openingRole = config.script[0]?.speaker;
+  const isOpeningVoice = openingRole === role;
   let audioContext: AudioContext | null = null;
   let currentSource: AudioBufferSourceNode | null = null;
+  let microphone: MediaStream | null = null;
+  let analyser: AnalyserNode | null = null;
+  let analyserData: Float32Array<ArrayBuffer> | null = null;
+  let vadFrame = 0;
   let selfReady = false;
-  let peerReady = false;
   let started = false;
   let finished = false;
   let currentLine = -1;
+  let nextIndex = 0;
+  let listening = false;
+  let speechHeard = false;
+  let speechStartedAt = 0;
+  let lastLoudAt = 0;
   const audioBuffers = new Map<number, AudioBuffer>();
   const transcriptNodes = new Map<number, HTMLElement>();
-  const channel = new BroadcastChannel(`crosstalk:${config.roomId}`);
 
   document.body.dataset.role = role;
   document.body.innerHTML = `
@@ -315,15 +317,15 @@ function renderVoice(role: Role): void {
             <p id="mode-label">VOICE NOT PREPARED</p>
           </div>
 
-          <div class="meters" aria-label="Performance readiness">
+          <div class="meters" aria-label="Voice and microphone levels">
             <div><span>VOICE</span><i><b id="voice-meter"></b></i></div>
-            <div><span>PEER</span><i><b id="peer-meter"></b></i></div>
+            <div><span>MIC</span><i><b id="peer-meter"></b></i></div>
           </div>
 
           <button id="session-button" class="session-button" type="button">
             <span id="button-label">Prepare ${escapeHtml(selfName)}</span><b aria-hidden="true">●</b>
           </button>
-          <p id="session-note" class="session-note">Generate ${ownLines.length} ${ownLines.length === 1 ? "line" : "lines"}, then wait for the other voice window.</p>
+          <p id="session-note" class="session-note">${isOpeningVoice ? `Prepare ${peerName}'s window first. Then prepare this voice and press Start.` : `Prepare this window first. It will listen for ${peerName}'s opening line.`}</p>
           <a class="back-link" href="${escapeHtml(window.location.pathname)}">← Back to setup</a>
         </aside>
 
@@ -335,7 +337,7 @@ function renderVoice(role: Role): void {
           <div id="transcript" class="transcript" aria-live="polite">
             <div id="empty-transcript" class="empty-transcript">
               <span>●</span>
-              <p>Both windows prepare their voice.<br>The script then plays turn by turn.</p>
+              <p>Each window listens through its microphone.<br>Silence after a line triggers the next voice.</p>
             </div>
           </div>
         </section>
@@ -372,7 +374,7 @@ function renderVoice(role: Role): void {
       next === "playing" ? "ON AIR" :
       next === "complete" ? "COMPLETE" :
       next === "error" ? "CHECK SETUP" : "NOT READY";
-    button.disabled = next === "preparing" || next === "ready" || next === "playing";
+    button.disabled = next === "preparing" || next === "playing";
     buttonLabel.textContent =
       next === "preparing" ? "Generating voice…" :
       next === "complete" ? "Run it again" :
@@ -428,6 +430,20 @@ function renderVoice(role: Role): void {
     try {
       audioContext ??= new AudioContext();
       await audioContext.resume();
+      microphone ??= await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      const micSource = audioContext.createMediaStreamSource(microphone);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.2;
+      analyserData = new Float32Array(analyser.fftSize);
+      micSource.connect(analyser);
+      monitorMicrophone();
       for (const [position, line] of ownLines.entries()) {
         const buffer = await requestSpeech(line, line.index);
         audioBuffers.set(line.index, buffer);
@@ -436,9 +452,15 @@ function renderVoice(role: Role): void {
         note.textContent = `Generating ${prepared} of ${ownLines.length} lines…`;
       }
       selfReady = true;
-      setState("ready", peerReady ? "Both voices are ready. Starting…" : `${selfName} is ready. Waiting for ${peerName}…`);
-      channel.postMessage({ type: "ready", role } satisfies RoomMessage);
-      maybeStart();
+      if (isOpeningVoice) {
+        setState("ready", `${selfName} is ready. Make sure ${peerName} is listening, then start.`);
+        button.disabled = false;
+        buttonLabel.textContent = "Start conversation";
+        modeLabel.textContent = "READY TO OPEN";
+      } else {
+        started = true;
+        enterListening();
+      }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Could not prepare this voice.";
       setState("error", message);
@@ -448,8 +470,8 @@ function renderVoice(role: Role): void {
   function completeLine(index: number): void {
     currentSource = null;
     currentLine = -1;
-    channel.postMessage({ type: "line-complete", index } satisfies RoomMessage);
-    advanceAfter(index);
+    nextIndex = index + 1;
+    advance();
   }
 
   function playLine(index: number): void {
@@ -462,7 +484,6 @@ function renderVoice(role: Role): void {
     orb.dataset.mode = "speaking";
     modeLabel.textContent = `${selfName.toUpperCase()} SPEAKING`;
     showTranscript(index);
-    channel.postMessage({ type: "line-start", index } satisfies RoomMessage);
     const source = audioContext.createBufferSource();
     currentSource = source;
     source.buffer = buffer;
@@ -471,93 +492,125 @@ function renderVoice(role: Role): void {
     source.start();
   }
 
-  function advanceAfter(index: number): void {
-    const nextIndex = index + 1;
+  function advance(): void {
     const nextLine = config.script[nextIndex];
     if (!nextLine) {
-      finished = true;
-      orb.dataset.mode = "";
-      modeLabel.textContent = "PERFORMANCE COMPLETE";
-      setState("complete", "The full script has finished.");
+      finishPerformance();
       return;
     }
-    if (nextLine.speaker === role) playLine(nextIndex);
+    if (nextLine.speaker === role) {
+      window.setTimeout(() => playLine(nextIndex), 1050);
+    }
     else {
-      orb.dataset.mode = "listening";
-      modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
-      setState("playing", `Waiting for ${peerName}'s next line…`);
+      window.setTimeout(enterListening, 650);
     }
   }
 
-  function maybeStart(): void {
-    if (!selfReady || !peerReady || started) return;
+  function startConversation(): void {
+    if (!selfReady || started || openingRole !== role) return;
     started = true;
-    const firstLine = config.script[0];
-    setState("playing", "Both voices are ready. The performance is starting…");
-    if (firstLine?.speaker === role) playLine(0);
-    else {
-      orb.dataset.mode = "listening";
-      modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
+    nextIndex = 0;
+    playLine(0);
+  }
+
+  function enterListening(): void {
+    if (finished) return;
+    const expected = config.script[nextIndex];
+    if (!expected) {
+      finishPerformance();
+      return;
     }
+    listening = true;
+    speechHeard = false;
+    speechStartedAt = 0;
+    lastLoudAt = 0;
+    orb.dataset.mode = "listening";
+    modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
+    setState("playing", `Waiting to hear ${peerName}'s turn ${nextIndex + 1}…`);
+  }
+
+  function finishPerformance(): void {
+    listening = false;
+    finished = true;
+    orb.dataset.mode = "";
+    modeLabel.textContent = "PERFORMANCE COMPLETE";
+    peerMeter.style.transform = "scaleX(0.02)";
+    setState("complete", "The full script has finished.");
+  }
+
+  function monitorMicrophone(): void {
+    if (!analyser || !analyserData) return;
+    analyser.getFloatTimeDomainData(analyserData);
+    let sum = 0;
+    for (const sample of analyserData) sum += sample * sample;
+    const rms = Math.sqrt(sum / analyserData.length);
+    peerMeter.style.transform = `scaleX(${Math.max(0.02, Math.min(1, rms * 12))})`;
+
+    if (listening && currentSource === null) {
+      const now = performance.now();
+      const loud = rms >= 0.035;
+      if (loud) {
+        if (!speechHeard) {
+          speechHeard = true;
+          speechStartedAt = now;
+          showTranscript(nextIndex);
+          note.textContent = `${peerName} is speaking turn ${nextIndex + 1}…`;
+        }
+        lastLoudAt = now;
+      } else if (
+        speechHeard &&
+        now - speechStartedAt >= 500 &&
+        now - lastLoudAt >= 850
+      ) {
+        listening = false;
+        speechHeard = false;
+        nextIndex += 1;
+        advance();
+      }
+    }
+
+    vadFrame = window.requestAnimationFrame(monitorMicrophone);
   }
 
   function clearTranscript(): void {
     transcriptNodes.clear();
-    transcript.innerHTML = `<div id="empty-transcript" class="empty-transcript"><span>●</span><p>Both windows prepare their voice.<br>The script then plays turn by turn.</p></div>`;
+    transcript.innerHTML = `<div id="empty-transcript" class="empty-transcript"><span>●</span><p>Each window listens through its microphone.<br>Silence after a line triggers the next voice.</p></div>`;
     document.querySelectorAll(".script-list li").forEach((item) => item.classList.remove("is-current"));
   }
 
-  function resetPerformance(broadcast: boolean): void {
+  function resetPerformance(): void {
     currentSource?.stop();
     currentSource = null;
     currentLine = -1;
     started = false;
     finished = false;
+    listening = false;
+    speechHeard = false;
+    nextIndex = 0;
     clearTranscript();
-    if (broadcast) channel.postMessage({ type: "reset" } satisfies RoomMessage);
-    setState("ready", "Both voices remain prepared. Restarting…");
-    window.setTimeout(maybeStart, 350);
+    if (isOpeningVoice) {
+      setState("ready", `${selfName} is reset. Reset ${peerName}, then start here.`);
+      button.disabled = false;
+      buttonLabel.textContent = "Start conversation";
+      modeLabel.textContent = "READY TO OPEN";
+    } else {
+      started = true;
+      enterListening();
+    }
   }
 
-  channel.addEventListener("message", (event: MessageEvent<RoomMessage>) => {
-    const message = event.data;
-    if (message.type === "hello") {
-      if (selfReady) channel.postMessage({ type: "ready", role } satisfies RoomMessage);
-      return;
-    }
-    if (message.type === "ready" && message.role !== role) {
-      peerReady = true;
-      peerMeter.style.transform = "scaleX(1)";
-      if (selfReady) note.textContent = "Both voices are ready. Starting…";
-      maybeStart();
-      return;
-    }
-    if (message.type === "line-start") {
-      showTranscript(message.index);
-      orb.dataset.mode = "listening";
-      modeLabel.textContent = `LISTENING TO ${peerName.toUpperCase()}`;
-      setState("playing", `${peerName} is speaking turn ${message.index + 1}…`);
-      return;
-    }
-    if (message.type === "line-complete") {
-      advanceAfter(message.index);
-      return;
-    }
-    if (message.type === "reset") resetPerformance(false);
-  });
-
   button.addEventListener("click", () => {
-    if (finished) resetPerformance(true);
+    if (finished) resetPerformance();
+    else if (selfReady && isOpeningVoice) startConversation();
     else void prepareVoice();
   });
   element<HTMLButtonElement>("clear-transcript").addEventListener("click", clearTranscript);
   window.addEventListener("pagehide", () => {
     currentSource?.stop();
-    channel.close();
+    window.cancelAnimationFrame(vadFrame);
+    microphone?.getTracks().forEach((track) => track.stop());
     void audioContext?.close();
   });
-
-  channel.postMessage({ type: "hello", role } satisfies RoomMessage);
 }
 
 const currentRole = roleFromUrl();
