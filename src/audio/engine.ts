@@ -1,10 +1,9 @@
 import type { FrequencyPreset } from "../core/config";
 import { createUltrasoundDecoder } from "../modem/ggwave";
+import { ChannelSense } from "./channel";
 import { renderSpectrum } from "./spectrum";
 
-const BUSY_MARGIN_DB = 9;
-const FLOOR_RISE_PER_FRAME_DB = 0.02;
-const CLEAR_AFTER_MS = 600;
+const MAX_WAIT_FOR_CLEAR_MS = 20_000;
 
 export interface AcousticEngine {
   readonly sampleRate: number;
@@ -68,28 +67,17 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
   const firstBin = Math.floor(options.preset.actualHz / hzPerBin);
   const lastBin = Math.min(bandAnalyser.frequencyBinCount - 1, Math.ceil(options.preset.endHz / hzPerBin));
   const bins = new Float32Array(bandAnalyser.frequencyBinCount);
-  let noiseFloor = Number.POSITIVE_INFINITY;
-  let lastBusyAt = 0;
+  const channel = new ChannelSense();
   let busy = false;
   let playing: AudioBufferSourceNode | undefined;
   let closed = false;
 
-  // In-band energy well above the tracked noise floor means someone is transmitting.
   const senseChannel = (): void => {
     bandAnalyser.getFloatFrequencyData(bins);
     let power = 0;
-    for (let bin = firstBin; bin <= lastBin; bin += 1) power += 10 ** ((bins[bin] ?? -160) / 10);
-    const level = 10 * Math.log10(power / (lastBin - firstBin + 1) || 1e-16);
-    const now = performance.now();
-
-    if (playing) {
-      lastBusyAt = now;
-    } else {
-      noiseFloor = level < noiseFloor ? level : noiseFloor + FLOOR_RISE_PER_FRAME_DB;
-      if (level > noiseFloor + BUSY_MARGIN_DB) lastBusyAt = now;
-    }
-
-    const nextBusy = now - lastBusyAt < CLEAR_AFTER_MS;
+    for (let bin = firstBin; bin <= lastBin; bin += 1) power += 10 ** ((bins[bin] ?? -Infinity) / 10);
+    const level = 10 * Math.log10(power / (lastBin - firstBin + 1));
+    const nextBusy = channel.update(level, performance.now(), playing !== undefined);
     if (nextBusy !== busy) {
       busy = nextBusy;
       options.onBusyChange(busy);
@@ -130,9 +118,11 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
     },
 
     async waitForClearChannel(isCancelled) {
+      // Listen-before-talk is best effort: never hold a message back indefinitely.
+      const giveUpAt = performance.now() + MAX_WAIT_FOR_CLEAR_MS;
       for (;;) {
         while (busy || playing) {
-          if (isCancelled()) return;
+          if (isCancelled() || performance.now() > giveUpAt) return;
           await sleep(100);
         }
         // Random backoff so two devices that were both waiting don't start together.

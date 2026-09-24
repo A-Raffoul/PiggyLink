@@ -59,9 +59,9 @@ export function renderSpectrum(
     for (let index = 0; index < bins.length; index += 1) {
       const frequency = (index * analyser.context.sampleRate) / analyser.fftSize;
       if (frequency < MIN_HZ || frequency > maximumHz) continue;
-      const decibels = Math.max(-110, Math.min(-20, bins[index] ?? -110));
+      const decibels = Math.max(-140, Math.min(-20, bins[index] ?? -140));
       const x = toX(frequency);
-      const y = height - ((decibels + 110) / 90) * height;
+      const y = height - ((decibels + 140) / 120) * height;
       if (!drawing) {
         context.moveTo(x, y);
         drawing = true;
