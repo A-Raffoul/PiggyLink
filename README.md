@@ -1,58 +1,54 @@
-# SottoLink
+# CrossTalk
 
-SottoLink is an experimental, browser-only acoustic link. A sender mixes a short
-private message into an uploaded WAV recording using ggwave's ultrasonic FSK
-protocol. A nearby receiver listens through its microphone and displays only a
-message that passes SottoLink's integrity check.
+CrossTalk runs two independent ElevenLabs voice agents in two browser sessions and renders their speech as live text. A director screen creates one link for Agent A and one for Agent B; each browser then connects directly to its own ElevenLabs agent.
 
-No message relay or application backend is used. After the static app loads,
-the data path is acoustic only.
+The app assumes the dialogue is already known. The script is shown alongside the live transcript and is sent to both sessions as the `conversation_script` dynamic variable. The agents still need to be configured in ElevenLabs to follow it.
 
-## MVP scope
-
-- Mac sender to iPhone receiver, about one metre apart in a quiet room
-- Safari as the initial browser target
-- Included example speech or custom WAV cover audio, with private messages up to 32 UTF-8 bytes
-- ggwave Ultrasound Normal with manually matched 15, 16, 17, or 18 kHz presets
-- Adjustable carrier level from -30 to -12 dB relative to the speech in the overlay window
-- Raw microphone constraints and a live high-frequency spectrum display
-- Plaintext, session-only data
-
-The 18 kHz preset spans approximately 18–22.45 kHz and assumes a 48 kHz audio
-pipeline. Device speakers, microphones, browser processing, room acoustics, and
-listener hearing all affect reliability and audibility. The app does not claim
-that its signal is universally inaudible or secure.
-
-## Develop
+## Run locally
 
 ```sh
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Microphone capture requires HTTPS outside `localhost`. Deploy the static Vite
-build to Vercel for testing on an iPhone.
+You can also paste public agent IDs into the setup screen, so the environment file is optional. Microphone access works on `localhost`; deployed versions require HTTPS.
+
+## ElevenLabs agent setup
+
+Create two public ElevenLabs Agents. Configure Agent A to speak first and Agent B to wait for incoming speech. Give both agents a strict prompt similar to:
+
+```text
+You are {{speaker_name}}, speaking with {{partner_name}}.
+Follow this pre-written conversation exactly:
+
+{{conversation_script}}
+
+Only say lines labeled with browser role {{browser_role}}. Say one line per turn,
+in order, and wait until your partner has spoken before continuing. Do not add,
+omit, paraphrase, or explain anything. End the conversation after your final line.
+```
+
+Define placeholder values for `speaker_name`, `partner_name`, `conversation_script`, and `browser_role` in each agent's Dynamic Variables settings. Set Agent A's first message to its first scripted line; Agent B should not have a first message.
+
+In each agent's Advanced settings, enable the client events needed for transcript display. Keep the agents public for this static prototype. For private agents, add a server-side endpoint that creates a signed URL or conversation token—never expose an ElevenLabs API key in browser code.
+
+## Demo flow
+
+1. Enter the two public agent IDs, names, and the known script on the director screen.
+2. Launch or copy the Agent A and Agent B links and open them in separate browsers or devices.
+3. Put the devices within earshot and prevent headphones from being selected.
+4. Start Agent B first so it is listening, then start Agent A.
+5. Agent A delivers the opening line; each agent hears the other through the devices' microphones. Both pages display the local SDK transcript.
+
+Two browsers on one computer can create echo or device contention. Two physical devices, or explicitly routed virtual audio devices, are more reliable.
+
+## Commands
 
 ```sh
 npm test
+npm run typecheck
 npm run build
 ```
 
-## Test procedure
-
-1. Deploy to Vercel and open the same URL in Safari on the Mac and iPhone.
-2. On the iPhone, select Receiver, choose 15 kHz, and tap Start listening.
-3. On the Mac, select Sender and choose the same frequency.
-4. Use the included speech example—or upload your own WAV—enter a message, and begin at -30 dB.
-5. Tap Mix & transmit with the devices stationary and about one metre apart.
-6. Raise strength toward -12 dB only if decoding fails, then repeat at higher
-   frequency presets to compare audibility and reliability.
-
-The target first milestone is at least 9 successful decodes out of 10 trials on
-the reference devices while the carrier is not consciously noticeable.
-
-## Third-party code
-
-The current ggwave Emscripten build is vendored under `src/vendor` because the
-published npm package does not expose the upstream frequency-start API. ggwave
-is MIT licensed; its license is included beside the vendored build.
+The earlier acoustic-modem modules remain under `src/audio`, `src/core`, `src/modem`, and `src/vendor`; CrossTalk no longer imports them from the application entrypoint.
