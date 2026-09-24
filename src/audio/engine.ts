@@ -3,7 +3,7 @@ import { createUltrasoundDecoder } from "../modem/ggwave";
 import { ChannelSense } from "./channel";
 import { renderSpectrum } from "./spectrum";
 
-const MAX_WAIT_FOR_CLEAR_MS = 20_000;
+const MAX_WAIT_FOR_CLEAR_MS = 10_000;
 
 export interface AcousticEngine {
   readonly sampleRate: number;
@@ -126,7 +126,7 @@ export async function startAcousticEngine(options: EngineOptions): Promise<Acous
           await sleep(100);
         }
         // Random backoff so two devices that were both waiting don't start together.
-        await sleep(200 + Math.random() * 1_000);
+        await sleep(100 + Math.random() * 400);
         if (isCancelled() || (!busy && !playing)) return;
       }
     },

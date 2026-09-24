@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decibelsToGain, extendCover, findAudioEnd, findAudioOnset, mixCarrierIntoCover } from "./mix";
+import { decibelsToGain, extendCover, findAudioEnd, findAudioOnset, mixCarrierIntoCover, trimWithFade } from "./mix";
 
 describe("audio onset detection", () => {
   it("locates the first non-silent 20 ms frame", () => {
@@ -12,6 +12,18 @@ describe("audio onset detection", () => {
     const samples = new Float32Array(4_800);
     samples.fill(0.4, 0, 1_920);
     expect(findAudioEnd([samples], 48_000)).toBe(1_920);
+  });
+});
+
+describe("trimming", () => {
+  it("cuts to the requested length and fades the tail to silence", () => {
+    const channel = new Float32Array(1_000).fill(0.5);
+    const [trimmed] = trimWithFade([channel], 600, 1_000, 0.1);
+    expect(trimmed).toHaveLength(600);
+    expect(trimmed?.[400]).toBe(0.5);
+    expect(trimmed?.[550]).toBeCloseTo(0.245);
+    expect(trimmed?.[599]).toBe(0);
+    expect(channel[599]).toBe(0.5);
   });
 });
 

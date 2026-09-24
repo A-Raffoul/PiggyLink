@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import exampleCover from "../../public/example-cover.wav?inline";
-import { MAX_MESSAGE_BYTES, OVERLAY_DELAY_SECONDS, FREQUENCY_PRESETS } from "../core/config";
+import { MAX_MESSAGE_BYTES, OVERLAY_DELAY_SECONDS, FREQUENCY_PRESETS, TAIL_AFTER_CARRIER_SECONDS } from "../core/config";
 import { Conversation } from "../core/conversation";
 import { decodeFrame } from "../core/frame";
 import { createUltrasoundDecoder, encodeUltrasound } from "../modem/ggwave";
-import { extendCover, findAudioOnset, mixCarrierIntoCover } from "./mix";
+import { extendCover, findAudioOnset, mixCarrierIntoCover, trimWithFade } from "./mix";
 
 const SAMPLE_RATE = 48_000;
 
@@ -49,10 +49,16 @@ describe("sender to receiver pipeline", () => {
 
     const carrier = await encodeUltrasound(outgoing.wire, FREQUENCY_PRESETS[0]!, SAMPLE_RATE);
     const delay = findAudioOnset([cover], SAMPLE_RATE) + Math.round(OVERLAY_DELAY_SECONDS * SAMPLE_RATE);
-    const extended = extendCover([cover], delay + carrier.length, SAMPLE_RATE);
+    const end = delay + carrier.length + Math.round(TAIL_AFTER_CARRIER_SECONDS * SAMPLE_RATE);
+    const extended = extendCover([cover], end, SAMPLE_RATE);
     const mixed = mixCarrierIntoCover(extended, carrier, delay, -30, SAMPLE_RATE);
+    const [played] = trimWithFade(mixed.channels, end, SAMPLE_RATE);
+    expect(played).toHaveLength(end);
 
-    const received = (await decodeAll(mixed.channels[0]!)).map(decodeFrame);
+    // The receiver keeps listening after playback stops, so append silence.
+    const heard = new Float32Array(end + SAMPLE_RATE);
+    heard.set(played!);
+    const received = (await decodeAll(heard)).map(decodeFrame);
     expect(received).toHaveLength(1);
     expect(bob.receive(received[0]!)).toMatchObject({ kind: "message", frame: { text } });
   });

@@ -34,6 +34,13 @@ describe("channel sensing", () => {
     expect(feed(sense, repeat(-120, 40), signal.end).busy).toBe(false);
   });
 
+  it("ignores brief spikes such as keyboard clicks", () => {
+    const sense = new ChannelSense();
+    const quiet = feed(sense, repeat(-120, 100));
+    const clicks = feed(sense, [-80, -80, -80, -120, -120, -80, -80, -120], quiet.end);
+    expect(clicks.busy).toBe(false);
+  });
+
   it("re-learns the floor when the room gets permanently louder", () => {
     const sense = new ChannelSense();
     const quiet = feed(sense, repeat(-130, 100));

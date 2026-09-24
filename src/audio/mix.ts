@@ -101,6 +101,23 @@ export function extendCover(
   });
 }
 
+export function trimWithFade(
+  channels: readonly Float32Array[],
+  length: number,
+  sampleRate: number,
+  fadeSeconds = 0.03,
+): Float32Array[] {
+  const fade = Math.max(1, Math.round(sampleRate * fadeSeconds));
+  return channels.map((channel) => {
+    const output = channel.slice(0, length);
+    const fadeStart = Math.max(0, output.length - fade);
+    for (let index = fadeStart; index < output.length; index += 1) {
+      output[index] = (output[index] ?? 0) * ((output.length - 1 - index) / fade);
+    }
+    return output;
+  });
+}
+
 export function decibelsToGain(decibels: number): number {
   return 10 ** (decibels / 20);
 }

@@ -1,11 +1,12 @@
 import "./styles.css";
 import { inject } from "@vercel/analytics";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
-import { extendCover, findAudioOnset, mixCarrierIntoCover } from "./audio/mix";
+import { extendCover, findAudioOnset, mixCarrierIntoCover, trimWithFade } from "./audio/mix";
 import {
   FREQUENCY_PRESETS,
   MAX_MESSAGE_BYTES,
   OVERLAY_DELAY_SECONDS,
+  TAIL_AFTER_CARRIER_SECONDS,
   formatKhz,
   getFrequencyPreset,
   utf8ByteLength,
@@ -161,8 +162,10 @@ async function buildTransmission(active: Session, wire: string): Promise<Float32
   const channels = Array.from({ length: cover.numberOfChannels }, (_, index) => cover.getChannelData(index));
   const carrier = await encodeUltrasound(wire, preset, engine.sampleRate);
   const delay = findAudioOnset(channels, engine.sampleRate) + Math.round(OVERLAY_DELAY_SECONDS * engine.sampleRate);
-  const extended = extendCover(channels, delay + carrier.length, engine.sampleRate);
-  return mixCarrierIntoCover(extended, carrier, delay, Number(signalStrength.value), engine.sampleRate).channels;
+  const end = delay + carrier.length + Math.round(TAIL_AFTER_CARRIER_SECONDS * engine.sampleRate);
+  const extended = extendCover(channels, end, engine.sampleRate);
+  const mixed = mixCarrierIntoCover(extended, carrier, delay, Number(signalStrength.value), engine.sampleRate);
+  return trimWithFade(mixed.channels, end, engine.sampleRate);
 }
 
 function transmit(message: OutgoingMessage): Promise<void> {
