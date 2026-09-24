@@ -1,5 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
-
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -22,19 +20,9 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-// Every route spends API credits, so an access code is mandatory.
-function checkAccess(request: Request): void {
-  const expected = Buffer.from(requireEnv("SOTTO_ACCESS_CODE"));
-  const provided = Buffer.from(request.headers.get("x-access-code") ?? "");
-  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
-    throw new HttpError(401, "Wrong or missing access code. Enter it in Settings.");
-  }
-}
-
 export function route(handler: (request: Request) => Promise<Response>): (request: Request) => Promise<Response> {
   return async (request) => {
     try {
-      checkAccess(request);
       return await handler(request);
     } catch (error) {
       if (error instanceof HttpError) return json({ error: error.message }, error.status);

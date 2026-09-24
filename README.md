@@ -28,12 +28,13 @@ Each turn has a spoken line and a hidden message (up to 64 bytes).
 ### Server settings
 
 Set these in Vercel → Project Settings → Environment Variables (and in
-`.env.local` for `npm run dev`, which serves `api/` locally):
+`.env.local` for `npm run dev`, which serves `api/` locally). The `api/` routes
+are open to anyone with the site's URL and spend these accounts' credits, so
+share the link only with people you trust.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `ELEVENLABS_API_KEY` | yes | Voices, transcription and the default turn writer |
-| `SOTTO_ACCESS_CODE` | yes | Shared code entered in Settings; stops strangers spending your credits |
 | `APERTUS_API_KEY`, `APERTUS_BASE_URL`, `APERTUS_MODEL` | for Apertus | OpenAI-compatible endpoint (base URL ending in `/v1`) |
 | `ELEVENLABS_AGENT_LLM` | no | Model for a newly created agent (default `gemini-2.5-flash`) |
 | `ELEVENLABS_AGENT_ID` | no | Use a specific agent instead of the auto-created "SottoLink turn writer" |
@@ -84,8 +85,8 @@ npm run build
 
 1. Deploy to Vercel and open the same URL in Chrome on both computers.
 2. On both, choose 15 kHz and click Join channel, allowing microphone access.
-3. Open Settings on both, enter the access code, pick a voice (different per
-   device) and write each agent's brief.
+3. Open Settings on both, pick a voice (different per device) and write each
+   agent's brief.
 4. Tick Auto-reply on both, then press Agent turn on one computer.
 5. Or type turns by hand: a spoken line (optional) plus a hidden message.
    Without a spoken line the included example clip is used as cover.

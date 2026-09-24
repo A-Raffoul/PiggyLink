@@ -49,7 +49,6 @@ const leaveButton = element<HTMLButtonElement>("leave-button");
 const agentBrief = element<HTMLTextAreaElement>("agent-brief");
 const writerSelect = element<HTMLSelectElement>("writer-select");
 const voiceSelect = element<HTMLSelectElement>("voice-select");
-const accessCodeInput = element<HTMLInputElement>("access-code");
 const setupStatus = element<HTMLElement>("setup-status");
 const maxAutoTurnsInput = element<HTMLInputElement>("max-auto-turns");
 const coverInput = element<HTMLInputElement>("cover-file");
@@ -132,7 +131,6 @@ interface StoredSettings {
   brief?: string;
   writer?: Writer;
   voiceId?: string;
-  accessCode?: string;
   maxAutoTurns?: number;
 }
 
@@ -149,7 +147,6 @@ function saveSettings(): void {
     brief: agentBrief.value,
     writer: writerSelect.value as Writer,
     voiceId: voiceSelect.value,
-    accessCode: accessCodeInput.value,
     maxAutoTurns: Number(maxAutoTurnsInput.value),
   };
   try {
@@ -161,10 +158,8 @@ function saveSettings(): void {
 
 const stored = readSettings();
 agentBrief.value = stored.brief?.trim() ? stored.brief : DEFAULT_BRIEF;
-accessCodeInput.value = stored.accessCode ?? "";
 if (stored.maxAutoTurns) maxAutoTurnsInput.value = String(stored.maxAutoTurns);
 
-const accessCode = (): string => accessCodeInput.value.trim();
 const maxAutoTurns = (): number => Math.max(1, Math.min(50, Math.round(Number(maxAutoTurnsInput.value) || 6)));
 
 function setSetupStatus(text: string, state?: "error" | "done"): void {
@@ -188,13 +183,9 @@ function fillSelect(select: HTMLSelectElement, options: { value: string; label: 
 let setupRequest = 0;
 async function loadSetup(): Promise<void> {
   const request = ++setupRequest;
-  if (!accessCode()) {
-    setSetupStatus("Needed for AI voices, transcription and agents.");
-    return;
-  }
-  setSetupStatus("Checking…");
+  setSetupStatus("Connecting…");
   try {
-    const info = await fetchSetup(accessCode());
+    const info = await fetchSetup();
     if (request !== setupRequest) return;
     const labels: Record<Writer, string> = { elevenlabs: "ElevenLabs agent", apertus: "Apertus" };
     fillSelect(
@@ -223,10 +214,6 @@ function openSettingsFor(problem: string, focus: HTMLElement): void {
 }
 
 function ensureAi(needsVoice: boolean): boolean {
-  if (!accessCode()) {
-    openSettingsFor("Enter the access code to use AI voices and agents.", accessCodeInput);
-    return false;
-  }
   if (needsVoice && !voiceSelect.value) {
     openSettingsFor("Choose a voice first.", voiceSelect);
     return false;
@@ -363,7 +350,7 @@ async function prepareTurn(active: Session, spoken: string, hidden: string): Pro
   let cover: Float32Array[];
   if (spoken) {
     setActivity("voicing");
-    cover = [await speak(accessCode(), spoken, voiceSelect.value)];
+    cover = [await speak(spoken, voiceSelect.value)];
   } else {
     cover = await coverFor(engine);
   }
@@ -472,7 +459,7 @@ async function agentTurn(): Promise<void> {
       history: history.map(({ from, spoken, hidden }): HistoryTurn => ({ from, spoken, hidden })),
       maxHiddenBytes: MAX_MESSAGE_BYTES,
     };
-    const turn = await writeAgentTurn(accessCode(), request);
+    const turn = await writeAgentTurn(request);
     if (session !== active) return;
     await sendTurn(turn.spoken, turn.hidden);
   } catch (error) {
@@ -489,11 +476,9 @@ async function transcribeTurn(active: Session, record: ThreadTurn, target: HTMLE
   const factor = Math.round(active.engine.sampleRate / STT_SAMPLE_RATE);
   const samples = downsample(active.engine.recentAudio(seconds), factor);
   try {
-    const text = accessCode()
-      ? await transcribe(accessCode(), encodeWav(samples, active.engine.sampleRate / factor))
-      : "";
+    const text = await transcribe(encodeWav(samples, active.engine.sampleRate / factor));
     record.spoken = text;
-    target.textContent = text || (accessCode() ? "(no speech recognised)" : "(add the access code to transcribe)");
+    target.textContent = text || "(no speech recognised)";
   } catch (error) {
     target.textContent = `Couldn't transcribe: ${errorText(error, "unknown error")}`;
   } finally {
@@ -573,7 +558,6 @@ async function join(): Promise<void> {
     joinPanel.hidden = true;
     chatPanel.hidden = false;
     render();
-    if (!accessCode()) openSettingsFor("Enter the access code to use AI voices and agents.", accessCodeInput);
   } catch (error) {
     joinError.textContent = `Could not start the microphone: ${errorText(error, "permission denied")}`;
   } finally {
@@ -626,10 +610,6 @@ leaveButton.addEventListener("click", () => void leave());
 settingsToggle.addEventListener("click", () => {
   settingsPanel.hidden = !settingsPanel.hidden;
   settingsToggle.setAttribute("aria-expanded", String(!settingsPanel.hidden));
-});
-accessCodeInput.addEventListener("change", () => {
-  saveSettings();
-  void loadSetup();
 });
 for (const input of [agentBrief, writerSelect, voiceSelect, maxAutoTurnsInput]) {
   input.addEventListener("change", () => {
