@@ -222,6 +222,10 @@ select:focus-visible {
   color: var(--support);
   background: transparent;
 }
+.role-badge[data-role="custom"] {
+  color: var(--hidden);
+  background: transparent;
+}
 .role-status,
 .start-note {
   color: var(--muted);
@@ -988,5 +992,105 @@ input[type="range"] {
   .bubble-hidden,
   .primary-action {
     border: 1px solid ButtonText;
+  }
+}
+
+/* Persona selection stays on the first screen, including on narrow devices. */
+.landing {
+  padding-block: 20px 32px;
+  gap: 0;
+}
+.spectral-orb {
+  height: clamp(170px, 28svh, 280px);
+}
+.landing-actions,
+.persona-picker {
+  width: 100%;
+}
+.landing-actions {
+  gap: 16px;
+}
+.persona-heading {
+  color: var(--muted);
+  font-size: var(--type-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.persona-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 810px;
+  margin: 0 auto;
+}
+.persona-option {
+  --persona-accent: var(--speech);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 132px;
+  padding: 18px;
+  border: 1px solid var(--control-line);
+  border-radius: 14px;
+  background: var(--surface-field);
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+.persona-option[data-agent-mode="target"] {
+  --persona-accent: var(--support);
+}
+.persona-option[data-agent-mode="custom"] {
+  --persona-accent: var(--hidden);
+}
+.persona-option:hover {
+  transform: translateY(-2px);
+  background: var(--surface-hover);
+}
+.persona-option[aria-pressed="true"] {
+  border-color: var(--persona-accent);
+  background: var(--surface-hover);
+  box-shadow: inset 0 0 0 1px var(--persona-accent);
+}
+.persona-option strong {
+  color: var(--persona-accent);
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+.persona-option span,
+.persona-option small {
+  line-height: 1.35;
+}
+.persona-option span {
+  font-size: 0.875rem;
+}
+.persona-option small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: auto;
+}
+.landing .primary-action:disabled {
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+.landing .primary-action:disabled .play-icon {
+  border-left-color: var(--muted);
+}
+@media (max-width: 680px) {
+  .spectral-orb {
+    height: clamp(130px, 22svh, 210px);
+  }
+  .persona-options {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .persona-option {
+    min-height: 0;
+    padding: 12px 14px;
+    gap: 3px;
+  }
+  .persona-option small {
+    margin-top: 0;
   }
 }

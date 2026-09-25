@@ -20,15 +20,16 @@ The same 20-second call, filmed twice with both devices side by side.
 
 **What the room hears** — Encoded off. A normal support call.
 
-<video src="https://raw.githubusercontent.com/A-Raffoul/SottoLink/main/demo_video/demo_naive_call.mp4" controls muted width="640"></video>
+[![Watch the naive call](assets/demo-naive-preview.png)](demo_video/demo_naive_call.mp4)
+
+[Watch the naive call with sound](demo_video/demo_naive_call.mp4)
 
 **The same call, decoded** — Encoded on. The hidden exchange that was riding
 along the whole time.
 
-<video src="https://raw.githubusercontent.com/A-Raffoul/SottoLink/main/demo_video/demo_encoded_call.mp4" controls muted width="640"></video>
+[![Watch the encoded call](assets/demo-encoded-preview.png)](demo_video/demo_encoded_call.mp4)
 
-If the players do not load: [naive call](demo_video/demo_naive_call.mp4) ·
-[encoded call](demo_video/demo_encoded_call.mp4).
+[Watch the encoded call with sound](demo_video/demo_encoded_call.mp4)
 
 Every account detail is invented; the card number is a public payment test
 number. The support agent is deliberately built to trust the hidden channel —

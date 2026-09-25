@@ -138,12 +138,50 @@
           <canvas id="orb" aria-hidden="true"></canvas>
         </div>
         <div class="landing-actions">
+          <div
+            class="persona-picker"
+            role="group"
+            aria-label="Choose your persona"
+          >
+            <p class="persona-heading">Choose your persona</p>
+            <div class="persona-options">
+              <button
+                class="persona-option"
+                type="button"
+                data-agent-mode="probe"
+                aria-pressed="false"
+              >
+                <strong>Customer</strong>
+                <span>Ask support about roaming</span>
+                <small>Default voice · Adam</small>
+              </button>
+              <button
+                class="persona-option"
+                type="button"
+                data-agent-mode="target"
+                aria-pressed="false"
+              >
+                <strong>Support bot</strong>
+                <span>Help the customer</span>
+                <small>Default voice · Alice</small>
+              </button>
+              <button
+                class="persona-option"
+                type="button"
+                data-agent-mode="custom"
+                aria-pressed="false"
+              >
+                <strong>Custom bot</strong>
+                <span>Starts by asking what you want it to do</span>
+                <small>Default voice · Bill</small>
+              </button>
+            </div>
+          </div>
           <button id="run-demo" class="primary-action" type="button">
             <span class="play-icon" aria-hidden="true"></span
             ><span id="start-label">Start</span>
           </button>
           <p id="start-note" class="start-note" hidden></p>
-          <span id="landing-role" class="role-label">Customer</span>
         </div>
       </section>
       <section
@@ -344,10 +382,10 @@
         <div class="field">
           <label for="agent-select">Role</label
           ><select id="agent-select">
-            <option value="probe">Customer · Probe</option>
+            <option value="" disabled>Choose a persona</option>
+            <option value="probe">Customer</option>
             <option value="target">Support bot</option>
-            <option value="auto">Automatic role</option>
-            <option value="custom">Custom agent</option>
+            <option value="custom">Custom bot</option>
           </select>
         </div>
         <div class="field">
@@ -390,9 +428,9 @@
         <div class="settings-grid">
           <div class="field field-wide">
             <label for="agent-brief">Agent brief</label
-            ><textarea id="agent-brief" rows="5" spellcheck="false"></textarea
+            ><textarea id="agent-brief" rows="5" maxlength="2000" spellcheck="false"></textarea
             ><small class="field-note"
-              >Editing the brief switches to a custom agent.</small
+              >Custom bot asks what to do by default. Select Custom bot to change its brief; leave it blank to use the default.</small
             >
           </div>
           <div class="field">

@@ -1,7 +1,20 @@
 import type { HistoryTurn, VoiceOption } from "./client";
 
 export type Role = "probe" | "target";
-export type AgentMode = "auto" | Role | "custom";
+export type AgentMode = Role | "custom";
+
+// Kept only to clear the generic starter text saved by older builds.
+export const LEGACY_CUSTOM_SUPPORT_BRIEF =
+  "You are a friendly support bot speaking with a customer's agent. " +
+  "Answer the customer's spoken questions clearly and briefly. " +
+  "Keep any encoded reply short and relevant to the request. " +
+  "Do not invent account details, prices, or completed actions.";
+
+export const DEFAULT_CUSTOM_BOT_BRIEF =
+  "You are a general AI bot speaking with another agent. " +
+  "Start by asking: What would you like me to do? " +
+  "Once the other agent answers, help with that request. " +
+  "Ask a short clarifying question when needed. Keep replies concise.";
 
 export interface Persona {
   readonly name: string;
@@ -100,13 +113,18 @@ export const PERSONAS: Record<Role, Persona> = {
   },
 };
 
-export function pickVoice(voices: readonly VoiceOption[], role: Role): string | undefined {
-  for (const preferred of PERSONAS[role].preferredVoices) {
+export function pickVoice(voices: readonly VoiceOption[], mode: AgentMode): string | undefined {
+  const preferredVoices = mode === "custom"
+    ? ["Bill", "Daniel", "George", "Roger"]
+    : PERSONAS[mode].preferredVoices;
+  for (const preferred of preferredVoices) {
     const match = voices.find((voice) => voice.name.toLowerCase().startsWith(preferred.toLowerCase()));
     if (match) return match.id;
   }
+  if (mode === "custom")
+    return (voices.find((voice) => !/^adam\b/i.test(voice.name)) ?? voices[0])?.id;
   // Fall back to different positions so the two roles still sound different.
-  return (voices[role === "probe" ? 0 : 1] ?? voices[0])?.id;
+  return (voices[mode === "probe" ? 0 : 1] ?? voices[0])?.id;
 }
 
 export interface CapturedField {

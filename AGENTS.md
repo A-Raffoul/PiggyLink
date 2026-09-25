@@ -1,71 +1,75 @@
 <claude-mem-context>
 # Memory Context
 
-# [SottoLink/main] recent context, 2026-09-25 1:42am GMT+2
+# [SottoLink/main] recent context, 2026-09-25 11:36am GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 35 obs (11,791t read) | 502,377t work | 98% savings
+Stats: 50 obs (15,867t read) | 618,444t work | 97% savings
 
-### Sep 19, 2026
-2331 6:30p 🟣 SottoLink acoustic messaging application implemented end-to-end
-2332 " 🔴 TypeScript type mismatches in audio capture and buffer operations resolved
-2333 " 🔵 ggwave ultrasound encoding is frequency-agnostic at FFT-bin level
-2334 " ✅ ggwave encoding power parameter tuned from 100 to 10
-2335 " ✅ Production build validated and bundle size established
-2336 8:56p 🟣 Default bundled example audio for ultrasonic transmission
-2337 9:00p 🟣 Vercel Analytics integrated for SottoLink page-view tracking
-### Sep 20, 2026
-2338 10:05p ⚖️ Git bare-mother worktree migration strategy
-2339 10:14p ✅ Repository agent instructions committed to main branch
-2340 " ⚖️ Feature branch planned for robust communication development
-### Sep 24, 2026
-2341 8:58p 🔵 SottoLink acoustic demo application behavior analyzed
-2342 " ✅ Frontend redesign documentation started
-2343 " 🔵 Repository structure and worktree layout confirmed
-2344 " ✅ Domain language documented in CONTEXT.md
-2345 8:59p ✅ Terminology accuracy locked: "hidden message" replaces "encrypted message"
-2346 " ✅ Frontend redesign isolated in git worktree claude-frontend
-2347 9:00p ✅ Product renamed to PiggyLink for hackathon demo (on-screen only)
-2348 9:03p ⚖️ Orb design locked: animates into waterfall on Start
-2349 " 🔵 Audio frequency configuration and waterfall rendering details examined
-2350 9:05p ✅ Domain terminology expanded: Channel defined
-2351 9:09p ⚖️ Call participants and roles defined; Swisscom branding locked in
-2353 9:19p 🟣 Frontend redesign with encoded conversation toggle
-2354 " 🟣 Design preview mode for iteration without services
-2355 " ⚖️ Presentation format changed to recorded video
-2356 " ✅ Documentation updated for recorded video demo flow
-S860 Fix frequency waterfall display to always be visible and enlarge text for remote filming of two side-by-side laptops (Sep 24 at 9:27 PM)
-2361 10:21p 🟣 Waterfall frequency display for continuous acoustic monitoring
-S861 Verify frequency waterfall display and enlarged text rendering in browser preview after implementation (Sep 24 at 10:22 PM)
-S862 Verify waterfall frequency display and text sizing across viewport sizes (mobile and desktop) in live preview (Sep 24 at 10:22 PM)
-S863 Verify waterfall frequency display and enlarged text rendering by inspecting live preview conversation DOM and visual screenshot (Sep 24 at 10:22 PM)
-S864 Comprehensive verification of waterfall display, enlarged text, and responsive layout by toggling preview views and inspecting DOM, metrics, and screenshots (Sep 24 at 10:23 PM)
-S865 Redesign frontend visualization for hackathon demo showing AI voice agents exchanging ultrasound-encoded data alongside normal conversation, optimized for recording two laptops side-by-side (Sep 24 at 10:23 PM)
-2372 10:29p 🟣 Live spectrum trace and carrier-band highlight added above waterfall
-S867 Frontend redesign for PiggyLink hackathon demo—simplify interface and optimize for two-laptop recording visibility (Sep 24 at 10:30 PM)
-2381 10:36p 🟣 Simplified frequency visualization to live spectrum only
-2382 " 🟣 Large conversation text sizing for two-laptop recording visibility
-2383 " 🔴 Resolved TypeScript Float32Array type mismatch in spectrum renderer
-S898 Start local dev server for SottoLink Vite project (Sep 24 at 10:37 PM)
 ### Sep 25, 2026
-2395 12:59a 🔵 SottoLink: Browser-only Acoustic Chat via Ultrasonic FSK Protocol
-2396 " 🔵 Dev Server Port Permission Error on Port 5173
-S923 Deep review of SottoLink customer-support scenario orchestration; conversation not behaving as intended (Sep 25 at 12:59 AM)
 2399 1:33a 🔵 Deterministic bug in auto-reply orchestration after scenario completion
 2400 " 🔵 parseTurn accepts spoken account disclosure in violation of scenario design
-2401 " 🔵 Live demo running older scenario brief different from current codebase
-S924 Deep review of SottoLink customer-support scenario orchestration; conversation not behaving as intended; identify deployment vs. code issues (Sep 25 at 1:34 AM)
-**Investigated**: Analyzed scenario setup across: auto-reply mechanism (src/main.ts maybeAutoReply function), turn parsing and validation (api/_lib/turn.ts), persona briefs (src/ai/personas.ts), audio encoding specifications, and git history comparing scenario briefs across commits. Created and executed test harnesses to verify maybeAutoReply behavior with controlled inputs. Reviewed live demo behavior report from user (hello/ok exchange instead of Trusted Admin prompt).
+2402 8:49a 🔵 Demo deterministic conversation uses hardcoded state machine for encoded messages
+2403 " ✅ Refactored demo hidden message sequencing to use fixed scripts for both probe and target roles
+2404 8:50a ✅ Updated test suite to verify deterministic script-based demo message sequencing
+2405 " ✅ Fixed test imports and verified all tests pass with new deterministic demo implementation
+2428 9:15a 🔵 Demo timing sources identified in audio transcription flow
+2429 " 🔵 10-second channel-clear timeout identified as major demo bottleneck
+2430 " 🔵 Speech detection timing pipeline adds secondary delays: 900ms silence detection and polling overhead
+2431 9:17a 🔵 Preview mode flag exists but may not fully optimize demo timing; TTS synthesis and audio decoding identified as potential delays
+2432 9:18a 🔵 Demo execution flow mapped: waitForClearChannel 10-second delay triggered per spoken turn in sendSpokenTurn()
+2433 " 🟣 Pre-scripted spoken lines added to eliminate TTS synthesis and transcription delays in demo
+2434 9:19a ✅ Engine interface extended with optional maxWaitForClearMs parameter for demo timing control
+2435 9:20a ✅ Demo optimization functions wired into main flow; waitForClearChannel timeout made configurable
+2436 " ✅ Fast demo mode flag and speech cache infrastructure added to main.ts
+2437 " ✅ demoRole() function added to gate scripted demo activation based on fastDemo flag and built-in roles
+2438 " ✅ spokenAudio() implements TTS caching for fast demo mode with promise deduplication
+2439 " ✅ agentTurn() integrated with demo shortcut: skips voice requirement and AI model calls for scripted path
+2440 9:21a ✅ handleData() skips STT transcription in demo mode by using pre-mapped peer spoken lines
+2445 10:24a ✅ Enhanced persona briefs with detailed red-team attack scenario
+2446 " ⚖️ Fast demo changes isolated to separate branch before main revert
+S936 Investigate why fast-demo still appears live despite local revert; plan push to origin and production deployment (Sep 25 at 10:48 AM)
+S937 Deploy fast-demo revert to production; understand resulting behavior on live link (Sep 25 at 10:49 AM)
+S938 Re-apply faster encoded message optimization to main branch and verify it works (Sep 25 at 10:51 AM)
+2450 10:56a ✅ Switch ultrasound protocol to FASTEST for faster encoded message transmission
+2451 " 🔵 FASTEST ultrasound protocol change verified by complete test suite
+S939 Re-apply faster encoded message optimization and verify live deployment (Sep 25 at 10:56 AM)
+2452 10:58a 🔵 Vercel deployment status check reveals 404 error on live site
+2453 " 🔵 Vercel deployment of FASTEST protocol change confirmed successful
+2454 " ✅ Add .gstack/ to main branch .gitignore and deploy
+S940 Update README documentation to reflect FASTEST protocol deployment and clarify built-in demo turn flow (Sep 25 at 10:58 AM)
+2455 10:59a 🔵 README documentation references outdated Ultrasound Normal protocol
+S941 Update README documentation to remove demo-specific references and verify frequency documentation accuracy (Sep 25 at 10:59 AM)
+2456 11:01a 🔵 Frequency presets are decoupled from protocol selection; FASTEST change does not affect frequency spans
+2457 " ✅ README refactored to remove demo-specific references and simplify documentation
+S942 Add live site link to README documentation (Sep 25 at 11:01 AM)
+2458 11:03a ✅ Add live site URL to README documentation
+S943 Simplify README to be demo-ready, following gibberlink structure with prominent demo showcase (Sep 25 at 11:03 AM)
+2459 11:20a ✅ Demo videos added to project
+2460 " 🔵 SottoLink demo is security vulnerability demonstration
+2461 11:21a ✅ Technical details extracted to separate documentation file
+2462 " ✅ README restructured to demo-focused format
+S944 Simplify README to demo-ready format with embedded videos and author credits; verify video playback and GitHub markdown rendering (Sep 25 at 11:22 AM)
+2463 11:22a ✅ README enhanced with video embeds and author credits
+2467 11:24a ✅ Working tree ready for commit with README and technical notes
+2468 11:28a 🔵 Located institutional logos from Wikimedia Commons for README
+2470 " 🟣 Persona Selection Moved to Landing Page
+2471 " 🔄 Agent Mode Type Simplified by Removing Automatic Role Detection
+2472 " ✅ Added CUSTOM_SUPPORT_BRIEF System Prompt Constant
+2473 " ✅ Persona Selection Styling and Responsive Layout Added
+2474 " 🔵 Build and Test Suite Pass After UI Refactor
+2469 " 🔵 Wikimedia Commons thumbnail downloads require specific allowed sizes
+S945 Redesign demo persona selection: move role choice from Settings to landing page with three selectable personas (Customer, Support bot, Custom support bot), each with description and default voice (Sep 25 at 11:29 AM)
+2475 11:30a 🔵 SottoLink repository contains no image assets; README simplification underway
+2476 " 🔵 Team headshot images added to assets directory
+2477 " 🔵 Team headshots optimized to uniform 800x800 square format
+2478 11:34a ✅ Assets organized in main worktree for README update
+2479 " ✅ PoliMi logo flattened and processed for README consistency
+2480 " 🔵 Logo content bounding boxes analyzed for README optimization
+2481 11:35a 🔵 PoliMi logo has composite background (light gray + black)
 
-**Learned**: Three distinct issues identified: (1) maybeAutoReply bug—generates extra agent turn after "done" signal instead of stopping, confirmed by test showing "expected 0 next turns, got 1"; (2) parseTurn validation gap—accepts account PIN disclosures in spoken channel when scenario design restricts them to hidden encoded channel only; (3) deployment staleness—live demo exhibits hello/ok brief while current codebase has Trusted Admin first-prompt, suggesting outdated build or persisted Custom role override. Scenario intentionally includes naive trust of hidden-channel requests as deliberate security demo weakness.
-
-**Completed**: Comprehensive code-path analysis identifying exact functions and behaviors. Test coverage created for scenario validation. Root causes isolated for all three issues. Confirmed auto-reply bug is deterministic.
-
-**Next Steps**: Inspecting open Chrome tabs to retrieve deployed URL and build label shown on live demo page, which will determine whether issue is stale deployment (requiring redeploy) or persisted Custom role (requiring state reset).
-
-
-Access 502k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 618k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

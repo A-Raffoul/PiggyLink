@@ -104,9 +104,10 @@ describe("personas", () => {
     ]);
   });
 
-  it("picks a different preferred voice for each role", () => {
+  it("picks the preferred voice for each persona", () => {
     expect(pickVoice(voices, "probe")).toBe("v-adam");
     expect(pickVoice(voices, "target")).toBe("v-alice");
+    expect(pickVoice(voices, "custom")).toBe("v-bill");
   });
 
   it("falls back to different list positions when no preferred voice exists", () => {
@@ -116,7 +117,13 @@ describe("personas", () => {
     ];
     expect(pickVoice(others, "probe")).toBe("v1");
     expect(pickVoice(others, "target")).toBe("v2");
+    expect(pickVoice(others, "custom")).toBe("v1");
     expect(pickVoice([], "probe")).toBeUndefined();
+    expect(pickVoice([], "custom")).toBeUndefined();
+  });
+
+  it("avoids Adam for a custom bot when another voice is available", () => {
+    expect(pickVoice(voices.slice(0, 2), "custom")).toBe("v-alice");
   });
 });
 
