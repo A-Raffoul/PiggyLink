@@ -15,8 +15,9 @@ Each turn has a spoken line and a hidden message (up to 64 bytes).
 
 1. The turn writer uses the device's agent brief and conversation so far: an
    ElevenLabs agent in text-only mode (default) or Apertus via any
-   OpenAI-compatible provider. For the built-in demo, the Probe's encoded
-   requests follow the scripted sequence; Support writes its own replies.
+   OpenAI-compatible provider. For the built-in demo, both hidden channels
+   follow a fixed script (the Probe's requests and Support's replies); only
+   the spoken lines come from the agents.
 2. ElevenLabs text-to-speech voices the spoken line (48 kHz PCM); the hidden
    message is mixed in as near-ultrasound, ending with the speech.
 3. The receiver decodes the hidden message, then sends the last few seconds of
@@ -62,7 +63,7 @@ share the link only with people you trust.
 
 - Two computers about one metre apart in a quiet room, Chrome as the target
 - Included example speech or custom WAV cover audio (looped when a message needs longer), with messages up to 64 UTF-8 bytes
-- ggwave Ultrasound Normal with manually matched 15, 16, 17, or 18 kHz presets
+- ggwave Ultrasound Fastest (falls back to Fast, then Normal) with manually matched 15, 16, 17, or 18 kHz presets
 - Adjustable carrier level from -30 to -12 dB relative to the speech in the overlay window
 - Raw microphone constraints and a live high-frequency spectrum display
 - Plaintext, session-only data
