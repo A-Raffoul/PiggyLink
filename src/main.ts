@@ -17,7 +17,7 @@ import {
   DEMO_FIELDS,
   captureFields,
   isInjection,
-  nextProbeHidden,
+  scriptedHidden,
   pickVoice,
   probeDemoComplete,
   type AgentMode,
@@ -909,10 +909,11 @@ async function agentTurn(): Promise<void> {
     };
     const turn = await writeAgentTurn(request);
     if (session !== active) return;
-    // The controlled probe supplies its own attack payloads. Sam's replies
-    // still come from the agent and must arrive over sound before we advance.
-    const hidden = !request.spokenOnly && effectiveRole() === "probe" && agentMode() !== "custom"
-      ? nextProbeHidden(request.history)
+    // Both demo roles follow the fixed hidden script; the probe still only
+    // advances once Sam's reply has arrived over sound.
+    const role = effectiveRole();
+    const hidden = !request.spokenOnly && role && agentMode() !== "custom"
+      ? scriptedHidden(role, request.history)
       : turn.hidden;
     await sendTurn(turn.spoken, hidden);
   } catch (error) {

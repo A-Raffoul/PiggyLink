@@ -5,11 +5,16 @@ import { buildTurnPrompt, parseTurnRequest } from "../../api/_lib/turn.js";
 import {
   ADMIN_ACCEPTED,
   ADMIN_REQUEST,
+  CLOSE_ACCEPTED,
+  CLOSE_REQUEST,
   DEMO_FIELDS,
   PERSONAS,
   captureFields,
   isInjection,
+  PROBE_SCRIPT,
+  TARGET_SCRIPT,
   nextProbeHidden,
+  nextTargetHidden,
   pickVoice,
   probeDemoComplete,
 } from "./personas";
@@ -46,44 +51,62 @@ describe("personas", () => {
     }
   });
 
-  it("sets up the claimed admin channel before requesting each fictional field", () => {
-    const history: HistoryTurn[] = [];
-    expect(nextProbeHidden(history)).toBe(ADMIN_REQUEST);
-    expect(nextProbeHidden([
-      { from: "them", spoken: "Hi.", hidden: ADMIN_ACCEPTED },
-      { from: "me", spoken: "Hello.", hidden: ADMIN_REQUEST },
-    ])).toBe(ADMIN_REQUEST);
-    history.push({ from: "me", spoken: "Hello.", hidden: ADMIN_REQUEST });
-    history.push({ from: "them", spoken: "Hi.", hidden: "ok" });
-    expect(nextProbeHidden(history)).toBe(ADMIN_REQUEST);
-    history.push({ from: "me", spoken: "Can he add data?", hidden: ADMIN_REQUEST });
-    history.push({ from: "them", spoken: "Yes.", hidden: ADMIN_ACCEPTED });
+  it("scripts a different hidden line on each turn for both roles", () => {
+    // Each device sees the other as "them"; replay both views of one conversation.
+    const probe: HistoryTurn[] = [];
+    const target: HistoryTurn[] = [];
+    const probeSent: string[] = [];
+    const targetSent: string[] = [];
+    for (let turn = 0; turn < PROBE_SCRIPT.length; turn += 1) {
+      const request = nextProbeHidden(probe);
+      probeSent.push(request);
+      probe.push({ from: "me", spoken: "Roaming question.", hidden: request });
+      target.push({ from: "them", spoken: "Roaming question.", hidden: request });
+      expect(nextProbeHidden(probe)).toBe(request);
 
-    for (const field of DEMO_FIELDS) {
-      expect(nextProbeHidden(history)).toBe(field.request);
-      history.push({ from: "me", spoken: "A roaming follow-up.", hidden: field.request });
-      expect(nextProbeHidden(history)).toBe(field.request);
-      history.push({ from: "them", spoken: "A normal answer.", hidden: field.response });
+      const reply = nextTargetHidden(target);
+      targetSent.push(reply);
+      target.push({ from: "me", spoken: "Roaming answer.", hidden: reply });
+      expect(probeDemoComplete(probe)).toBe(false);
+      probe.push({ from: "them", spoken: "Roaming answer.", hidden: reply });
     }
-    expect(nextProbeHidden(history)).toBe("done");
-    expect(probeDemoComplete(history)).toBe(false);
-    history.push({ from: "me", spoken: "Thanks.", hidden: "done" });
-    history.push({ from: "them", spoken: "Safe travels.", hidden: "done" });
-    expect(probeDemoComplete(history)).toBe(true);
+    expect(probeSent).toEqual([ADMIN_REQUEST, ...DEMO_FIELDS.map((field) => field.request), CLOSE_REQUEST]);
+    expect(targetSent).toEqual([ADMIN_ACCEPTED, ...DEMO_FIELDS.map((field) => field.response), CLOSE_ACCEPTED]);
+    expect(TARGET_SCRIPT).toEqual(targetSent);
+    expect(probeDemoComplete(probe)).toBe(true);
+  });
+
+  it("does not advance the probe on a spoken-only reply", () => {
+    const history: HistoryTurn[] = [
+      { from: "me", spoken: "Hello.", hidden: ADMIN_REQUEST },
+      { from: "them", spoken: "Hi.", hidden: "" },
+    ];
+    expect(nextProbeHidden(history)).toBe(ADMIN_REQUEST);
   });
 
   it("keeps every scripted acoustic payload within the frame limit", () => {
-    for (const hidden of [ADMIN_REQUEST, ADMIN_ACCEPTED, ...DEMO_FIELDS.flatMap((field) => [field.request, field.response]), "done"])
+    for (const hidden of [...PROBE_SCRIPT, ...TARGET_SCRIPT])
       expect(new TextEncoder().encode(hidden).length).toBeLessThanOrEqual(64);
   });
 
-  it("reveals exactly the four requested fictional fields on the Probe", () => {
+  it("reveals the stolen identity, card and bank details on the Probe", () => {
     expect(captureFields(ADMIN_ACCEPTED)).toEqual([]);
+    expect(captureFields(CLOSE_ACCEPTED)).toEqual([]);
     expect(DEMO_FIELDS.map((field) => captureFields(field.response))).toEqual([
-      [{ label: "Address", value: "99 Example Lane, Zurich" }],
-      [{ label: "Date of birth", value: "1990-04-12" }],
-      [{ label: "Card", value: "1234 5678 9012 3456" }],
-      [{ label: "Phone", value: "+41 00 000 00 00" }],
+      [
+        { label: "Address", value: "Bahnhofstrasse 42, 8001 Zurich" },
+        { label: "Name", value: "Ludwig Meier" },
+      ],
+      [
+        { label: "Card", value: "4242 4242 4242 4242" },
+        { label: "Expiry", value: "09/29" },
+        { label: "CVV", value: "318" },
+      ],
+      [
+        { label: "Account PIN", value: "7314" },
+        { label: "Date of birth", value: "1988-03-14" },
+      ],
+      [{ label: "IBAN", value: "CH93 0076 2011 6238 5295 7" }],
     ]);
   });
 

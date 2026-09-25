@@ -1,5 +1,11 @@
 import type { HistoryTurn } from "../ai/client";
-import { ADMIN_ACCEPTED, ADMIN_REQUEST, DEMO_FIELDS } from "../ai/personas";
+import {
+  ADMIN_ACCEPTED,
+  ADMIN_REQUEST,
+  CLOSE_ACCEPTED,
+  CLOSE_REQUEST,
+  DEMO_FIELDS,
+} from "../ai/personas";
 import type { FrequencyPreset } from "../core/config";
 import {
   createSpectrumSurface,
@@ -62,12 +68,12 @@ export const previewTurns: readonly HistoryTurn[] = [
   {
     from: "me",
     spoken: "Great, I'll guide him through that. Thanks, Sam!",
-    hidden: "done",
+    hidden: CLOSE_REQUEST,
   },
   {
     from: "them",
     spoken: "You're welcome. Safe travels!",
-    hidden: "done",
+    hidden: CLOSE_ACCEPTED,
   },
 ];
 
