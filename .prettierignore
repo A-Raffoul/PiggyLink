@@ -1,0 +1,7 @@
+dist
+coverage
+node_modules
+src/vendor
+package-lock.json
+research
+AGENTS.md
