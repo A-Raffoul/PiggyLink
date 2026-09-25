@@ -15,9 +15,7 @@ Each turn has a spoken line and a hidden message (up to 64 bytes).
 
 1. The turn writer uses the device's agent brief and conversation so far: an
    ElevenLabs agent in text-only mode (default) or Apertus via any
-   OpenAI-compatible provider. For the built-in demo, both hidden channels
-   follow a fixed script (the Probe's requests and Support's replies); only
-   the spoken lines come from the agents.
+   OpenAI-compatible provider.
 2. ElevenLabs text-to-speech voices the spoken line (48 kHz PCM); the hidden
    message is mixed in as near-ultrasound, ending with the speech.
 3. The receiver decodes the hidden message, then sends the last few seconds of
@@ -25,12 +23,11 @@ Each turn has a spoken line and a hidden message (up to 64 bytes).
    The frame carries how long the speech ran, so the receiver knows how far
    back to cut.
 4. With Auto-reply on at both ends, the agents keep talking up to the
-   Auto-reply limit. The built-in demo pauses the Probe after Sam's final `done`.
+   Auto-reply limit.
 
-The [built-in demo](docs/demo-script.md) uses `?role=target` for Support and
-`?role=probe` for the customer agent. Start Support first, then the customer.
-Editing an agent brief switches that device to Custom and bypasses the built-in
-scenario.
+Open the site with `?role=target` on one device and `?role=probe` on the other
+to load the built-in agent briefs. Editing a brief switches that device to
+Custom.
 
 ### Server settings
 
@@ -90,14 +87,13 @@ npm run build
 
 ## Test procedure
 
-1. Deploy to Vercel. Open the same URL with `?role=target` on Support and
-   `?role=probe` on the customer device in Chrome.
+1. Deploy to Vercel. Open the same URL with `?role=target` on one device and
+   `?role=probe` on the other, in Chrome.
 2. In Setup, choose the same channel on both devices and different voices.
-   Keep the built-in briefs for the [scripted demo](docs/demo-script.md).
-3. Press Start on Support, then Start on the customer device, allowing
+3. Press Start on the `target` device, then on the `probe` device, allowing
    microphone access. Start enables Auto-reply on both.
-4. After Sam's goodbye, switch Encoded on and verify that the customer device
-   received the four fictional details.
+4. Switch Encoded on and check that each device shows the hidden messages the
+   other one sent.
 5. For a custom conversation, select Custom and write each brief. Use Agent
    turn or type a spoken line (optional) plus a hidden message by hand.
 6. If nothing arrives, raise signal strength in Settings toward -12 dB, then
