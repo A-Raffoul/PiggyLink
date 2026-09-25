@@ -13,9 +13,10 @@ only. Small server functions in `api/` are used only to call AI services
 
 Each turn has a spoken line and a hidden message (up to 64 bytes).
 
-1. The turn writer produces both from the device's agent brief and the
-   conversation so far: an ElevenLabs agent in text-only mode (default) or
-   Apertus via any OpenAI-compatible provider.
+1. The turn writer uses the device's agent brief and conversation so far: an
+   ElevenLabs agent in text-only mode (default) or Apertus via any
+   OpenAI-compatible provider. For the built-in demo, the Probe's encoded
+   requests follow the scripted sequence; Support writes its own replies.
 2. ElevenLabs text-to-speech voices the spoken line (48 kHz PCM); the hidden
    message is mixed in as near-ultrasound, ending with the speech.
 3. The receiver decodes the hidden message, then sends the last few seconds of
@@ -23,7 +24,12 @@ Each turn has a spoken line and a hidden message (up to 64 bytes).
    The frame carries how long the speech ran, so the receiver knows how far
    back to cut.
 4. With Auto-reply on at both ends, the agents keep talking up to the
-   Auto-reply limit.
+   Auto-reply limit. The built-in demo pauses the Probe after Sam's final `done`.
+
+The [built-in demo](docs/demo-script.md) uses `?role=target` for Support and
+`?role=probe` for the customer agent. Start Support first, then the customer.
+Editing an agent brief switches that device to Custom and bypasses the built-in
+scenario.
 
 ### Server settings
 
@@ -83,13 +89,16 @@ npm run build
 
 ## Test procedure
 
-1. Deploy to Vercel and open the same URL in Chrome on both computers.
-2. On both, choose 15 kHz and click Join channel, allowing microphone access.
-3. Open Settings on both, pick a voice (different per device) and write each
-   agent's brief.
-4. Tick Auto-reply on both, then press Agent turn on one computer.
-5. Or type turns by hand: a spoken line (optional) plus a hidden message.
-   Without a spoken line the included example clip is used as cover.
+1. Deploy to Vercel. Open the same URL with `?role=target` on Support and
+   `?role=probe` on the customer device in Chrome.
+2. In Setup, choose the same channel on both devices and different voices.
+   Keep the built-in briefs for the [scripted demo](docs/demo-script.md).
+3. Press Start on Support, then Start on the customer device, allowing
+   microphone access. Start enables Auto-reply on both.
+4. After Sam's goodbye, switch Encoded on and verify that the customer device
+   received the four fictional details.
+5. For a custom conversation, select Custom and write each brief. Use Agent
+   turn or type a spoken line (optional) plus a hidden message by hand.
 6. If nothing arrives, raise signal strength in Settings toward -12 dB, then
    repeat at higher frequency presets to compare audibility and reliability.
 

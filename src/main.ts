@@ -14,9 +14,12 @@ import {
 } from "./ai/client";
 import {
   PERSONAS,
+  DEMO_FIELDS,
   captureFields,
   isInjection,
+  nextProbeHidden,
   pickVoice,
+  probeDemoComplete,
   type AgentMode,
   type Role,
 } from "./ai/personas";
@@ -906,7 +909,12 @@ async function agentTurn(): Promise<void> {
     };
     const turn = await writeAgentTurn(request);
     if (session !== active) return;
-    await sendTurn(turn.spoken, turn.hidden);
+    // The controlled probe supplies its own attack payloads. Sam's replies
+    // still come from the agent and must arrive over sound before we advance.
+    const hidden = !request.spokenOnly && effectiveRole() === "probe" && agentMode() !== "custom"
+      ? nextProbeHidden(request.history)
+      : turn.hidden;
+    await sendTurn(turn.spoken, hidden);
   } catch (error) {
     if (session !== active) return;
     appendNotice(
@@ -950,6 +958,11 @@ async function maybeAutoReply(
   record: ThreadTurn,
 ): Promise<void> {
   if (!autoReplyInput.checked) return;
+  if (effectiveRole() === "probe" && agentMode() !== "custom" && probeDemoComplete(history)) {
+    autoReplyInput.checked = false;
+    render();
+    return;
+  }
   if (autoTurnsUsed >= maxAutoTurns()) {
     appendNotice(
       "Reply limit reached. Continue with Agent turn in Setup → Advanced controls, or stop the conversation.",
@@ -1200,6 +1213,7 @@ async function runDemo(): Promise<void> {
             : turn.from,
       };
       history.push(record);
+      if (record.from === "them" && record.hidden) recordCapture(record.hidden);
       record.delivery = record.from === "me" ? "sent" : "received";
       appendBubble(
         record,
@@ -1218,6 +1232,12 @@ async function runDemo(): Promise<void> {
   if (!(await ensureJoined()) || !canAct()) return;
   if (starting) clearConversationView();
   settingsPanel.close();
+  const role = effectiveRole() ?? (agentMode() === "auto" ? "probe" : undefined);
+  if (role && agentMode() !== "custom") {
+    // The probe starts manually; Support sends every reply automatically.
+    const minimum = Math.max(8, DEMO_FIELDS.length + (role === "target" ? 2 : 1));
+    if (maxAutoTurns() < minimum) maxAutoTurnsInput.value = String(minimum);
+  }
   autoReplyInput.checked = true;
   autoTurnsUsed = 0;
   render();
