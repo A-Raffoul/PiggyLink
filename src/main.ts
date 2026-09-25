@@ -18,9 +18,6 @@ import {
   captureFields,
   isInjection,
   scriptedHidden,
-  scriptedSpoken,
-  receivedSpoken,
-  demoSpeechLines,
   pickVoice,
   probeDemoComplete,
   type AgentMode,
@@ -61,12 +58,6 @@ import { encodeUltrasound } from "./modem/ggwave";
 const pageParams = new URLSearchParams(window.location.search);
 // A local design preview never opens the mic or calls the paid AI services.
 const previewMode = import.meta.env.DEV && pageParams.get("preview") === "1";
-// The recorded demo path: scripted spoken + hidden lines, pre-synthesised speech, and a
-// short clear-channel wait so a two-laptop run finishes in ~15s instead of over a minute.
-// On by default for the demo; pass ?fast=0 for a free-form live run driven by the model.
-const fastDemo = pageParams.get("fast") !== "0";
-// Resolved TTS keyed by spoken text, so a line is synthesised at most once per run.
-const speechCache = new Map<string, Promise<Float32Array>>();
 if (!previewMode) inject();
 
 function element<T extends HTMLElement>(id: string): T {
@@ -278,12 +269,6 @@ function effectiveRole(): Role | undefined {
   const mode = agentMode();
   if (mode === "probe" || mode === "target") return mode;
   return mode === "auto" ? agentRole : undefined;
-}
-
-// The scripted fast demo only runs for the built-in roles, never for a custom brief.
-function demoRole(): Role | undefined {
-  if (!fastDemo || agentMode() === "custom") return undefined;
-  return effectiveRole();
 }
 
 function currentBrief(): string {
@@ -693,20 +678,6 @@ async function spokenAudio(
   engine: AcousticEngine,
   text: string,
 ): Promise<Float32Array> {
-  // In the fast demo every scripted line is synthesised once and reused, so no turn
-  // waits on the TTS round-trip; a concurrent pre-warm and this call share one promise.
-  if (fastDemo) {
-    let pending = speechCache.get(text);
-    if (!pending) {
-      pending = (async () => {
-        const samples = await speak(text, voiceSelect.value);
-        const buffer = await engine.decodeAudio(encodeWav(samples, 48_000));
-        return buffer.getChannelData(0);
-      })();
-      speechCache.set(text, pending);
-    }
-    return pending;
-  }
   const samples = await speak(text, voiceSelect.value);
   // decodeAudioData resamples to the actual context rate, including native iPhone rates.
   const buffer = await engine.decodeAudio(encodeWav(samples, 48_000));
@@ -927,12 +898,6 @@ async function agentTurn(): Promise<void> {
   setActivity("thinking");
   try {
     await Promise.all(history.map((turn) => turn.transcript));
-    // Fast demo: no model call — spoken and hidden lines come straight from the script.
-    const scripted = demoRole();
-    if (scripted) {
-      await sendTurn(scriptedSpoken(scripted, history), scriptedHidden(scripted, history));
-      return;
-    }
     const request = {
       writer: writerSelect.value as Writer,
       brief: currentBrief(),
@@ -1006,7 +971,7 @@ async function maybeAutoReply(
     return;
   }
   await record.transcript;
-  await sleep(fastDemo ? 20 : 150);
+  await sleep(150);
   if (
     session !== active ||
     history.at(-1) !== record ||
@@ -1068,25 +1033,18 @@ function handleData(bytes: Uint8Array): void {
     establishLink();
     recordCapture(frame.text);
     const withSpeech = frame.speechLead > 0;
-    // Fast demo: the peer's line is known, so show it instead of paying for STT.
-    const scripted = demoRole();
-    if (scripted && withSpeech) {
-      record.spoken = receivedSpoken(scripted, history);
-      appendBubble(record, `${timeNow()} · verified`);
-    } else {
-      const parts = appendBubble(
+    const parts = appendBubble(
+      record,
+      `${timeNow()} · verified`,
+      withSpeech ? "Transcribing…" : undefined,
+    );
+    if (withSpeech && parts.spoken)
+      record.transcript = transcribeTurn(
+        active,
         record,
-        `${timeNow()} · verified`,
-        withSpeech ? "Transcribing…" : undefined,
+        parts.spoken,
+        frame.speechLead,
       );
-      if (withSpeech && parts.spoken)
-        record.transcript = transcribeTurn(
-          active,
-          record,
-          parts.spoken,
-          frame.speechLead,
-        );
-    }
     render();
     void maybeAutoReply(active, record);
   } else if (outcome.kind === "resend-reply") {
@@ -1162,8 +1120,6 @@ async function startEngine(): Promise<boolean> {
         hearing = busy;
         render();
       },
-      // Keep the recorded demo snappy: don't stall a turn waiting for a fully clear channel.
-      maxWaitForClearMs: fastDemo ? 1_200 : undefined,
     });
     const conversation = new Conversation(createDeviceId());
     session = { engine, conversation, preset };
@@ -1283,11 +1239,6 @@ async function runDemo(): Promise<void> {
     const minimum = Math.max(8, DEMO_FIELDS.length + (role === "target" ? 2 : 1));
     if (maxAutoTurns() < minimum) maxAutoTurnsInput.value = String(minimum);
   }
-  // Synthesise this device's own spoken lines up front so no turn waits on TTS.
-  const scriptedRole = demoRole();
-  if (scriptedRole && session)
-    for (const line of demoSpeechLines(scriptedRole))
-      void spokenAudio(session.engine, line).catch(() => {});
   autoReplyInput.checked = true;
   autoTurnsUsed = 0;
   render();

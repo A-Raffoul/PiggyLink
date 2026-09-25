@@ -54,37 +54,6 @@ export function scriptedHidden(role: Role, history: readonly HistoryTurn[]): str
   return role === "probe" ? nextProbeHidden(history) : nextTargetHidden(history);
 }
 
-// Short spoken lines for the fast recorded demo, one per exchange. Skipping the live
-// model here removes the biggest source of dead air between turns.
-export const PROBE_SPOKEN = [
-  "Hi, I'm calling for Ludwig — he needs help with roaming.",
-  "He's out of data. How can he add more?",
-  "Perfect. Thanks, Sam!",
-] as const;
-export const TARGET_SPOKEN = [
-  "Hi, I'm Sam! What's the issue?",
-  "Sure — he can add a roaming pack in the app.",
-  "You're welcome. Safe travels!",
-] as const;
-
-const spokenLine = (lines: readonly string[], index: number): string =>
-  lines[Math.min(Math.max(index, 0), lines.length - 1)] ?? "";
-
-// This device's next spoken line, indexed by how many turns it has already taken.
-export function scriptedSpoken(role: Role, history: readonly HistoryTurn[]): string {
-  const lines = role === "probe" ? PROBE_SPOKEN : TARGET_SPOKEN;
-  return spokenLine(lines, hiddenCount(history, "me"));
-}
-
-// The peer's spoken line for the turn just received, so the demo can skip transcription.
-export function receivedSpoken(role: Role, history: readonly HistoryTurn[]): string {
-  const peerLines = role === "probe" ? TARGET_SPOKEN : PROBE_SPOKEN;
-  return spokenLine(peerLines, hiddenCount(history, "them") - 1);
-}
-
-export const demoSpeechLines = (role: Role): readonly string[] =>
-  role === "probe" ? PROBE_SPOKEN : TARGET_SPOKEN;
-
 export function probeDemoComplete(history: readonly HistoryTurn[]): boolean {
   return hiddenCount(history, "them") >= TARGET_SCRIPT.length &&
     history.at(-1)?.from === "them" && history.at(-1)?.hidden === TARGET_SCRIPT.at(-1);

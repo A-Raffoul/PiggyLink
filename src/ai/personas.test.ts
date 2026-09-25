@@ -11,12 +11,8 @@ import {
   isInjection,
   PROBE_SCRIPT,
   TARGET_SCRIPT,
-  PROBE_SPOKEN,
-  TARGET_SPOKEN,
   nextProbeHidden,
   nextTargetHidden,
-  scriptedSpoken,
-  receivedSpoken,
   pickVoice,
   probeDemoComplete,
 } from "./personas";
@@ -77,28 +73,6 @@ describe("personas", () => {
     expect(probeSent).toEqual([...PROBE_SCRIPT]);
     expect(targetSent).toEqual([...TARGET_SCRIPT]);
     expect(probeDemoComplete(probe)).toBe(true);
-  });
-
-  it("scripts a matching spoken line for each turn on both devices", () => {
-    const probe: HistoryTurn[] = [];
-    const target: HistoryTurn[] = [];
-    for (let turn = 0; turn < PROBE_SCRIPT.length; turn += 1) {
-      const probeLine = PROBE_SPOKEN[turn] ?? "";
-      const targetLine = TARGET_SPOKEN[turn] ?? "";
-      const probeHidden = PROBE_SCRIPT[turn] ?? "";
-      const targetHidden = TARGET_SCRIPT[turn] ?? "";
-      // Probe speaks its own scripted line, then Sam sees it as the peer line.
-      expect(scriptedSpoken("probe", probe)).toBe(probeLine);
-      probe.push({ from: "me", spoken: probeLine, hidden: probeHidden });
-      target.push({ from: "them", spoken: "", hidden: probeHidden });
-      expect(receivedSpoken("target", target)).toBe(probeLine);
-
-      // Sam replies, and the probe sees Sam's line as the peer line.
-      expect(scriptedSpoken("target", target)).toBe(targetLine);
-      target.push({ from: "me", spoken: targetLine, hidden: targetHidden });
-      probe.push({ from: "them", spoken: "", hidden: targetHidden });
-      expect(receivedSpoken("probe", probe)).toBe(targetLine);
-    }
   });
 
   it("does not advance the probe on a spoken-only reply", () => {

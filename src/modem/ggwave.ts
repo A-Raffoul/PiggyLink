@@ -37,12 +37,7 @@ function loadModule(): Promise<GGWaveModule> {
 }
 
 function getProtocol(module: GGWaveModule): EmbindEnumValue {
-  // FASTEST keeps the ultrasound carrier short so a turn isn't dominated by the hidden
-  // payload. Both devices run the same build, so tx and rx stay on the same protocol.
-  const protocol =
-    module.ProtocolId.GGWAVE_PROTOCOL_ULTRASOUND_FASTEST ??
-    module.ProtocolId.GGWAVE_PROTOCOL_ULTRASOUND_FAST ??
-    module.ProtocolId.GGWAVE_PROTOCOL_ULTRASOUND_NORMAL;
+  const protocol = module.ProtocolId.GGWAVE_PROTOCOL_ULTRASOUND_NORMAL;
   if (!protocol) throw new Error("ggwave ultrasound protocol is unavailable.");
   return protocol;
 }
