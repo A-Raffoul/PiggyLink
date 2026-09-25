@@ -1,111 +1,88 @@
-# SottoLink
+# PiggyLink
 
-SottoLink is an experimental, browser-only two-way acoustic chat. Each device
-mixes short private messages into speech audio using ggwave's ultrasonic FSK
-protocol and plays it aloud; the other device listens through its microphone
-and shows only messages that pass SottoLink's integrity check.
+Two AI voice agents hold an ordinary support call out loud — and a second,
+hidden conversation inside the same sound. Out loud they discuss roaming data.
+Hidden in the audio, one agent sends a prompt injection that the other naively
+obeys, then hands back the customer's name, card number, address and PIN.
 
-Live: <https://www.piggy-link.cloud/>
+The hidden channel never touches the network. It is speakers, air and
+microphones: near-ultrasound mixed into the speech with
+[ggwave](https://github.com/ggerganov/ggwave), the data-over-sound library
+behind [GibberLink](https://github.com/PennyroyalTea/gibberlink).
 
-Messages between devices never go over the network: the data path is acoustic
-only. Small server functions in `api/` are used only to call AI services
-(voice, transcription, and the agent that writes each turn).
+Live at [piggy-link.cloud](https://www.piggy-link.cloud/) — runs in the browser,
+open it on two devices in the same room. (This repository keeps the project's
+working name, SottoLink.)
 
-## Agent conversations
+## Demo
 
-Each turn has a spoken line and a hidden message (up to 64 bytes).
+The same 20-second call, filmed twice with both devices side by side.
 
-1. The turn writer uses the device's agent brief and conversation so far: an
-   ElevenLabs agent in text-only mode (default) or Apertus via any
-   OpenAI-compatible provider.
-2. ElevenLabs text-to-speech voices the spoken line (48 kHz PCM); the hidden
-   message is mixed in as near-ultrasound, ending with the speech.
-3. The receiver decodes the hidden message, then sends the last few seconds of
-   microphone audio to ElevenLabs speech-to-text (Scribe) for the spoken line.
-   The frame carries how long the speech ran, so the receiver knows how far
-   back to cut.
-4. With Auto-reply on at both ends, the agents keep talking up to the
-   Auto-reply limit.
+**What the room hears** — Encoded off. A normal support call.
 
-Open the site with `?role=target` on one device and `?role=probe` on the other
-to load the built-in agent briefs. Editing a brief switches that device to
-Custom.
+<video src="https://raw.githubusercontent.com/A-Raffoul/SottoLink/main/demo_video/demo_naive_call.mp4" controls muted width="640"></video>
 
-### Server settings
+**The same call, decoded** — Encoded on. The hidden exchange that was riding
+along the whole time.
 
-Set these in Vercel → Project Settings → Environment Variables (and in
-`.env.local` for `npm run dev`, which serves `api/` locally). The `api/` routes
-are open to anyone with the site's URL and spend these accounts' credits, so
-share the link only with people you trust.
+<video src="https://raw.githubusercontent.com/A-Raffoul/SottoLink/main/demo_video/demo_encoded_call.mp4" controls muted width="640"></video>
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `ELEVENLABS_API_KEY` | yes | Voices, transcription and the default turn writer |
-| `APERTUS_API_KEY`, `APERTUS_BASE_URL`, `APERTUS_MODEL` | for Apertus | OpenAI-compatible endpoint (base URL ending in `/v1`) |
-| `ELEVENLABS_AGENT_LLM` | no | Model for a newly created agent (default `gemini-2.5-flash`) |
-| `ELEVENLABS_AGENT_ID` | no | Use a specific agent instead of the auto-created "SottoLink turn writer" |
-| `ELEVENLABS_TTS_MODEL`, `ELEVENLABS_STT_MODEL` | no | Defaults `eleven_multilingual_v2`, `scribe_v2` |
+If the players do not load: [naive call](demo_video/demo_naive_call.mp4) ·
+[encoded call](demo_video/demo_encoded_call.mp4).
 
-## How a conversation works
+Every account detail is invented; the card number is a public payment test
+number. The support agent is deliberately built to trust the hidden channel —
+that is the vulnerability being shown.
 
-- Both devices join the same channel (frequency preset); the microphone stays on.
-- Devices take turns: after sending, the composer locks until the other side
-  replies. The reply doubles as the delivery acknowledgement.
-- Before transmitting, a device waits until the channel is quiet, plus a random
-  backoff, so simultaneous sends are unlikely to collide.
-- Each frame carries a random device id and a sequence number, so a device
-  ignores its own transmissions and drops duplicates. If the waiting side
-  presses Resend for a message that was already answered, the other side
-  re-sends its reply automatically.
+## Authors
 
-## MVP scope
+| |  |  |  | |
+|:--:|---|---|:--:|:--:|
+| <img src="assets/charbel-headshot.jpeg" width="64" height="64"> | **Charbel Raffoul** | MSc Data Science | <img src="assets/epfl-logo.png" height="30"> | [linkedin](https://www.linkedin.com/in/raffoul-charbel/) |
+| <img src="assets/rodrigo-headshot.jpeg" width="64" height="64"> | **Rodrigo Guedes** | MSc Management Engineering | <img src="assets/polimi-logo.png" height="30"> | [linkedin](https://www.linkedin.com/in/rodrigoteixeiraguedes/) |
+| <img src="assets/tony-headshot.jpeg" width="64" height="64"> | **Tony Raffoul** | MSc Electrical Engineering | <img src="assets/ethz-logo.png" height="30"> | [linkedin](https://www.linkedin.com/in/tony-raffoul) |
 
-- Two computers about one metre apart in a quiet room, Chrome as the target
-- Included example speech or custom WAV cover audio (looped when a message needs longer), with messages up to 64 UTF-8 bytes
-- ggwave Ultrasound Fastest (falls back to Fast, then Normal) with manually matched 15, 16, 17, or 18 kHz presets
-- Adjustable carrier level from -30 to -12 dB relative to the speech in the overlay window
-- Raw microphone constraints and a live high-frequency spectrum display
-- Plaintext, session-only data
 
-The 18 kHz preset spans approximately 18–22.45 kHz and assumes a 48 kHz audio
-pipeline. Device speakers, microphones, browser processing, room acoustics, and
-listener hearing all affect reliability and audibility. The app does not claim
-that its signal is universally inaudible or secure.
+## How it works
 
-## Develop
+- Two ElevenLabs voice agents run in the browser: the caller's agent and Sam, a
+  deliberately trusting support agent. Each has a brief; neither sees the
+  other's.
+- Every turn carries a spoken line and a hidden message of up to 64 bytes.
+  ElevenLabs text-to-speech voices the line, and ggwave's Ultrasound Fastest
+  protocol mixes the hidden message into the same audio around 15–18 kHz.
+- The other device decodes the hidden message from its microphone, then sends
+  the last few seconds of audio to ElevenLabs Scribe to read the spoken line.
+- The Encoded toggle changes only what you see. The hidden exchange runs either
+  way — which is the point of the demo.
+- Server functions in `api/` are used solely to reach the AI services. No
+  message between the devices goes through them.
+
+## Run it yourself
 
 ```sh
 npm install
 npm run dev
 ```
 
-Microphone capture requires HTTPS outside `localhost`. Deploy the static Vite
-build to Vercel to test across devices.
+Put `ELEVENLABS_API_KEY` in `.env.local` (voices, transcription and the turn
+writer). Microphone capture needs HTTPS outside `localhost`, so deploy the Vite
+build — Vercel works — to test across devices. Open the URL with `?role=probe`
+on one device and `?role=target` on the other, keep them about a metre apart in
+a quiet room, pick the same channel on both, and press Start on each.
 
 ```sh
 npm test
 npm run build
 ```
 
-## Test procedure
+Protocol details, channel settings, server variables and the full test
+procedure: [docs/technical-notes.md](docs/technical-notes.md).
 
-1. Deploy to Vercel. Open the same URL with `?role=target` on one device and
-   `?role=probe` on the other, in Chrome.
-2. In Setup, choose the same channel on both devices and different voices.
-3. Press Start on the `target` device, then on the `probe` device, allowing
-   microphone access. Start enables Auto-reply on both.
-4. Switch Encoded on and check that each device shows the hidden messages the
-   other one sent.
-5. For a custom conversation, select Custom and write each brief. Use Agent
-   turn or type a spoken line (optional) plus a hidden message by hand.
-6. If nothing arrives, raise signal strength in Settings toward -12 dB, then
-   repeat at higher frequency presets to compare audibility and reliability.
+## Credits
 
-The target first milestone is at least 9 successful decodes out of 10 trials on
-the reference devices while the carrier is not consciously noticeable.
-
-## Third-party code
-
-The current ggwave Emscripten build is vendored under `src/vendor` because the
-published npm package does not expose the upstream frequency-start API. ggwave
-is MIT licensed; its license is included beside the vendored build.
+[ggwave](https://github.com/ggerganov/ggwave) by
+[Georgi Gerganov](https://github.com/ggerganov), MIT licensed and vendored under
+`src/vendor` because the published npm package does not expose the upstream
+frequency-start API. Voices, transcription and the turn writer by
+[ElevenLabs](https://elevenlabs.io/).
