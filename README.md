@@ -5,6 +5,8 @@ mixes short private messages into speech audio using ggwave's ultrasonic FSK
 protocol and plays it aloud; the other device listens through its microphone
 and shows only messages that pass SottoLink's integrity check.
 
+Live: <https://www.piggy-link.cloud/>
+
 Messages between devices never go over the network: the data path is acoustic
 only. Small server functions in `api/` are used only to call AI services
 (voice, transcription, and the agent that writes each turn).
