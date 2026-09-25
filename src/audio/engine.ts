@@ -24,6 +24,8 @@ interface EngineOptions {
   readonly onBusyChange: (busy: boolean) => void;
   readonly onSpeech?: (samples: Float32Array) => void;
   readonly canListenForSpeech?: () => boolean;
+  // The recorded demo caps listen-before-talk so a busy channel can't stall a turn.
+  readonly maxWaitForClearMs?: number;
 }
 
 const sleep = (ms: number): Promise<void> =>
@@ -190,7 +192,8 @@ export async function startAcousticEngine(
 
     async waitForClearChannel(isCancelled) {
       // Listen-before-talk is best effort: never hold a message back indefinitely.
-      const giveUpAt = performance.now() + MAX_WAIT_FOR_CLEAR_MS;
+      const giveUpAt =
+        performance.now() + (options.maxWaitForClearMs ?? MAX_WAIT_FOR_CLEAR_MS);
       for (;;) {
         while (busy || playing) {
           if (isCancelled() || performance.now() > giveUpAt) return;
