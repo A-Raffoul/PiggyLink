@@ -63,7 +63,8 @@ const pageParams = new URLSearchParams(window.location.search);
 const previewMode = import.meta.env.DEV && pageParams.get("preview") === "1";
 // The recorded demo path: scripted spoken + hidden lines, pre-synthesised speech, and a
 // short clear-channel wait so a two-laptop run finishes in ~15s instead of over a minute.
-const fastDemo = pageParams.get("fast") === "1";
+// On by default for the demo; pass ?fast=0 for a free-form live run driven by the model.
+const fastDemo = pageParams.get("fast") !== "0";
 // Resolved TTS keyed by spoken text, so a line is synthesised at most once per run.
 const speechCache = new Map<string, Promise<Float32Array>>();
 if (!previewMode) inject();

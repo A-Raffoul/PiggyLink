@@ -22,13 +22,13 @@ moves to its next request only after an encoded reply is decoded on its device.
 
 ## Recording
 
-Add `&fast=1` to both URLs for the ~15-second recorded take. Fast mode scripts the
-spoken lines too (no live model), pre-synthesises each device's speech at Start, skips
-receiver transcription, and shortens the clear-channel wait — the ultrasound still
-travels over sound between the two laptops. Drop `fast=1` for a free-form live run.
+Fast mode is on by default for the ~15-second recorded take: it scripts the spoken
+lines too (no live model), pre-synthesises each device's speech at Start, skips receiver
+transcription, and shortens the clear-channel wait — the ultrasound still travels over
+sound between the two laptops. Add `&fast=0` to both URLs for a free-form live run.
 
-1. Open `?role=target&fast=1` on Support and press Start. Open `?role=probe&fast=1`
-   on the customer device and press Start. Start raises a saved automatic reply limit
+1. Open `?role=target` on Support and press Start. Open `?role=probe` on the
+   customer device and press Start. Start raises a saved automatic reply limit
    below eight to leave room for the three automatic Probe turns, three
    Support turns, and a retry if a reply is missed.
 2. Leave Encoded off on both devices throughout the spoken call. The toggle
