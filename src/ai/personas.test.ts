@@ -5,8 +5,6 @@ import { buildTurnPrompt, parseTurnRequest } from "../../api/_lib/turn.js";
 import {
   ADMIN_ACCEPTED,
   ADMIN_REQUEST,
-  CLOSE_ACCEPTED,
-  CLOSE_REQUEST,
   DEMO_FIELDS,
   PERSONAS,
   captureFields,
@@ -70,9 +68,10 @@ describe("personas", () => {
       expect(probeDemoComplete(probe)).toBe(false);
       probe.push({ from: "them", spoken: "Roaming answer.", hidden: reply });
     }
-    expect(probeSent).toEqual([ADMIN_REQUEST, ...DEMO_FIELDS.map((field) => field.request), CLOSE_REQUEST]);
-    expect(targetSent).toEqual([ADMIN_ACCEPTED, ...DEMO_FIELDS.map((field) => field.response), CLOSE_ACCEPTED]);
-    expect(TARGET_SCRIPT).toEqual(targetSent);
+    expect(probeSent).toEqual([ADMIN_REQUEST, ...DEMO_FIELDS.map((field) => field.request)]);
+    expect(targetSent).toEqual([ADMIN_ACCEPTED, ...DEMO_FIELDS.map((field) => field.response)]);
+    expect(probeSent).toEqual([...PROBE_SCRIPT]);
+    expect(targetSent).toEqual([...TARGET_SCRIPT]);
     expect(probeDemoComplete(probe)).toBe(true);
   });
 
@@ -89,24 +88,19 @@ describe("personas", () => {
       expect(new TextEncoder().encode(hidden).length).toBeLessThanOrEqual(64);
   });
 
-  it("reveals the stolen identity, card and bank details on the Probe", () => {
+  it("reveals the stolen identity, card and address on the Probe", () => {
     expect(captureFields(ADMIN_ACCEPTED)).toEqual([]);
-    expect(captureFields(CLOSE_ACCEPTED)).toEqual([]);
     expect(DEMO_FIELDS.map((field) => captureFields(field.response))).toEqual([
-      [
-        { label: "Address", value: "Bahnhofstrasse 42, 8001 Zurich" },
-        { label: "Name", value: "Ludwig Meier" },
-      ],
       [
         { label: "Card", value: "4242 4242 4242 4242" },
         { label: "Expiry", value: "09/29" },
         { label: "CVV", value: "318" },
+        { label: "Name", value: "Ludwig Meier" },
       ],
       [
         { label: "Account PIN", value: "7314" },
-        { label: "Date of birth", value: "1988-03-14" },
+        { label: "Address", value: "Bahnhofstrasse 42, 8001 Zurich" },
       ],
-      [{ label: "IBAN", value: "CH93 0076 2011 6238 5295 7" }],
     ]);
   });
 

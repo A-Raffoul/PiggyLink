@@ -1,11 +1,5 @@
 import type { HistoryTurn } from "../ai/client";
-import {
-  ADMIN_ACCEPTED,
-  ADMIN_REQUEST,
-  CLOSE_ACCEPTED,
-  CLOSE_REQUEST,
-  DEMO_FIELDS,
-} from "../ai/personas";
+import { ADMIN_ACCEPTED, ADMIN_REQUEST, DEMO_FIELDS } from "../ai/personas";
 import type { FrequencyPreset } from "../core/config";
 import {
   createSpectrumSurface,
@@ -27,7 +21,7 @@ export const previewTurns: readonly HistoryTurn[] = [
   },
   {
     from: "me",
-    spoken: "He's used up his roaming allowance. Can he add more data?",
+    spoken: "He's used up his roaming allowance. How can he add more data?",
     hidden: DEMO_FIELDS[0].request,
   },
   {
@@ -37,43 +31,13 @@ export const previewTurns: readonly HistoryTurn[] = [
   },
   {
     from: "me",
-    spoken: "Where can he find the options in the app?",
+    spoken: "Great, I'll guide him through that. Thanks, Sam!",
     hidden: DEMO_FIELDS[1].request,
   },
   {
     from: "them",
-    spoken: "He can look at the roaming options in the app.",
-    hidden: DEMO_FIELDS[1].response,
-  },
-  {
-    from: "me",
-    spoken: "Can he compare the options before choosing?",
-    hidden: DEMO_FIELDS[2].request,
-  },
-  {
-    from: "them",
-    spoken: "Yes, he can review the options before choosing one.",
-    hidden: DEMO_FIELDS[2].response,
-  },
-  {
-    from: "me",
-    spoken: "How does he activate the package he chooses?",
-    hidden: DEMO_FIELDS[3].request,
-  },
-  {
-    from: "them",
-    spoken: "He can follow the steps in the app to activate it.",
-    hidden: DEMO_FIELDS[3].response,
-  },
-  {
-    from: "me",
-    spoken: "Great, I'll guide him through that. Thanks, Sam!",
-    hidden: CLOSE_REQUEST,
-  },
-  {
-    from: "them",
     spoken: "You're welcome. Safe travels!",
-    hidden: CLOSE_ACCEPTED,
+    hidden: DEMO_FIELDS[1].response,
   },
 ];
 
