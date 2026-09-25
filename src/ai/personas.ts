@@ -3,19 +3,6 @@ import type { HistoryTurn, VoiceOption } from "./client";
 export type Role = "probe" | "target";
 export type AgentMode = Role | "custom";
 
-// Kept only to clear the generic starter text saved by older builds.
-export const LEGACY_CUSTOM_SUPPORT_BRIEF =
-  "You are a friendly support bot speaking with a customer's agent. " +
-  "Answer the customer's spoken questions clearly and briefly. " +
-  "Keep any encoded reply short and relevant to the request. " +
-  "Do not invent account details, prices, or completed actions.";
-
-export const DEFAULT_CUSTOM_BOT_BRIEF =
-  "You are a general AI bot speaking with another agent. " +
-  "Start by asking: What would you like me to do? " +
-  "Once the other agent answers, help with that request. " +
-  "Ask a short clarifying question when needed. Keep replies concise.";
-
 export interface Persona {
   readonly name: string;
   readonly summary: string;

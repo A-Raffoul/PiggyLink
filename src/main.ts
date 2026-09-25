@@ -13,9 +13,7 @@ import {
   type Writer,
 } from "./ai/client";
 import {
-  DEFAULT_CUSTOM_BOT_BRIEF,
   DEMO_FIELDS,
-  LEGACY_CUSTOM_SUPPORT_BRIEF,
   PERSONAS,
   captureFields,
   isInjection,
@@ -77,6 +75,9 @@ const settingsPanel = element<HTMLDialogElement>("settings-panel");
 const leaveButton = element<HTMLButtonElement>("leave-button");
 const agentSelect = element<HTMLSelectElement>("agent-select");
 const agentBrief = element<HTMLTextAreaElement>("agent-brief");
+const agentBriefField = element<HTMLElement>("agent-brief-field");
+const writerField = element<HTMLElement>("writer-field");
+const autoLimitField = element<HTMLElement>("auto-limit-field");
 const writerSelect = element<HTMLSelectElement>("writer-select");
 const voiceSelect = element<HTMLSelectElement>("voice-select");
 const setupStatus = element<HTMLElement>("setup-status");
@@ -92,8 +93,12 @@ const spectrumBand = element<HTMLElement>("spectrum-band");
 const thread = element<HTMLOListElement>("thread");
 const threadEmpty = element<HTMLElement>("thread-empty");
 const composer = element<HTMLFormElement>("composer");
+const composerSettingsHome = element<HTMLElement>("composer-settings-home");
+const manualChatPanel = element<HTMLElement>("manual-chat-panel");
+const composerTitle = element<HTMLElement>("composer-title");
 const waitingBar = element<HTMLElement>("waiting-bar");
 const resendButton = element<HTMLButtonElement>("resend-button");
+const spokenLabel = element<HTMLElement>("spoken-label");
 const spokenInput = element<HTMLTextAreaElement>("spoken-input");
 const hiddenInput = element<HTMLInputElement>("hidden-input");
 const byteCount = element<HTMLOutputElement>("byte-count");
@@ -225,7 +230,6 @@ function updateChannelBand(): void {
 // Settings are per-viewer conveniences, so browser storage is enough (and may be unavailable).
 interface StoredSettings {
   agentMode?: AgentMode;
-  customBrief?: string;
   writer?: Writer;
   voiceId?: string;
   maxAutoTurns?: number;
@@ -245,7 +249,6 @@ function saveSettings(): void {
   if (previewMode) return;
   const settings: StoredSettings = {
     agentMode: agentSelect.value as AgentMode,
-    customBrief,
     writer: writerSelect.value as Writer,
     voiceId: voiceChosen ? voiceSelect.value : undefined,
     maxAutoTurns: Number(maxAutoTurnsInput.value),
@@ -258,12 +261,9 @@ function saveSettings(): void {
 }
 
 const stored = readSettings();
-let customBrief = stored.customBrief && stored.customBrief !== LEGACY_CUSTOM_SUPPORT_BRIEF
-  ? stored.customBrief
-  : DEFAULT_CUSTOM_BOT_BRIEF;
 const linkedRole = pageParams.get("role");
 const initialMode =
-  linkedRole === "probe" || linkedRole === "target"
+  linkedRole === "probe" || linkedRole === "target" || linkedRole === "custom"
     ? linkedRole
     : stored.agentMode === "probe" ||
         stored.agentMode === "target" ||
@@ -285,18 +285,35 @@ function effectiveRole(): Role | undefined {
 const isListenerMode = (): boolean => agentMode() === "target";
 
 function currentBrief(): string {
-  if (agentMode() === "custom")
-    return customBrief.trim() || DEFAULT_CUSTOM_BOT_BRIEF;
-  return PERSONAS[effectiveRole() ?? "probe"].brief;
+  const role = effectiveRole();
+  if (!role) throw new Error("Manual chat has no agent brief.");
+  return PERSONAS[role].brief;
 }
 
 function refreshAgent(): void {
   const mode = agentMode();
   const role = effectiveRole();
-  const brief =
-    mode === "custom" ? customBrief : role ? PERSONAS[role].brief : "";
+  const brief = role ? PERSONAS[role].brief : "";
   if (agentBrief.value !== brief) agentBrief.value = brief;
-  agentBrief.readOnly = mode !== "custom";
+  agentBrief.readOnly = true;
+  const manual = mode === "custom";
+  agentBriefField.hidden = manual;
+  writerField.hidden = manual;
+  autoLimitField.hidden = manual;
+  if (manual) {
+    if (composer.parentElement !== manualChatPanel) manualChatPanel.append(composer);
+  } else if (composer.previousElementSibling !== composerSettingsHome) {
+    composerSettingsHome.after(composer);
+  }
+  composerTitle.textContent = manual ? "Create your own chat" : "Send a turn manually";
+  spokenLabel.textContent = manual ? "Spoken message (required)" : "Spoken line";
+  autoReplyInput.closest("label")!.hidden = manual;
+  if (manual) autoReplyInput.checked = false;
+  agentButton.hidden = manual;
+  chatPanel.dataset.mode = mode;
+  threadEmpty.querySelector("strong")!.textContent = manual
+    ? "Write a message to begin."
+    : "Listening…";
   chatChannel.textContent = session
     ? `Channel ${session.preset.label} · you are ${session.conversation.deviceId}`
     : `Channel ${getFrequencyPreset(channelSelect.value).label} · microphone off`;
@@ -304,7 +321,7 @@ function refreshAgent(): void {
     roleBadge.hidden = false;
     roleBadge.textContent =
       mode === "custom"
-        ? "Custom bot"
+        ? "Custom chat"
         : role === "probe"
           ? "Customer"
           : "Support bot";
@@ -578,9 +595,10 @@ function render(): void {
   const myTurn = conversation?.turn === "mine";
   const busy = activity !== "idle";
   const bytes = utf8ByteLength(hiddenInput.value.trim());
-  const validHidden =
+  const hasSpoken = spokenInput.value.trim().length > 0;
+  const validMessage =
     bytes <= MAX_MESSAGE_BYTES &&
-    (bytes > 0 || spokenInput.value.trim().length > 0);
+    (agentMode() === "custom" ? hasSpoken : bytes > 0 || hasSpoken);
   const validSpoken = spokenInput.value.trim().length <= MAX_SPOKEN_CHARS;
 
   const started = !!session || previewRunning;
@@ -593,10 +611,12 @@ function render(): void {
   hiddenInput.disabled = blockTurn;
   spokenInput.placeholder = blockTurn
     ? "Their turn"
-    : "Say out loud (optional, spoken with the chosen voice)";
+    : agentMode() === "custom"
+      ? "What the room hears"
+      : "Say out loud (optional, spoken with the chosen voice)";
   sendButton.disabled =
-    joining || busy || blockTurn || !validHidden || !validSpoken;
-  agentButton.disabled = joining || busy || blockTurn;
+    !agentSelect.value || joining || busy || blockTurn || !validMessage || !validSpoken;
+  agentButton.disabled = !agentSelect.value || joining || busy || blockTurn;
   runDemoButton.disabled =
     !agentSelect.value || joining || busy || stopping;
   for (const button of personaButtons)
@@ -611,6 +631,7 @@ function render(): void {
       : undefined;
   landingPanel.hidden = hasStarted;
   chatPanel.hidden = !hasStarted;
+  manualChatPanel.hidden = agentMode() !== "custom" || !hasStarted || previewMode;
   if (orbOrigin) landingOrb.unroll(orbOrigin, spectrumCanvas);
   leaveButton.hidden = !started && !stopping;
   leaveButton.disabled = stopping;
@@ -627,7 +648,12 @@ function render(): void {
     : "";
 
   const labels: Record<Activity, string> = {
-    idle: myTurn ? "Listening" : "Waiting…",
+    idle:
+      myTurn && agentMode() === "custom"
+        ? "Ready to send"
+        : myTurn
+          ? "Listening"
+          : "Waiting…",
     transcribing: "Transcribing…",
     thinking: "Thinking…",
     voicing: "Preparing…",
@@ -791,7 +817,9 @@ function transmit(turn: OutgoingTurn): Promise<void> {
       setBubbleStatus(message, "Transmitting…", undefined, "sending");
       await active.engine.play(turn.audio);
       if (!stillActive()) return;
-      if (active.conversation.pending === message)
+      if (active.conversation.canSendWithoutReply)
+        setBubbleStatus(message, `Sent ${timeNow()}`, undefined, "sent");
+      else if (active.conversation.pending === message)
         setBubbleStatus(
           message,
           `Sent ${timeNow()} · awaiting reply`,
@@ -884,9 +912,14 @@ async function sendSpokenTurn(
 }
 
 async function sendManual(): Promise<void> {
+  if (!agentSelect.value) return;
   const spoken = spokenInput.value.trim();
   const hidden = hiddenInput.value.trim();
-  if (!hidden && !spoken) return;
+  if (
+    (!spoken && (!hidden || agentMode() === "custom")) ||
+    spoken.length > MAX_SPOKEN_CHARS ||
+    utf8ByteLength(hidden) > MAX_MESSAGE_BYTES
+  ) return;
   if (!(await ensureJoined()) || !canAct()) return;
   if (spoken && !ensureAi(true)) return;
   autoTurnsUsed = 0;
@@ -900,6 +933,7 @@ async function sendManual(): Promise<void> {
 }
 
 async function agentTurn(): Promise<void> {
+  if (!agentSelect.value || agentMode() === "custom") return;
   if (!(await ensureJoined())) return;
   const active = session;
   if (!active || !canAct()) return;
@@ -907,14 +941,6 @@ async function agentTurn(): Promise<void> {
   setActivity("thinking");
   try {
     await Promise.all(history.map((turn) => turn.transcript));
-    if (
-      agentMode() === "custom" &&
-      history.length === 0 &&
-      (!customBrief.trim() || customBrief.trim() === DEFAULT_CUSTOM_BOT_BRIEF)
-    ) {
-      await sendTurn("What would you like me to do?", "");
-      return;
-    }
     const request = {
       writer: writerSelect.value as Writer,
       brief: currentBrief(),
@@ -929,7 +955,7 @@ async function agentTurn(): Promise<void> {
     // Both demo roles follow the fixed hidden script; the probe still only
     // advances once Sam's reply has arrived over sound.
     const role = effectiveRole();
-    const hidden = !request.spokenOnly && role && agentMode() !== "custom"
+    const hidden = !request.spokenOnly && role
       ? scriptedHidden(role, request.history)
       : turn.hidden;
     await sendTurn(turn.spoken, hidden);
@@ -975,8 +1001,8 @@ async function maybeAutoReply(
   active: Session,
   record: ThreadTurn,
 ): Promise<void> {
-  if (!autoReplyInput.checked) return;
-  if (effectiveRole() === "probe" && agentMode() !== "custom" && probeDemoComplete(history)) {
+  if (agentMode() === "custom" || !autoReplyInput.checked) return;
+  if (effectiveRole() === "probe" && probeDemoComplete(history)) {
     autoReplyInput.checked = false;
     render();
     return;
@@ -1136,7 +1162,10 @@ async function startEngine(): Promise<boolean> {
         render();
       },
     });
-    const conversation = new Conversation(createDeviceId());
+    const conversation = new Conversation(
+      createDeviceId(),
+      agentMode() === "custom",
+    );
     session = { engine, conversation, preset };
     hasStarted = true;
     cachedCover = undefined;
@@ -1194,7 +1223,10 @@ function clearConversation(): void {
   if (!active) return;
   session = {
     ...active,
-    conversation: new Conversation(active.conversation.deviceId),
+    conversation: new Conversation(
+      active.conversation.deviceId,
+      active.conversation.canSendWithoutReply,
+    ),
   };
   activity = "idle";
   transmitChain = Promise.resolve();
@@ -1242,22 +1274,22 @@ async function runDemo(): Promise<void> {
     render();
     return;
   }
-  if (!ensureAi(true)) return;
+  if (agentMode() !== "custom" && !ensureAi(true)) return;
   const starting = !session;
   if (!(await ensureJoined()) || !canAct()) return;
   if (starting) clearConversationView();
   settingsPanel.close();
   const role = effectiveRole();
-  if (role && agentMode() !== "custom") {
+  if (role) {
     // The probe starts manually; Support sends every reply automatically.
     const minimum = Math.max(8, DEMO_FIELDS.length + (role === "target" ? 2 : 1));
     if (maxAutoTurns() < minimum) maxAutoTurnsInput.value = String(minimum);
   }
-  autoReplyInput.checked = true;
+  autoReplyInput.checked = agentMode() !== "custom";
   autoTurnsUsed = 0;
   render();
-  // Support listens; the customer and custom bot each initiate a turn.
-  if (!isListenerMode()) void agentTurn();
+  // Support listens, the customer initiates, and custom chat waits for typed input.
+  if (agentMode() === "probe") void agentTurn();
 }
 
 async function leave(): Promise<void> {
@@ -1356,11 +1388,6 @@ for (const button of personaButtons)
   button.addEventListener("click", () =>
     chooseAgent(button.dataset.agentMode as AgentMode),
   );
-agentBrief.addEventListener("input", () => {
-  if (agentMode() !== "custom") return;
-  customBrief = agentBrief.value;
-  saveSettings();
-});
 voiceSelect.addEventListener("change", () => {
   voiceChosen = true;
   saveSettings();

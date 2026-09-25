@@ -101,3 +101,31 @@ describe("turn-taking conversation", () => {
     expect(alice.send("three").frame.sequence).toBe(first.frame.sequence + 1);
   });
 });
+
+describe("manual conversation", () => {
+  it("sends repeated encoded and spoken messages without a reply", () => {
+    const manual = new Conversation("aaaa", true);
+    const first = manual.send("first");
+    const second = manual.send("second");
+    manual.sendSpeech();
+    const third = manual.send("third");
+
+    expect([first, second, third].map((message) => message.frame.sequence)).toEqual([0, 1, 2]);
+    expect(manual.turn).toBe("mine");
+    expect(manual.pending).toBeUndefined();
+  });
+
+  it("accepts peer messages without treating them as acknowledgements", () => {
+    const [manual, peer] = [new Conversation("aaaa", true), new Conversation("bbbb")];
+    manual.send("first");
+    manual.send("second");
+    const incoming = peer.send("hello");
+
+    expect(manual.receive(incoming.frame)).toMatchObject({
+      kind: "message",
+      acknowledges: undefined,
+    });
+    expect(manual.receive(incoming.frame)).toEqual({ kind: "duplicate" });
+    expect(manual.send("third").frame.sequence).toBe(2);
+  });
+});

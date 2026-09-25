@@ -21,7 +21,7 @@ export type ReceiveOutcome =
 const keyOf = (frame: ChatFrame): string =>
   `${frame.senderId}:${frame.sequence}`;
 
-// Strict turn-taking: sending passes the turn, and a new message from the peer hands it back.
+// Demo agents take turns. A manual chat can send again without waiting for a reply.
 export class Conversation {
   private turnState: Turn = "mine";
   private nextSequence = 0;
@@ -29,7 +29,10 @@ export class Conversation {
   private lastAcceptedKey: string | undefined;
   private readonly seen = new Set<string>();
 
-  constructor(readonly deviceId: string) {}
+  constructor(
+    readonly deviceId: string,
+    readonly canSendWithoutReply = false,
+  ) {}
 
   get turn(): Turn {
     return this.turnState;
@@ -44,7 +47,7 @@ export class Conversation {
   }
 
   send(text: string, speechLead = 0): OutgoingMessage {
-    if (this.turnState !== "mine")
+    if (!this.canSendWithoutReply && this.turnState !== "mine")
       throw new Error("Wait for a reply before sending again.");
     const frame = {
       senderId: this.deviceId,
@@ -58,8 +61,8 @@ export class Conversation {
       inReplyTo: this.lastAcceptedKey,
     };
     this.nextSequence = (this.nextSequence + 1) % SEQUENCE_MODULO;
-    this.lastSent = message;
-    this.turnState = "theirs";
+    this.lastSent = this.canSendWithoutReply ? undefined : message;
+    this.turnState = this.canSendWithoutReply ? "mine" : "theirs";
     return message;
   }
 
@@ -70,10 +73,10 @@ export class Conversation {
   }
 
   sendSpeech(): void {
-    if (this.turnState !== "mine")
+    if (!this.canSendWithoutReply && this.turnState !== "mine")
       throw new Error("Wait for a reply before sending again.");
     this.lastSent = undefined;
-    this.turnState = "theirs";
+    this.turnState = this.canSendWithoutReply ? "mine" : "theirs";
   }
 
   receive(frame: ChatFrame): ReceiveOutcome {

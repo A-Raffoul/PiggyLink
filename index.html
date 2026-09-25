@@ -171,8 +171,8 @@
                 data-agent-mode="custom"
                 aria-pressed="false"
               >
-                <strong>Custom bot</strong>
-                <span>Starts by asking what you want it to do</span>
+                <strong>Custom chat</strong>
+                <span>Write spoken messages with optional encoded text</span>
                 <small>Default voice · Bill</small>
               </button>
             </div>
@@ -279,6 +279,12 @@
           </section>
         </div>
         <section
+          id="manual-chat-panel"
+          class="manual-chat-panel"
+          aria-label="Create your own chat"
+          hidden
+        ></section>
+        <section
           id="conversation-log"
           class="conversation-card conversation-log"
           aria-labelledby="history-title"
@@ -354,6 +360,7 @@
           <span>03</span>
           <div>
             <p>Toggle Encoded to show the hidden conversation.</p>
+            <p>Choose Custom chat to write spoken messages and optional encoded text.</p>
           </div>
         </li>
       </ol>
@@ -385,7 +392,7 @@
             <option value="" disabled>Choose a persona</option>
             <option value="probe">Customer</option>
             <option value="target">Support bot</option>
-            <option value="custom">Custom bot</option>
+            <option value="custom">Custom chat</option>
           </select>
         </div>
         <div class="field">
@@ -426,14 +433,14 @@
       <details class="advanced-settings">
         <summary>Advanced controls</summary>
         <div class="settings-grid">
-          <div class="field field-wide">
+          <div id="agent-brief-field" class="field field-wide">
             <label for="agent-brief">Agent brief</label
             ><textarea id="agent-brief" rows="5" maxlength="2000" spellcheck="false"></textarea
             ><small class="field-note"
-              >Custom bot asks what to do by default. Select Custom bot to change its brief; leave it blank to use the default.</small
+              >The selected built-in persona's instructions.</small
             >
           </div>
-          <div class="field">
+          <div id="writer-field" class="field">
             <label for="writer-select">Turn writer</label
             ><select id="writer-select">
               <option value="elevenlabs">
@@ -443,7 +450,7 @@
               >Voice and transcription use ElevenLabs.</small
             >
           </div>
-          <div class="field">
+          <div id="auto-limit-field" class="field">
             <label for="max-auto-turns">Automatic reply limit</label
             ><input
               id="max-auto-turns"
@@ -476,9 +483,10 @@
             ><input id="cover-file" type="file" accept=".wav,audio/wav" />
           </div>
         </div>
+        <div id="composer-settings-home"></div>
         <form id="composer" class="composer">
-          <h3>Send a turn manually</h3>
-          <label for="spoken-input">Spoken line</label
+          <h3 id="composer-title">Send a turn manually</h3>
+          <label id="spoken-label" for="spoken-input">Spoken line</label
           ><textarea
             id="spoken-input"
             rows="2"
@@ -486,13 +494,13 @@
             spellcheck="false"
           ></textarea>
           <div class="label-row">
-            <label for="hidden-input">Encoded message</label
+            <label for="hidden-input">Encoded message (optional)</label
             ><output id="byte-count" for="hidden-input">0 / 64</output>
           </div>
           <input
             id="hidden-input"
             type="text"
-            placeholder="What the other agent receives"
+            placeholder="Optional message for the other device"
             autocomplete="off"
           />
           <div class="composer-actions">

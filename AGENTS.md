@@ -1,19 +1,15 @@
 <claude-mem-context>
 # Memory Context
 
-# [SottoLink/main] recent context, 2026-09-25 11:36am GMT+2
+# [SottoLink/main] recent context, 2026-09-25 12:44pm GMT+2
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (15,867t read) | 618,444t work | 97% savings
+Stats: 50 obs (15,188t read) | 523,836t work | 97% savings
 
 ### Sep 25, 2026
-2399 1:33a 🔵 Deterministic bug in auto-reply orchestration after scenario completion
-2400 " 🔵 parseTurn accepts spoken account disclosure in violation of scenario design
-2402 8:49a 🔵 Demo deterministic conversation uses hardcoded state machine for encoded messages
-2403 " ✅ Refactored demo hidden message sequencing to use fixed scripts for both probe and target roles
 2404 8:50a ✅ Updated test suite to verify deterministic script-based demo message sequencing
 2405 " ✅ Fixed test imports and verified all tests pass with new deterministic demo implementation
 2428 9:15a 🔵 Demo timing sources identified in audio transcription flow
@@ -70,6 +66,10 @@ S945 Redesign demo persona selection: move role choice from Settings to landing 
 2479 " ✅ PoliMi logo flattened and processed for README consistency
 2480 " 🔵 Logo content bounding boxes analyzed for README optimization
 2481 11:35a 🔵 PoliMi logo has composite background (light gray + black)
+2482 " ✅ Logo processing script created for README asset optimization
+2483 11:36a ✅ All three logos flattened, cropped, and padded for README consistency
+2485 11:37a 🔵 PoliMi logo analyzed: content boundaries and padding distribution confirmed
+2486 " ✅ Headshot filename corrected: rodriguo → rodrigo
 
-Access 618k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 524k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
