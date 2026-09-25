@@ -6,7 +6,9 @@ describe("cover audio loading", () => {
     const uploaded = new Uint8Array([1, 2, 3]).buffer;
     const fetchCover = vi.fn();
 
-    await expect(loadCoverAudio({ arrayBuffer: async () => uploaded }, fetchCover)).resolves.toBe(uploaded);
+    await expect(loadCoverAudio({ arrayBuffer: async () => uploaded }, fetchCover)).resolves.toBe(
+      uploaded,
+    );
     expect(fetchCover).not.toHaveBeenCalled();
   });
 
@@ -19,7 +21,10 @@ describe("cover audio loading", () => {
   });
 
   it("reports an unavailable example", async () => {
-    const fetchCover = vi.fn(async () => ({ ok: false, arrayBuffer: async () => new ArrayBuffer(0) }));
+    const fetchCover = vi.fn(async () => ({
+      ok: false,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }));
     await expect(loadCoverAudio(undefined, fetchCover)).rejects.toThrow("could not be loaded");
   });
 });

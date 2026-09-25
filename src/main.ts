@@ -1,6 +1,10 @@
 import "./styles.css";
 import { inject } from "@vercel/analytics";
-import { startAcousticReceiver, type AcousticReceiver, type CaptureSettings } from "./audio/capture";
+import {
+  startAcousticReceiver,
+  type AcousticReceiver,
+  type CaptureSettings,
+} from "./audio/capture";
 import { findAudioOnset, mixCarrierIntoCover } from "./audio/mix";
 import {
   FREQUENCY_PRESETS,
@@ -82,7 +86,8 @@ function updateMessageCount(): boolean {
   const valid = count > 0 && count <= MAX_MESSAGE_BYTES;
   byteCount.textContent = `${count} / ${MAX_MESSAGE_BYTES} bytes`;
   byteCount.classList.toggle("is-error", count > MAX_MESSAGE_BYTES);
-  messageError.textContent = count > MAX_MESSAGE_BYTES ? "Message exceeds the 32-byte UTF-8 limit." : "";
+  messageError.textContent =
+    count > MAX_MESSAGE_BYTES ? "Message exceeds the 32-byte UTF-8 limit." : "";
   return valid;
 }
 
@@ -167,7 +172,9 @@ async function transmit(): Promise<void> {
     const preset = getFrequencyPreset(senderFrequency.value);
     const framedMessage = encodePrivateFrame(privateMessage.value);
     const carrier = await encodeUltrasound(framedMessage, preset, audioContext.sampleRate);
-    const channels = Array.from({ length: cover.numberOfChannels }, (_, index) => cover.getChannelData(index));
+    const channels = Array.from({ length: cover.numberOfChannels }, (_, index) =>
+      cover.getChannelData(index),
+    );
     const speechOnset = findAudioOnset(channels, audioContext.sampleRate);
     const delaySamples = speechOnset + Math.round(OVERLAY_DELAY_SECONDS * audioContext.sampleRate);
     const requiredSeconds = (delaySamples + carrier.length) / audioContext.sampleRate;
@@ -201,10 +208,15 @@ async function transmit(): Promise<void> {
       if (playingSource !== source) return;
       playingSource = undefined;
       transmitButton.disabled = false;
-      setSenderStatus(`Transmission complete · ${preset.label} · ${signalStrength.value} dB`, "success");
+      setSenderStatus(
+        `Transmission complete · ${preset.label} · ${signalStrength.value} dB`,
+        "success",
+      );
     };
     source.start();
-    setSenderStatus(`Transmitting ${framedMessage.length} modem bytes inside ${cover.duration.toFixed(1)} s of speech…`);
+    setSenderStatus(
+      `Transmitting ${framedMessage.length} modem bytes inside ${cover.duration.toFixed(1)} s of speech…`,
+    );
   } catch (error) {
     transmitButton.disabled = false;
     setSenderStatus(error instanceof Error ? error.message : "Transmission failed.", "error");
@@ -214,9 +226,21 @@ async function transmit(): Promise<void> {
 function showCaptureSettings(settings: CaptureSettings): void {
   const values = [
     `${settings.sampleRate.toLocaleString()} Hz`,
-    settings.echoCancellation === undefined ? "Not reported" : settings.echoCancellation ? "On" : "Off",
-    settings.noiseSuppression === undefined ? "Not reported" : settings.noiseSuppression ? "On" : "Off",
-    settings.autoGainControl === undefined ? "Not reported" : settings.autoGainControl ? "On" : "Off",
+    settings.echoCancellation === undefined
+      ? "Not reported"
+      : settings.echoCancellation
+        ? "On"
+        : "Off",
+    settings.noiseSuppression === undefined
+      ? "Not reported"
+      : settings.noiseSuppression
+        ? "On"
+        : "Off",
+    settings.autoGainControl === undefined
+      ? "Not reported"
+      : settings.autoGainControl
+        ? "On"
+        : "Off",
   ];
   const outputs = captureSettings.querySelectorAll("dd");
   outputs.forEach((output, index) => {
@@ -252,7 +276,8 @@ async function startListening(): Promise<void> {
         const rawFrame = new TextDecoder().decode(data);
         const message = decodePrivateFrame(rawFrame);
         if (message === null) {
-          receivedMeta.textContent = "A modem payload was rejected by the SottoLink integrity check.";
+          receivedMeta.textContent =
+            "A modem payload was rejected by the SottoLink integrity check.";
           return;
         }
         receivedMessage.textContent = message;

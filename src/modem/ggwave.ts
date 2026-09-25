@@ -29,10 +29,12 @@ const PROTOCOL_NAMES = [
 let modulePromise: Promise<GGWaveModule> | undefined;
 
 function loadModule(): Promise<GGWaveModule> {
-  modulePromise ??= createGGWave({ print: () => undefined, printErr: () => undefined }).then((module) => {
-    module.disableLog();
-    return module;
-  });
+  modulePromise ??= createGGWave({ print: () => undefined, printErr: () => undefined }).then(
+    (module) => {
+      module.disableLog();
+      return module;
+    },
+  );
   return modulePromise;
 }
 
@@ -42,7 +44,11 @@ function getProtocol(module: GGWaveModule): EmbindEnumValue {
   return protocol;
 }
 
-function configureProtocols(module: GGWaveModule, preset: FrequencyPreset, direction: "rx" | "tx"): void {
+function configureProtocols(
+  module: GGWaveModule,
+  preset: FrequencyPreset,
+  direction: "rx" | "tx",
+): void {
   for (const name of PROTOCOL_NAMES) {
     const protocol = module.ProtocolId[name];
     if (!protocol) continue;

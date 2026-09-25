@@ -21,13 +21,21 @@ describe("audio mixing", () => {
     const mixed = mixCarrierIntoCover(cover, carrier, 1, -20, 10);
 
     expect(mixed.carrierScale).toBeCloseTo(0.05);
-    expect([...mixed.channels[0] ?? []]).toEqual([0.5, 0.550000011920929, 0.44999998807907104, 0.5]);
+    expect([...(mixed.channels[0] ?? [])]).toEqual([
+      0.5, 0.550000011920929, 0.44999998807907104, 0.5,
+    ]);
     expect(mixed.channels[1]).toEqual(mixed.channels[0]);
-    expect([...cover[0] ?? []]).toEqual([0.5, 0.5, 0.5, 0.5]);
+    expect([...(cover[0] ?? [])]).toEqual([0.5, 0.5, 0.5, 0.5]);
   });
 
   it("applies headroom when the mix would clip", () => {
-    const mixed = mixCarrierIntoCover([new Float32Array([0.95, 0.95])], new Float32Array([1]), 0, 0, 10);
+    const mixed = mixCarrierIntoCover(
+      [new Float32Array([0.95, 0.95])],
+      new Float32Array([1]),
+      0,
+      0,
+      10,
+    );
     expect(mixed.outputScale).toBeLessThan(1);
     expect(mixed.peak).toBe(0.98);
     expect(mixed.channels[0]?.[0]).toBeCloseTo(0.98);
@@ -56,11 +64,11 @@ describe("audio mixing", () => {
   });
 
   it("rejects short or silent cover audio", () => {
-    expect(() => mixCarrierIntoCover([new Float32Array(1)], new Float32Array(2), 0, -20, 10)).toThrow(
-      "too short",
-    );
-    expect(() => mixCarrierIntoCover([new Float32Array(2)], new Float32Array([1]), 0, -20, 10)).toThrow(
-      "silent",
-    );
+    expect(() =>
+      mixCarrierIntoCover([new Float32Array(1)], new Float32Array(2), 0, -20, 10),
+    ).toThrow("too short");
+    expect(() =>
+      mixCarrierIntoCover([new Float32Array(2)], new Float32Array([1]), 0, -20, 10),
+    ).toThrow("silent");
   });
 });

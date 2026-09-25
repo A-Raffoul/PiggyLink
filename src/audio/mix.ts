@@ -63,7 +63,8 @@ export function mixCarrierIntoCover(
 ): MixResult {
   const firstChannel = coverChannels[0];
   if (!firstChannel || coverChannels.length === 0) throw new Error("Cover audio has no channels.");
-  if (delaySamples < 0 || !Number.isInteger(delaySamples)) throw new Error("Invalid overlay delay.");
+  if (delaySamples < 0 || !Number.isInteger(delaySamples))
+    throw new Error("Invalid overlay delay.");
   if (delaySamples + carrier.length > firstChannel.length) {
     throw new Error("Cover audio is too short for this transmission.");
   }
@@ -91,7 +92,10 @@ export function mixCarrierIntoCover(
       quietCoverageStart = -1;
     }
     const quietCoverageEnd = offset + frameLength;
-    if (quietCoverageStart >= 0 && quietCoverageEnd - quietCoverageStart >= conservativeQuietLimit) {
+    if (
+      quietCoverageStart >= 0 &&
+      quietCoverageEnd - quietCoverageStart >= conservativeQuietLimit
+    ) {
       throw new Error(
         "The cover audio has a sustained quiet gap during transmission. Use denser speech or a shorter message.",
       );
