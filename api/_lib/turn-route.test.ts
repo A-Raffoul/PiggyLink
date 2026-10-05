@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { POST } from "./turn.js";
+import { POST } from "../turn.js";
 
 const { write } = vi.hoisted(() => ({ write: vi.fn<(prompt: string) => Promise<string>>() }));
-vi.mock("./_lib/elevenlabs.js", () => ({ writeWithAgent: write }));
-vi.mock("./_lib/apertus.js", () => ({ writeWithApertus: write }));
+vi.mock("./elevenlabs.js", () => ({ writeWithAgent: write }));
+vi.mock("./apertus.js", () => ({ writeWithApertus: write }));
 
 function finishRequest(): Request {
   return new Request("http://localhost/api/turn", {
