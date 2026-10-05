@@ -9,8 +9,10 @@ confirmation and goodbye. Every live line is generated fresh; wording varies.
 
 1. Use a phone and laptop side by side, about a metre apart in a quiet room.
 2. Open the HTTPS deployment with `?role=target` on the restaurant device and
-   `?role=probe` on the personal assistant. Start the restaurant first, then the
-   assistant. A small call-control packet connects them; the restaurant speaks first.
+   `?role=probe` on the personal assistant. Start both around the same time.
+   The restaurant speaks first without an ultrasound handshake. If the assistant
+   misses the greeting, the restaurant replays it about two seconds after it ends,
+   up to three times; it stops retrying once the assistant replies.
    The default voices are Sarah for the restaurant and Chris for the assistant.
 3. Match both frequency channels. The default 18 kHz channel spans roughly
    18–22.45 kHz. The app requires a 48 kHz browser audio context; it explains
@@ -76,7 +78,7 @@ After stopping, **Change setup** returns to the profile and role choices.
 Visitors use two real devices. On the assistant device they edit the example
 name, restaurant request, and playful private
 detail. Its other-device link selects the matching role and scenario without
-including profile data. Start that device first, then the assistant. The same
+including profile data. Start both devices around the same time. The same
 short opening, PiggyLink switch, quiet aside, and spoken goodbye apply to the
 restaurant call. Custom chat remains available for manually composed messages.
 Public production has no simulated one-screen mode.

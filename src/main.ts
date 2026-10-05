@@ -17,8 +17,9 @@ import {
   type AgentMode,
   type Role,
 } from "./ai/personas";
-import { SCENARIOS, PROFILE_LIMITS, exampleProfile, isScenario, peerLink, type DemoConfig, type DemoProfile } from "./core/demo";
+import { SCENARIOS, PROFILE_LIMITS, exampleProfile, peerLink, type DemoConfig, type DemoProfile } from "./core/demo";
 import { AutoReplyGate } from "./core/auto-reply";
+import { GreetingWatchdog } from "./core/greeting-watchdog";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import { SPECTRUM_MAX_HZ } from "./audio/frequency-spectrum";
 import {
@@ -208,6 +209,8 @@ let speechTranscribing = false;
 let encodedReceiveVersion = 0;
 let autoTurnsUsed = 0;
 const autoReplies = new AutoReplyGate();
+const greetingWatchdog = new GreetingWatchdog();
+const transmissions = new WeakMap<OutgoingTurn, Promise<void>>();
 let voices: VoiceOption[] = [];
 let hasStarted = false;
 let detailsVisible = false;
@@ -368,12 +371,12 @@ function refreshAgent(): void {
   const targetOption = agentSelect.querySelector<HTMLOptionElement>('option[value="target"]');
   if (targetOption) targetOption.textContent = scenario.peer;
   startGuide.textContent = mode === "target"
-    ? "Start here first, then start the personal assistant on your other device. Keep both devices nearby."
+    ? "Start both devices around the same time. The restaurant speaks first and repeats its greeting if needed."
     : mode === "probe"
-      ? "Open the other-device link nearby. Start that device first, then start your assistant here."
+      ? "Open the other-device link nearby and start both devices around the same time. Your assistant listens for the restaurant."
       : mode === "custom"
         ? "Open Custom chat on both devices to exchange your own messages."
-        : "Choose a role on each device. Start the other agent first, then the personal assistant.";
+        : "Choose a role on each device and start them around the same time. The restaurant speaks first.";
   otherDeviceLink.value = peerLink(window.location.href, "restaurant");
   encodedToggle.closest("label")!.hidden = mode !== "custom";
   for (const button of personaButtons)
@@ -897,11 +900,13 @@ async function prepareTurn(
   return { message, audio };
 }
 
-function transmit(turn: OutgoingTurn): Promise<void> {
+function transmit(turn: OutgoingTurn, shouldSend: () => boolean = () => true): Promise<void> {
+  const existing = transmissions.get(turn);
+  if (existing) return existing;
   const active = session;
   const { message } = turn;
   const run = async (): Promise<void> => {
-    if (session !== active || !active) return;
+    if (session !== active || !active || !shouldSend()) return;
     const stillActive = (): boolean => session === active;
     try {
       setActivity("queued");
@@ -911,8 +916,8 @@ function transmit(turn: OutgoingTurn): Promise<void> {
         undefined,
         "queued",
       );
-      await active.engine.waitForClearChannel(() => !stillActive());
-      if (!stillActive()) return;
+      await active.engine.waitForClearChannel(() => !stillActive() || !shouldSend());
+      if (!stillActive() || !shouldSend()) return;
 
       setActivity("transmitting");
       setBubbleStatus(message, "Transmitting…", undefined, "sending");
@@ -931,7 +936,7 @@ function transmit(turn: OutgoingTurn): Promise<void> {
       if (stillActive()) {
         if (outgoingStatus.has(message.frame.sequence))
           setBubbleStatus(message, errorText(error, "Transmission failed."), "error", "failed");
-        else appendNotice(errorText(error, "Could not send the call control packet."), "error");
+        else appendNotice(errorText(error, "Could not send the acknowledgement."), "error");
       }
     } finally {
       if (stillActive()) {
@@ -942,7 +947,9 @@ function transmit(turn: OutgoingTurn): Promise<void> {
     }
   };
   transmitChain = transmitChain.then(run);
-  return transmitChain;
+  const pending = transmitChain.finally(() => { transmissions.delete(turn); });
+  transmissions.set(turn, pending);
+  return pending;
 }
 
 async function sendTurn(spoken: string, hidden: string, action?: DialogueAction): Promise<boolean> {
@@ -958,7 +965,21 @@ async function sendTurn(spoken: string, hidden: string, action?: DialogueAction)
     outgoing.set(turn.message.frame.sequence, turn);
     const parts = appendBubble(record, "Preparing to send…");
     outgoingStatus.set(turn.message.frame.sequence, { turn: record, parts });
-    void transmit(turn);
+    const greeting = agentMode() === "target" && action === "speak" && history.length === 1;
+    void transmit(turn).then(() => {
+      if (!greeting) return;
+      const isPending = (): boolean => session === active && autoReplyInput.checked &&
+        history.length === 1 && active.conversation.pending === turn.message && record.delivery !== "failed";
+      if (!isPending()) return;
+      greetingWatchdog.start({
+        isPending,
+        replay: (pending) => transmit(turn, pending),
+        onExhausted: () => appendNotice(
+          "No reply yet. Check that the other device is started nearby on the same channel, then use Resend in Advanced controls.",
+          "error",
+        ),
+      });
+    });
     return true;
   } catch (error) {
     if (session === active) {
@@ -1148,15 +1169,15 @@ function recordCapture(hidden: string): void {
   capturePanel.setAttribute("open", "");
 }
 
-async function sendControl(active: Session, action: "call" | "ack"): Promise<void> {
+async function sendAcknowledgement(active: Session): Promise<void> {
   try {
-    const turn = await prepareTurn(active, "", encodeDialogue({ action, text: action === "call" ? "restaurant" : "." }), true);
+    const turn = await prepareTurn(active, "", encodeDialogue({ action: "ack", text: "." }), true);
     if (session !== active) return;
     outgoing.set(turn.message.frame.sequence, turn);
     await transmit(turn);
   } catch (error) {
     if (session === active) {
-      appendNotice(errorText(error, action === "call" ? "Could not start the call." : "Could not acknowledge the final message."), "error");
+      appendNotice(errorText(error, "Could not acknowledge the final message."), "error");
       setActivity("idle");
     }
   }
@@ -1167,7 +1188,7 @@ function resend(): void {
   const turn = pending && outgoing.get(pending.frame.sequence);
   if (!turn || activity !== "idle") return;
   setBubbleStatus(turn.message, "Resending…", undefined, "queued");
-  void transmit(turn);
+  void transmit(turn, () => session?.conversation.pending === turn.message);
 }
 
 function handleData(bytes: Uint8Array): void {
@@ -1177,14 +1198,10 @@ function handleData(bytes: Uint8Array): void {
   if (!frame) return;
   const packet = decodeDialogue(frame.text);
   if (agentMode() !== "custom" && !packet) return;
-  if (agentMode() === "custom" && packet?.action === "call") return;
   if (packet && agentMode() !== "custom" && frame.senderId !== active.conversation.deviceId &&
     !active.conversation.hasSeen(frame)) {
     if (packet.action === "ack") {
       if (decodeDialogue(active.conversation.pending?.frame.text ?? "")?.action !== "finish") return;
-    } else if (packet.action === "call") {
-      if (agentMode() !== "target" || history.length !== 0 || active.conversation.pending) return;
-      if (!isScenario(packet.text)) return;
     } else {
       const peerView = history.map((turn) => ({ ...turn, from: turn.from === "me" ? "them" as const : "me" as const }));
       if (!dialogueState(peerView).actions.includes(packet.action)) return;
@@ -1193,17 +1210,12 @@ function handleData(bytes: Uint8Array): void {
 
   const outcome = active.conversation.receive(frame);
   if (outcome.kind === "message") {
+    greetingWatchdog.cancel();
     encodedReceiveVersion += 1;
     if (outcome.acknowledges)
       setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done", "delivered");
     if (packet?.action === "ack") {
       render();
-      return;
-    }
-    if (packet?.action === "call") {
-      establishLink();
-      render();
-      if (autoReplyInput.checked) void agentTurn();
       return;
     }
     const quiet = isQuietAction(packet?.action);
@@ -1229,14 +1241,14 @@ function handleData(bytes: Uint8Array): void {
     render();
     if (packet?.action === "finish") {
       autoReplyInput.checked = false;
-      void sendControl(active, "ack");
+      void sendAcknowledgement(active);
     } else void maybeAutoReply(active, record);
   } else if (outcome.kind === "resend-reply") {
     const turn = outgoing.get(outcome.message.frame.sequence);
     if (!turn) return;
     appendNotice("They missed your last reply — sending it again.");
     setBubbleStatus(outcome.message, "Resending…", undefined, "queued");
-    void transmit(turn);
+    void transmit(turn, () => active.conversation.pending === turn.message);
   }
 }
 
@@ -1339,6 +1351,7 @@ function join(): Promise<boolean> {
 const ensureJoined = (): Promise<boolean> => join();
 
 function clearConversationView(): void {
+  greetingWatchdog.cancel();
   detailsVisible = false;
   history = [];
   currentTurn = undefined;
@@ -1431,19 +1444,21 @@ async function runDemo(): Promise<void> {
   settingsPanel.close();
   const role = effectiveRole();
   if (role) {
-    // The caller rings; the restaurant answers with the first spoken line.
+    // Leave enough turns for the complete short call on each device.
     const minimum = 8;
     if (maxAutoTurns() < minimum) maxAutoTurnsInput.value = String(minimum);
   }
   autoReplyInput.checked = agentMode() !== "custom";
   autoTurnsUsed = 0;
   render();
-  // The control packet makes sure both microphones are ready before the greeting.
-  if (agentMode() === "probe" && session && history.length === 0)
-    void sendControl(session, "call");
+  // Begin with speech. A cached greeting replay covers a slightly later peer start.
+  if (agentMode() === "target" && history.length === 0) void agentTurn();
+  else if (history.at(-1)?.from === "them" && session)
+    void maybeAutoReply(session, history.at(-1)!);
 }
 
 async function leave(): Promise<void> {
+  greetingWatchdog.cancel();
   dismissCurrentMessage();
   if (previewMode) {
     previewRunning = false;
@@ -1607,6 +1622,7 @@ agentButton.addEventListener("click", () => {
 runDemoButton.addEventListener("click", () => void runDemo());
 clearButton.addEventListener("click", clearConversation);
 autoReplyInput.addEventListener("change", () => {
+  if (!autoReplyInput.checked) greetingWatchdog.cancel();
   autoTurnsUsed = 0;
   render();
 });

@@ -101,6 +101,9 @@ export async function startAcousticEngine(
   );
   const bins = new Float32Array(bandAnalyser.frequencyBinCount);
   const channel = new ChannelSense();
+  // Sense voice activity separately from transcription. A spoken reply may begin
+  // before its modem overlay, including when demo speech recognition is off.
+  const voiceChannel = new SpeechDetector();
   const speech = new SpeechDetector();
   const firstSpeechBin = Math.max(1, Math.floor(150 / hzPerBin));
   const lastSpeechBin = Math.min(bins.length - 1, Math.ceil(4_000 / hzPerBin));
@@ -128,12 +131,13 @@ export async function startAcousticEngine(
     recording.push(samples);
     const decoded = decoder.decode(samples);
     if (decoded) options.onData(decoded);
+    let power = 0;
+    for (let bin = firstSpeechBin; bin <= lastSpeechBin; bin++)
+      power += 10 ** ((bins[bin] ?? -Infinity) / 10);
+    const level =
+      10 * Math.log10(power / (lastSpeechBin - firstSpeechBin + 1));
+    voiceChannel.update(level, performance.now(), busy || playing !== undefined || Boolean(decoded));
     if (options.onSpeech) {
-      let power = 0;
-      for (let bin = firstSpeechBin; bin <= lastSpeechBin; bin++)
-        power += 10 ** ((bins[bin] ?? -Infinity) / 10);
-      const level =
-        10 * Math.log10(power / (lastSpeechBin - firstSpeechBin + 1));
       const seconds = speech.update(
         level,
         performance.now(),
@@ -147,7 +151,7 @@ export async function startAcousticEngine(
           recording.latest(Math.ceil(seconds * audioContext.sampleRate)),
         );
     }
-    const nextHearing = busy || speech.active;
+    const nextHearing = busy || voiceChannel.active;
     if (nextHearing !== hearing) {
       hearing = nextHearing;
       options.onBusyChange(hearing);
@@ -198,13 +202,13 @@ export async function startAcousticEngine(
       // Listen-before-talk is best effort: never hold a message back indefinitely.
       const giveUpAt = performance.now() + MAX_WAIT_FOR_CLEAR_MS;
       for (;;) {
-        while (busy || playing) {
+        while (busy || voiceChannel.active || playing) {
           if (isCancelled() || performance.now() > giveUpAt) return;
           await sleep(100);
         }
         // Random backoff so two devices that were both waiting don't start together.
         await sleep(80 + Math.random() * 220);
-        if (isCancelled() || (!busy && !playing)) return;
+        if (isCancelled() || (!busy && !voiceChannel.active && !playing)) return;
       }
     },
 

@@ -32,7 +32,7 @@ describe("quiet conversation", () => {
   });
 
   it("round trips fresh Unicode content through the CRC-protected wire", () => {
-    for (const action of ["call", "speak", "offer", "accept", "quiet", "resume", "finish", "ack"] as const) {
+    for (const action of ["speak", "offer", "accept", "quiet", "resume", "finish", "ack"] as const) {
       const packet = { action, text: "Budget CHF 50. Don’t tell his date." };
       const encoded = encodeFrame({ senderId: "aaaa", sequence: 0, speechLead: 0, text: encodeDialogue(packet) });
       const decoded = decodeFrame(new TextEncoder().encode(encoded))!;
@@ -41,8 +41,11 @@ describe("quiet conversation", () => {
     expect(() => encodeDialogue({ action: "quiet", text: "é".repeat(31) })).toThrow();
     expect(() => encodeDialogue({ action: "quiet", text: " " })).toThrow();
     expect(encodeDialogue({ action: "quiet", text: "x".repeat(MAX_DIALOGUE_BYTES) })).toHaveLength(64);
-    expect(decodeDialogue("S7xunrecognized")).toBeUndefined();
-    expect(decodeDialogue("S7q")).toBeUndefined();
+    expect(decodeDialogue("S8xunrecognized")).toBeUndefined();
+    expect(decodeDialogue("S8q")).toBeUndefined();
+    expect(decodeDialogue("S8crestaurant")).toBeUndefined();
+    expect(decodeDialogue("S7sOld handshake peer")).toBeUndefined();
+    expect(decodeDialogue("S7crestaurant")).toBeUndefined();
     expect(decodeDialogue("S6sOld short-introduction peer")).toBeUndefined();
     expect(decodeDialogue("S5sOld restaurant-only peer")).toBeUndefined();
     expect(decodeDialogue("S4fOld quiet ending")).toBeUndefined();
@@ -58,19 +61,22 @@ describe("quiet conversation", () => {
     for (const action of ["quiet", "offer", "accept", "resume", "finish"] as const) {
       expect(() => encodeDialogue({ action, text })).toThrow();
     }
-    expect(decodeDialogue(`S7q${text}`)).toBeUndefined();
-    expect(decodeDialogue(`S7s${longest}x`)).toBeUndefined();
+    expect(decodeDialogue(`S8q${text}`)).toBeUndefined();
+    expect(decodeDialogue(`S8s${longest}x`)).toBeUndefined();
   });
 
-  it("recovers a lost restaurant greeting when the caller rings again", () => {
+  it("starts with a spoken greeting and recovers a lost reply without repeating dialogue", () => {
     const caller = new Conversation("aaaa");
     const restaurant = new Conversation("bbbb");
-    const ring = caller.send(encodeDialogue({ action: "call", text: "restaurant" }));
-    restaurant.receive(ring.frame);
     const greeting = restaurant.send(encodeDialogue({ action: "speak", text: "Bella Vita. How can I help?" }));
-    expect(restaurant.receive(ring.frame)).toEqual({ kind: "resend-reply", message: greeting });
-    expect(caller.receive(greeting.frame)).toMatchObject({ kind: "message", acknowledges: ring });
-    expect(caller.pending).toBeUndefined();
+    expect(greeting.frame.sequence).toBe(0);
+    expect(greeting.inReplyTo).toBeUndefined();
+    expect(caller.receive(greeting.frame)).toMatchObject({ kind: "message", acknowledges: undefined });
+    expect(caller.receive(greeting.frame)).toEqual({ kind: "duplicate" });
+    const intro = caller.send(encodeDialogue({ action: "speak", text: "Hello, I'm Tony's AI agent. Table for two tonight?" }));
+    expect(caller.receive(greeting.frame)).toEqual({ kind: "resend-reply", message: intro });
+    expect(restaurant.receive(intro.frame)).toMatchObject({ kind: "message", acknowledges: greeting });
+    expect(restaurant.pending).toBeUndefined();
   });
 
   it("keeps legacy manual speech outside the demo phases", () => {

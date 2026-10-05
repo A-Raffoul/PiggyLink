@@ -3,7 +3,7 @@ import { MAX_FRAME_TEXT_BYTES } from "./frame.js";
 
 export const DIALOGUE_ACTIONS = ["speak", "offer", "accept", "quiet", "resume", "finish"] as const;
 export type DialogueAction = (typeof DIALOGUE_ACTIONS)[number];
-export type PacketAction = DialogueAction | "call" | "ack";
+export type PacketAction = DialogueAction | "ack";
 export interface DialogueMessage {
   readonly action: PacketAction;
   readonly text: string;
@@ -15,11 +15,11 @@ export interface DialogueHistory {
 
 // The existing CRC-protected frame carries this compact envelope. Opening packets
 // carry the spoken transcript; quiet packets carry only the generated message.
-// S7 allows a full spoken introduction in one frame. Older peers reject longer
-// transcripts, so both devices must use the same version.
-const PREFIX = "S7";
+// S8 starts with the restaurant's spoken greeting, without a call handshake.
+// Older peers wait for that handshake, so both devices must use the same version.
+const PREFIX = "S8";
 const CODES: Record<PacketAction, string> = {
-  speak: "s", offer: "o", accept: "a", quiet: "q", resume: "r", finish: "f", call: "c", ack: "k",
+  speak: "s", offer: "o", accept: "a", quiet: "q", resume: "r", finish: "f", ack: "k",
 };
 export const MAX_DIALOGUE_BYTES = MAX_MESSAGE_BYTES - 3;
 export const MAX_SPOKEN_DIALOGUE_BYTES = MAX_FRAME_TEXT_BYTES - 3;
@@ -45,7 +45,7 @@ export function decodeDialogue(text: string): DialogueMessage | undefined {
 }
 
 export function isQuietAction(action: PacketAction | undefined): boolean {
-  return action === "quiet" || action === "resume" || action === "call" || action === "ack";
+  return action === "quiet" || action === "resume" || action === "ack";
 }
 
 export function parseReceivedBudget(text: string): string | undefined {

@@ -56,6 +56,9 @@ the profile; the other agent learns the detail through sound. The server enforce
 the ten-turn call: a brief opening, explicit PiggyLink agreement, one private
 aside and reply, a return-to-voice request, then a spoken close and goodbye.
 The profile form explains the intentional sharing and encourages fictional details.
+Start both devices around the same time. The restaurant speaks on Start, with
+no initial ultrasound handshake. A two-second watchdog replays a missed greeting
+up to three times, using the original audio and packet until a reply arrives.
 The hotel and gift scenarios were removed to keep the experience focused.
 Custom chat remains available on the landing page for manually composed messages.
 

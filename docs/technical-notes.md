@@ -11,10 +11,17 @@ fresh text through the selected AI writer; there are no fixed live payloads.
 The current fictional budget is CHF 50. The default voices are Chris for the
 caller and Sarah for the restaurant; an explicitly selected voice takes priority.
 
-The caller sends a small `call` control packet containing the scenario ID, which is
-not dialogue. The other device adopts that scenario. Setup links contain only
-the scenario and target role, never profile data. The restaurant
-answers only after receiving it, so both microphones are ready before its greeting.
+Setup links contain only the scenario and target role, never profile data.
+Start both devices around the same time. The restaurant generates and speaks its
+greeting on Start; there is no initial `call` packet or silent handshake. Its
+spoken greeting carries the first transcript packet. After playback, a two-second
+watchdog retries the same audio and packet if no reply has arrived, at most three
+times. Channel sensing checks voice activity as well as the modem band, without
+transcribing background speech; the caller's voice can precede its transcript
+overlay. Each retry waits for a clear channel and checks again for a reply before
+playing. The next timeout starts after playback ends. A received reply, Stop,
+reset, or disabling automatic replies cancels the watchdog. No extra model or TTS
+requests are made for replays, and repeated packets do not add dialogue turns.
 The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
 1. **Spoken:** restaurant greeting, caller's explicit introduction as an AI agent
@@ -29,8 +36,8 @@ The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
 Each existing L3 frame contains device ID, sequence number, speech duration,
 CRC-16, and up to 126 UTF-8 bytes of payload: its 14-byte header keeps the whole
-wire within ggwave's 140-byte variable-length limit. The payload begins with `S7`
-and one action letter (`c`, `s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`).
+wire within ggwave's 140-byte variable-length limit. The payload begins with `S8`
+and one action letter (`s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`).
 The caller's first spoken request may use 123 UTF-8 bytes, so it can clearly
 identify itself and make a complete request. Other generated turns retain the
 61-byte limit, and manual messages retain their 64-byte limit. Overlong model
@@ -44,7 +51,7 @@ instead of the shorter soft target. Byte counts are
 measured in UTF-8; a repeated invalid answer remains an error rather than being
 silently replaced with canned dialogue.
 
-Both devices must refresh to this version: `S6` only supported short speech,
+Both devices must refresh to this version: `S7` required an initial call handshake,
 so mixed versions intentionally reject each other's packets.
 For profile-based calls, the backend validates alternating roles, history actions,
 channel fields, and byte lengths. It rejects extra requests after the ten-turn call.
@@ -175,7 +182,10 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
   greeting to the spoken confirmation and goodbye. The quiet exchange in the
   second run explicitly mentioned the date and waiter; no budget was spoken.
   A separate live opening check exercised correction of an oversized introduction.
-- The short initial call-control packet decoded in the actual 48 kHz modem loopback.
+- Startup now begins with the spoken greeting; the initial call-control packet was
+  removed. Timer tests cover late starts, cancellation before and during channel
+  wait, no overlapping retries, and a three-retry limit. Conversation tests cover
+  duplicate greetings and replaying a lost reply without extra dialogue turns.
 - The final-turn validation failure reported during phone testing has regression
   coverage for oversized Unicode text, wrong actions, and unwanted speech. Five
   API replays of the reported conversation, a real model repair of an oversized

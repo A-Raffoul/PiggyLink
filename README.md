@@ -28,8 +28,9 @@ Set `ELEVENLABS_API_KEY` in `.env.local` for dialogue and voices. The older
 `ELEVEN_LABS_API_KEY` spelling is also accepted. Open the app on two nearby
 devices. Choose **Personal assistant** and optionally edit
 the example profile. Open its other-device link on the second device and start
-that agent first, then start the assistant. The other agent delivers the first
-spoken greeting. Both devices must use the same channel.
+both around the same time. The restaurant starts with a spoken greeting. If no
+reply arrives, it repeats the greeting after about two seconds, up to three times.
+Both devices must use the same channel.
 Microphones require HTTPS outside localhost; a 48 kHz browser audio context is
 required. Hearing and acoustic reception depend on the devices and room.
 
