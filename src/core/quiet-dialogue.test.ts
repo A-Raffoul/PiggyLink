@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Conversation } from "./conversation";
 import { decodeFrame, encodeFrame } from "./frame";
-import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, parseReceivedBudget, MAX_DIALOGUE_BYTES, type DialogueAction, type DialogueHistory } from "./quiet-dialogue";
+import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, parseReceivedBudget, MAX_DIALOGUE_BYTES, MAX_SPOKEN_DIALOGUE_BYTES, type DialogueAction, type DialogueHistory } from "./quiet-dialogue";
 
 const flip = (history: DialogueHistory[]): DialogueHistory[] => history.map((turn) => ({ ...turn, from: turn.from === "me" ? "them" : "me" }));
 
@@ -41,10 +41,25 @@ describe("quiet conversation", () => {
     expect(() => encodeDialogue({ action: "quiet", text: "é".repeat(31) })).toThrow();
     expect(() => encodeDialogue({ action: "quiet", text: " " })).toThrow();
     expect(encodeDialogue({ action: "quiet", text: "x".repeat(MAX_DIALOGUE_BYTES) })).toHaveLength(64);
-    expect(decodeDialogue("S6xunrecognized")).toBeUndefined();
-    expect(decodeDialogue("S6q")).toBeUndefined();
+    expect(decodeDialogue("S7xunrecognized")).toBeUndefined();
+    expect(decodeDialogue("S7q")).toBeUndefined();
+    expect(decodeDialogue("S6sOld short-introduction peer")).toBeUndefined();
     expect(decodeDialogue("S5sOld restaurant-only peer")).toBeUndefined();
     expect(decodeDialogue("S4fOld quiet ending")).toBeUndefined();
+  });
+
+  it("allows a full spoken introduction while keeping quiet and switch messages short", () => {
+    const text = "Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?";
+    expect(decodeDialogue(encodeDialogue({ action: "speak", text }))).toEqual({ action: "speak", text });
+    const longest = "é".repeat(61) + "!";
+    expect(new TextEncoder().encode(longest)).toHaveLength(MAX_SPOKEN_DIALOGUE_BYTES);
+    expect(decodeDialogue(encodeDialogue({ action: "speak", text: longest }))?.text).toBe(longest);
+    expect(() => encodeDialogue({ action: "speak", text: longest + "x" })).toThrow();
+    for (const action of ["quiet", "offer", "accept", "resume", "finish"] as const) {
+      expect(() => encodeDialogue({ action, text })).toThrow();
+    }
+    expect(decodeDialogue(`S7q${text}`)).toBeUndefined();
+    expect(decodeDialogue(`S7s${longest}x`)).toBeUndefined();
   });
 
   it("recovers a lost restaurant greeting when the caller rings again", () => {

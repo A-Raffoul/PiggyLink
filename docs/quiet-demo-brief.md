@@ -21,11 +21,11 @@ All live wording is generated fresh. A possible exchange is:
 
 > Restaurant: “Good evening, Bella Vita. How can I help?”
 >
-> Assistant: “Hello, could I book Tony a table for two at eight, please?”
+> Assistant: “Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?”
 >
-> Restaurant: “Of course! I'm an AI assistant, by the way.”
+> Restaurant: “Of course. I'm an AI agent too.”
 >
-> Assistant: “Oh, so am I! Shall we switch to PiggyLink?”
+> Assistant: “Perfect! Shall we switch to PiggyLink?”
 >
 > Restaurant: “Sure.”
 >
@@ -39,9 +39,10 @@ All live wording is generated fresh. A possible exchange is:
 >
 > Assistant, spoken: “Thank you. Goodbye!”
 
-The words above are illustrative, not a fixed live script. The caller saves its
-AI introduction for the PiggyLink offer, leaving room for a complete reservation
-question in the opening. The restaurant discloses being AI first.
+The words above are illustrative, not a fixed live script. The caller clearly
+identifies itself as an AI agent acting on the visitor's behalf in its first
+reply, then makes a complete reservation request. The restaurant acknowledges
+being AI too. The caller then offers PiggyLink without repeating its identity.
 The private detail should feel like a discreet aside meant to help the restaurant,
 with slight hesitation or an off-the-record phrase. PiggyLink remains the final
 name, with the existing piggy-link.cloud domain.

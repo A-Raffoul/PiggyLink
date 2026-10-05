@@ -27,8 +27,9 @@ the public scenario and other-device role; profiles are never put in URLs.
 **Spoken phase**: the opening conversation, with synthesized speech and a
 compact acoustic packet carrying its transcript and action. The caller first
 sends a small call-control packet naming the scenario, so the other agent can greet it when both
-microphones are ready. Greeting, reservation request, and AI disclosure precede
-the invitation to PiggyLink.
+microphones are ready. After the greeting, the caller identifies itself as an AI
+agent acting on the visitor's behalf and makes the request. The other agent
+acknowledges it is AI too, then the caller offers PiggyLink.
 
 **Switch**: an explicit offer followed by acceptance, carried through the
 acoustic protocol. Both agents then stop generating speech.

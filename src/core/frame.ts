@@ -1,5 +1,3 @@
-import { MAX_MESSAGE_BYTES } from "./config";
-
 // Wire: "L3" + sender id (4) + sequence (2) + speech lead (2) + CRC-16 (4 hex) + raw UTF-8 text; fields are base36.
 const FRAME_VERSION = "L3";
 const ID_LENGTH = 4;
@@ -7,6 +5,9 @@ const SEQUENCE_LENGTH = 2;
 const LEAD_LENGTH = 2;
 const CRC_LENGTH = 4;
 const HEADER_LENGTH = FRAME_VERSION.length + ID_LENGTH + SEQUENCE_LENGTH + LEAD_LENGTH + CRC_LENGTH;
+// ggwave's variable-length wire limit includes our 14-byte header.
+// https://github.com/ggerganov/ggwave/blob/master/include/ggwave/ggwave.h
+export const MAX_FRAME_TEXT_BYTES = 140 - HEADER_LENGTH;
 export const SEQUENCE_MODULO = 36 ** SEQUENCE_LENGTH;
 export const MAX_SPEECH_LEAD = 36 ** LEAD_LENGTH - 1;
 
@@ -59,8 +60,8 @@ export function encodeFrame(frame: ChatFrame): string {
   if (!validInteger(frame.sequence, SEQUENCE_MODULO - 1)) throw new Error("Invalid sequence number.");
   if (!validInteger(frame.speechLead, MAX_SPEECH_LEAD)) throw new Error("Invalid speech lead.");
   const text = new TextEncoder().encode(frame.text);
-  if (text.length === 0 || text.length > MAX_MESSAGE_BYTES) {
-    throw new Error(`Messages must be 1–${MAX_MESSAGE_BYTES} UTF-8 bytes.`);
+  if (text.length === 0 || text.length > MAX_FRAME_TEXT_BYTES) {
+    throw new Error(`Messages must be 1–${MAX_FRAME_TEXT_BYTES} UTF-8 bytes.`);
   }
 
   const fields = `${frame.senderId}${base36(frame.sequence, SEQUENCE_LENGTH)}${base36(frame.speechLead, LEAD_LENGTH)}`;
@@ -68,7 +69,7 @@ export function encodeFrame(frame: ChatFrame): string {
 }
 
 export function decodeFrame(bytes: Uint8Array): ChatFrame | null {
-  if (bytes.length <= HEADER_LENGTH || bytes.length > HEADER_LENGTH + MAX_MESSAGE_BYTES) return null;
+  if (bytes.length <= HEADER_LENGTH || bytes.length > HEADER_LENGTH + MAX_FRAME_TEXT_BYTES) return null;
 
   const header = String.fromCharCode(...bytes.subarray(0, HEADER_LENGTH));
   let offset = 0;

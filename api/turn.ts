@@ -24,6 +24,7 @@ export const POST = route(async (request) => {
           turnRequest.maxHiddenBytes,
           turnRequest.spokenOnly,
           turnRequest.actions,
+          turnRequest.maxSpokenBytes,
         ),
       );
     } catch (error) {

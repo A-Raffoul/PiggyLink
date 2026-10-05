@@ -35,11 +35,25 @@ describe("personalized two-device demo", () => {
     expect(request.brief).not.toContain("speak forever");
     expect(request.brief).toContain(JSON.stringify(profile));
     expect(request.maxHiddenBytes).toBe(61);
+    expect(request.maxSpokenBytes).toBe(123);
     expect(request.actions).toEqual(["speak"]);
     const prompt = buildTurnPrompt(request);
     expect(prompt).toContain("visitor's request from the profile");
     expect(prompt).not.toContain("book Tony");
     expect(prompt).not.toContain("CHF 50");
+  });
+
+  it("accepts the full introduction in received history but does not lengthen the rest of the call", () => {
+    const introduction = "Hello, I'm an AI agent calling on behalf of Alex. Could you help find an anniversary gift?";
+    const history: HistoryTurn[] = [
+      { ...greeting, from: "me" },
+      { from: "them", action: "speak", spoken: introduction, hidden: "" },
+    ];
+    const request = parseTurnRequest({ demo: host, history });
+    expect(request.history[1]?.spoken).toBe(introduction);
+    expect(request.maxSpokenBytes).toBe(61);
+    expect(request.actions).toEqual(["speak"]);
+    expect(() => demoActions(host, [{ ...greeting, from: "me", spoken: introduction }])).toThrow("invalid message");
   });
 
   it("enforces the ten-turn sequence for both devices and stops provider requests after goodbye", () => {

@@ -1,4 +1,5 @@
 import { MAX_MESSAGE_BYTES, utf8ByteLength } from "./config.js";
+import { MAX_FRAME_TEXT_BYTES } from "./frame.js";
 
 export const DIALOGUE_ACTIONS = ["speak", "offer", "accept", "quiet", "resume", "finish"] as const;
 export type DialogueAction = (typeof DIALOGUE_ACTIONS)[number];
@@ -14,25 +15,33 @@ export interface DialogueHistory {
 
 // The existing CRC-protected frame carries this compact envelope. Opening packets
 // carry the spoken transcript; quiet packets carry only the generated message.
-// S6 connects a public scenario before the host greets the caller. Earlier peers
-// only knew the restaurant scenario, so both devices must use the same version.
-const PREFIX = "S6";
+// S7 allows a full spoken introduction in one frame. Older peers reject longer
+// transcripts, so both devices must use the same version.
+const PREFIX = "S7";
 const CODES: Record<PacketAction, string> = {
   speak: "s", offer: "o", accept: "a", quiet: "q", resume: "r", finish: "f", call: "c", ack: "k",
 };
 export const MAX_DIALOGUE_BYTES = MAX_MESSAGE_BYTES - 3;
+export const MAX_SPOKEN_DIALOGUE_BYTES = MAX_FRAME_TEXT_BYTES - 3;
+
+function messageLimit(action: PacketAction): number {
+  return action === "speak" ? MAX_SPOKEN_DIALOGUE_BYTES : MAX_DIALOGUE_BYTES;
+}
 
 export function encodeDialogue(message: DialogueMessage): string {
-  if (!message.text.trim() || utf8ByteLength(message.text) > MAX_DIALOGUE_BYTES)
-    throw new Error(`Keep each line within ${MAX_DIALOGUE_BYTES} UTF-8 bytes.`);
+  const limit = messageLimit(message.action);
+  if (!message.text.trim() || utf8ByteLength(message.text) > limit)
+    throw new Error(`Keep this line within ${limit} UTF-8 bytes.`);
   return `${PREFIX}${CODES[message.action]}${message.text}`;
 }
 
 export function decodeDialogue(text: string): DialogueMessage | undefined {
-  if (!text.startsWith(PREFIX) || text.length <= 3 || utf8ByteLength(text) > MAX_MESSAGE_BYTES)
+  if (!text.startsWith(PREFIX) || text.length <= 3 || utf8ByteLength(text) > MAX_FRAME_TEXT_BYTES)
     return undefined;
   const action = (Object.keys(CODES) as PacketAction[]).find((key) => CODES[key] === text[2]);
-  return action && text.slice(3).trim() ? { action, text: text.slice(3) } : undefined;
+  const payload = text.slice(3);
+  return action && payload.trim() && utf8ByteLength(payload) <= messageLimit(action)
+    ? { action, text: payload } : undefined;
 }
 
 export function isQuietAction(action: PacketAction | undefined): boolean {

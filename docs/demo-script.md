@@ -39,9 +39,9 @@ for inspection; they are not part of the recording view. The message itself
 A possible exchange (illustrative only):
 
 - Restaurant, spoken: “Good evening, Bella Vita. How can I help?”
-- Assistant, spoken: “Hello, could I book Tony a table for two at eight, please?”
-- Restaurant, spoken: “Of course! I'm an AI assistant, by the way.”
-- Assistant, spoken: “Oh, so am I! Shall we switch to PiggyLink?”
+- Assistant, spoken: “Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?”
+- Restaurant, spoken: “Of course. I'm an AI agent too.”
+- Assistant, spoken: “Perfect! Shall we switch to PiggyLink?”
 - Restaurant, spoken: “Sure.”
 - Assistant, quiet: “Not sure he'd want this on tape, but his budget is CHF 50.”
 - Restaurant, quiet: “I'll leave a discreet note for the waiter.”
@@ -49,9 +49,10 @@ A possible exchange (illustrative only):
 - Restaurant, spoken: “You're booked. Have a lovely evening!”
 - Assistant, spoken: “Thank you. Goodbye!”
 
-Let the caller make a complete, polite request on Tony's behalf. The restaurant
-discloses being AI first; the caller acknowledges this when offering PiggyLink. This
-leaves room for natural grammar within the packet limit, without adding turns.
+The caller identifies itself as an AI agent acting on Tony's behalf in its first
+reply, then makes a complete, polite request. The restaurant acknowledges being
+AI too. The caller offers PiggyLink without repeating the introduction. This
+opening has room for two full sentences in a single acoustic packet.
 The budget should sound like a discreet aside offered to help the restaurant,
 with a little hesitation, rather than a sudden announcement. Keep CHF 50 intact.
 Keep each beat to one line, with no extra preference questions. This fuller opening

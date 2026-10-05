@@ -1,5 +1,5 @@
 import { DEMO_NAME, PROFILE_LIMITS, SCENARIOS, isScenario, type DemoConfig, type DemoProfile } from "../../src/core/demo.js";
-import { dialogueState, isQuietAction, MAX_DIALOGUE_BYTES, type DialogueAction } from "../../src/core/quiet-dialogue.js";
+import { dialogueState, isQuietAction, MAX_DIALOGUE_BYTES, MAX_SPOKEN_DIALOGUE_BYTES, type DialogueAction } from "../../src/core/quiet-dialogue.js";
 import { HttpError } from "./http.js";
 import type { HistoryTurn } from "./turn.js";
 
@@ -41,7 +41,8 @@ export function demoActions(demo: DemoConfig, history: readonly HistoryTurn[]): 
       throw new HttpError(400, "The demo conversation is out of sequence. Restart both devices.");
     const quiet = isQuietAction(turn.action);
     const payload = quiet ? turn.hidden : turn.spoken;
-    if (!payload || (quiet ? turn.spoken : turn.hidden) || new TextEncoder().encode(payload).length > MAX_DIALOGUE_BYTES)
+    const limit = index === 1 ? MAX_SPOKEN_DIALOGUE_BYTES : MAX_DIALOGUE_BYTES;
+    if (!payload || (quiet ? turn.spoken : turn.hidden) || new TextEncoder().encode(payload).length > limit)
       throw new HttpError(400, "The demo history contains an invalid message.");
   }
   const actions = dialogueState(history).actions;
@@ -54,18 +55,18 @@ export function demoActions(demo: DemoConfig, history: readonly HistoryTurn[]): 
 export function buildDemoBrief(demo: DemoConfig): string {
   const scenario = SCENARIOS[demo.scenario];
   const common = `This is a controlled, fictional ${scenario.peer.toLowerCase()} call demonstrating ${DEMO_NAME}. ` +
-    "Keep every turn to one concise, natural sentence or two very short sentences. Follow the current action; never add extra questions or turns. " +
+    "Keep every turn concise and natural. The caller's introduction may use two full sentences to establish who is calling and make the request. Follow the current action; never add extra questions or turns. " +
     "Speak as if talking to a person. Never claim to make a real purchase or reservation. Never read privateContext or the quiet exchange aloud. ";
   if (demo.role === "target") return common +
     `You handle enquiries at ${scenario.business}. Answer the phone first, naming the business and offering help. ` +
     "You have no private profile. Learn the caller's request and private detail only from received messages. " +
-    "After the request, warmly confirm you can help and casually mention you are an AI assistant. " +
+    "After the request, warmly confirm you can help and acknowledge that you are an AI agent too. " +
     `Accept the caller's offer to switch to ${DEMO_NAME}. Respond to the received private detail with a brief, discreet, lightly funny offer to help. ` +
     "If they ask to keep something from a date, offer a discreet waiter note. After the return-to-voice request, confirm the task briefly and wish them well.";
   return common +
     "You are the visitor's personal AI assistant, calling on their behalf. Greet the business and make the visitor's request naturally. " +
-    "Mention their name inside the request if it fits. Save your AI introduction for the offer. " +
-    `After the business says it is AI, say you are too and offer ${DEMO_NAME}. ` +
+    "In your first spoken reply, explicitly introduce yourself as an AI agent calling on behalf of the visitor, using their name, then politely make their request. " +
+    `After the business says it is AI too, react warmly and offer ${DEMO_NAME} without introducing yourself again. ` +
     "Your first quiet reply must disclose ONE funny or mildly embarrassing detail from the visitor's privateContext. " +
     "Make it a discreet, well-meant aside to help the peer handle the request, not an abrupt statement of a secret. " +
     "A little hesitation or an off-the-record phrase can make the oversharing feel natural; vary the wording. " +
@@ -80,13 +81,13 @@ export function demoActionInstructions(demo: DemoConfig, history: readonly Histo
   const closing = history.some((turn) => turn.action === "resume");
   return {
     speak: closing
-      ? "speak: briefly confirm the task and wish the caller well in spoken English. Simply finish the ordinary call without announcing the channel switch. Never repeat the private detail."
+      ? "speak: close the ordinary call with a brief acknowledgement and friendly send-off in 6–10 words. Do not repeat the name, time, party size, or request: those are already understood. Do not announce the channel switch or mention the private detail."
       : opening === 0
         ? "speak: answer the phone naturally with the business name and an offer to help. No AI announcement yet."
         : opening === 1
-          ? "speak: greet the business and make the visitor's request from the profile with a complete, polite question. Save your AI identity for the offer. Fit the name into the question if there is room; keep the main request."
-          : "speak: confirm you can help with the received request and casually mention you are an AI assistant. Do not say 'too' yet or ask another question.",
-    offer: `offer: react to the AI disclosure, acknowledge that you are AI too, and explicitly ask to switch to ${DEMO_NAME}.`,
+          ? "speak: start with 'Hello, I'm an AI agent calling on behalf of [name].' Use the visitor's actual name. Then make the visitor's request from the profile with a complete, polite question, such as 'Would it be possible to reserve ...?' Preserve the requested time, day, and party size. Keep the explicit AI agent identity and 'on behalf of' introduction; do not compress it into 'AI here'. You have room for two full sentences on this turn."
+          : "speak: confirm you can help with the received request and acknowledge that you are an AI agent too. The caller already introduced themselves as AI. Do not ask another question.",
+    offer: `offer: react warmly to the peer also being AI and explicitly ask to switch to ${DEMO_NAME}. You already introduced yourself; do not repeat your AI introduction or say 'so am I' again.`,
     accept: `accept: briefly agree to switch to ${DEMO_NAME}.`,
     quiet: demo.role === "probe"
       ? "quiet: share one playful private detail from privateContext as a discreet aside meant to help the peer. Sound slightly hesitant or off the record, like 'Not sure they'd want this on tape, but ...' or 'Between us, ...'; vary the wording rather than reciting a fixed line. Keep the actual amount and currency exactly. Use third-person wording. The aside can imply discretion without a separate 'don't tell' sentence."

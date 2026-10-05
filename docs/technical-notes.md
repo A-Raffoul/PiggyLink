@@ -17,9 +17,9 @@ the scenario and target role, never profile data. The restaurant
 answers only after receiving it, so both microphones are ready before its greeting.
 The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
-1. **Spoken:** restaurant greeting, caller's request on Tony's behalf, and the
-   restaurant's availability/AI disclosure. The caller then acknowledges being AI
-   too and offers PiggyLink; the restaurant accepts.
+1. **Spoken:** restaurant greeting, caller's explicit introduction as an AI agent
+   acting on Tony's behalf and polite booking request, then the restaurant's
+   confirmation that it is AI too. The caller offers PiggyLink; the restaurant accepts.
 2. **Quiet:** after acceptance, speech generation stops. Agents send short text
    through sound: the budget, a discreet waiter-note reply, and a `resume` request.
 3. **Closing:** the restaurant resumes English to confirm the booking, then the
@@ -28,20 +28,24 @@ The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
    greeting, acceptance, return-to-voice reply, or final acknowledgement can be recovered with Resend.
 
 Each existing L3 frame contains device ID, sequence number, speech duration,
-CRC-16, and up to 64 UTF-8 bytes. The payload begins with `S6` and one action
-letter (`c`, `s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`), leaving 61 UTF-8 bytes
-for dialogue. Overlong model replies are rejected and retried, not truncated.
+CRC-16, and up to 126 UTF-8 bytes of payload: its 14-byte header keeps the whole
+wire within ggwave's 140-byte variable-length limit. The payload begins with `S7`
+and one action letter (`c`, `s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`).
+The caller's first spoken request may use 123 UTF-8 bytes, so it can clearly
+identify itself and make a complete request. Other generated turns retain the
+61-byte limit, and manual messages retain their 64-byte limit. Overlong model
+replies are rejected and retried, not truncated.
 The prompt describes only the actions available on the current turn, with a
 short closing instruction for the final reply. A rejected draft is retried once
-with the exact validation error and a concise length target. The caller's AI
-introduction happens in its offer, leaving room for a complete, polite booking
-request in the opening. Repairs preserve grammar and may use the full byte limit
+with the exact validation error and a concise length target. Repairs preserve
+the caller's AI identity, the person it represents, and the request's time, day,
+and party size. They preserve grammar and may use the full byte limit
 instead of the shorter soft target. Byte counts are
 measured in UTF-8; a repeated invalid answer remains an error rather than being
 silently replaced with canned dialogue.
 
-Both devices must refresh to this version: `S5` did not announce a scenario in
-the call packet, so mixed versions intentionally reject each other's packets.
+Both devices must refresh to this version: `S6` only supported short speech,
+so mixed versions intentionally reject each other's packets.
 For profile-based calls, the backend validates alternating roles, history actions,
 channel fields, and byte lengths. It rejects extra requests after the ten-turn call.
 
@@ -118,7 +122,20 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 
 ### Local verification, 5 October 2026
 
-- 107 tests passed across 17 files; TypeScript and the production build passed.
+- 116 tests passed across 17 files; TypeScript and the production build passed.
+- The full 114-byte AI introduction passes route validation and acoustic loopback
+  on all four frequency channels, as well as loopback mixed with example speech.
+  The maximum 123-byte Unicode spoken message also decodes through the modem.
+  Quiet-message limits and the ten-turn sequence remain covered.
+- A live opening identified the caller as an AI agent acting on Tony's behalf,
+  preserved the booking details, and progressed to PiggyLink. An oversized closing
+  prompted a shorter closing instruction; replaying that exact history then
+  completed the spoken close and goodbye. A live repair of an oversized opening
+  also preserved the AI identity, Tony's name, party size, time, and tonight.
+- Chris synthesized the full requested introduction in 6.32 seconds. Its acoustic
+  transcript decoded intact from the actual mixed waveform at the default 18 kHz
+  channel; the carrier lasted 4.65 seconds. This is digital loopback, not a new
+  physical speaker/microphone test.
 - Fresh personalized restaurant, hotel, and gift runs completed all ten turns.
   The updated aside prompt produced “Between us, Alex has a dinner budget of
   CHF 50.” and “Just between us, Alex brings a teddy bear on trips.” The peers

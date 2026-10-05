@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../turn.js";
+import { exampleProfile } from "../../src/core/demo.js";
 
 const { write } = vi.hoisted(() => ({ write: vi.fn<(prompt: string) => Promise<string>>() }));
 vi.mock("./elevenlabs.js", () => ({ writeWithAgent: write }));
@@ -21,6 +22,21 @@ function quietReplyRequest(): Request {
 beforeEach(() => { write.mockReset(); });
 
 describe("turn generation recovery", () => {
+  it("delivers the requested full AI introduction without truncation or repair", async () => {
+    const spoken = "Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?";
+    write.mockResolvedValue(JSON.stringify({ action: "speak", spoken, hidden: "" }));
+    const response = await POST(new Request("http://localhost/api/turn", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        demo: { scenario: "restaurant", role: "probe", profile: exampleProfile("restaurant") },
+        history: [{ from: "them", action: "speak", spoken: "Bella Vita. How can I help?", hidden: "" }],
+      }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ action: "speak", spoken, hidden: "" });
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
   it("builds the host instructions on the server without requiring a client brief", async () => {
     write.mockResolvedValue(JSON.stringify({ action: "speak", spoken: "Little Things. How can I help?", hidden: "" }));
     const response = await POST(new Request("http://localhost/api/turn", {

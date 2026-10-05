@@ -3,6 +3,7 @@ import exampleCover from "../../public/example-cover.wav?inline";
 import { MAX_MESSAGE_BYTES, OVERLAY_DELAY_SECONDS, FREQUENCY_PRESETS, TAIL_AFTER_CARRIER_SECONDS } from "../core/config";
 import { Conversation } from "../core/conversation";
 import { decodeFrame } from "../core/frame";
+import { encodeDialogue } from "../core/quiet-dialogue";
 import { createUltrasoundDecoder, encodeUltrasound } from "../modem/ggwave";
 import { extendCover, findAudioOnset, mixCarrierIntoCover, trimWithFade } from "./mix";
 
@@ -40,11 +41,13 @@ async function decodeAll(samples: Float32Array): Promise<Uint8Array[]> {
 }
 
 describe("sender to receiver pipeline", () => {
-  it("delivers a maximum-length message mixed into the looped example speech", async () => {
+  it.each([
+    ["maximum manual message", "é".repeat(MAX_MESSAGE_BYTES / 2)],
+    ["full AI introduction", encodeDialogue({ action: "speak", text: "Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?" })],
+  ])("delivers a %s mixed into the looped example speech", async (_name, text) => {
     const cover = readPcm16Mono(exampleCover);
     const alice = new Conversation("a1ce");
     const bob = new Conversation("b0b0");
-    const text = "é".repeat(MAX_MESSAGE_BYTES / 2);
     const outgoing = alice.send(text);
 
     const carrier = await encodeUltrasound(outgoing.wire, FREQUENCY_PRESETS[0]!, SAMPLE_RATE);

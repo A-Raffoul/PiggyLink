@@ -52,8 +52,10 @@ illustrative messages and a simulated spectrum; it is excluded from production.
 - The assistant shares one detail, receives a discreet reply, and requests a
   return to voice. The closing and goodbye are spoken. The server enforces the
   ten-turn sequence and rejects requests after the goodbye.
-- A CRC-protected frame carries up to 64 UTF-8 bytes. A three-byte mode envelope
-  leaves 61 bytes for each short, freshly generated line.
+- The caller explicitly introduces itself as an AI agent acting on the visitor's
+  behalf before making the request. That introduction can use 123 UTF-8 bytes;
+  other generated turns stay within 61 bytes. The complete transcript travels
+  through sound in a CRC-protected frame.
 - Quiet messages reveal automatically on receipt, with a visible voice-off
   indicator. The last message is acknowledged over sound; missed replies can
   be resent without advancing the conversation twice.
