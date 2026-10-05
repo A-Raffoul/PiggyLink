@@ -2,10 +2,12 @@
 
 **The voices stop. The conversation continues.**
 
-Two AI agents arrange a restaurant reservation. They recognize each other,
+The restaurant answers a call from Tony's assistant with an ordinary greeting.
+The agents arrange a table for two and recognize each other,
 agree to switch to Sotto, and continue through high-frequency sound while their
 voices go quiet. The caller then overshares a fictional private dinner budget.
 The restaurant's screen reveals each message as it is decoded from the microphone.
+They then return to spoken English to confirm the booking and say goodbye.
 
 Spoken and quiet dialogue are generated fresh. This is a controlled demonstration:
 the caller is instructed to overshare invented information after switching. It
@@ -22,7 +24,8 @@ npm run dev
 Set `ELEVENLABS_API_KEY` in `.env.local` for dialogue and voices. The older
 `ELEVEN_LABS_API_KEY` spelling is also accepted. Open the app on two nearby
 devices, choose **Restaurant** on one and **Personal assistant** on the other,
-and start the restaurant first. Both devices must use the same channel.
+and start the restaurant first. Starting the assistant then connects the call;
+the restaurant delivers the first spoken greeting. Both devices must use the same channel.
 Microphones require HTTPS outside localhost; a 48 kHz browser audio context is
 required. Hearing and acoustic reception depend on the devices and room.
 
@@ -39,6 +42,8 @@ illustrative messages and a simulated spectrum; it is excluded from production.
   a speak, offer, or accept action. Both sides track the agreement to switch.
 - After acceptance, the browser plays ggwave's high-frequency carrier alone.
   Quiet turns use neither synthesized speech nor cover audio.
+- The assistant shares its budget, receives a discreet waiter-note reply, and
+  requests a return to voice. The booking confirmation and goodbye are spoken.
 - A CRC-protected frame carries up to 64 UTF-8 bytes. A three-byte mode envelope
   leaves 61 bytes for each short, freshly generated line.
 - Quiet messages reveal automatically on receipt, with a visible voice-off

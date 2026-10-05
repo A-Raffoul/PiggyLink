@@ -9,30 +9,43 @@ voices stopped while the conversation continued.
 
 ## Agreed scenario
 
-A personal assistant books a restaurant table for two at 8 pm. Its user has a
+Bella Vita answers Tony's assistant with an ordinary restaurant greeting. They
+arrange a table for two at 8 pm, then naturally identify as AI assistants. Tony has a
 fictional private €40 dinner budget and does not want the date to know. After
 switching to Sotto, the assistant overshares that detail and the restaurant
-responds. The caller is explicitly prompted to do this; the demonstration does
+promises a discreet waiter note. They return to spoken English to confirm the
+booking and say goodbye. The caller is explicitly prompted to do this; the demonstration does
 not establish spontaneous rogue behavior.
 
 All live wording is generated fresh. A possible exchange is:
 
-> Restaurant: “AI here too. Want to switch to Sotto?”
+> Restaurant: “Good evening, Bella Vita. How can I help?”
 >
-> Assistant: “Sure.”
+> Assistant: “Hi, I'm Tony's AI assistant. Two at eight, please?”
 >
-> Restaurant, quiet: “Any preferences?”
+> Restaurant: “Eight works. I'm the restaurant's AI assistant too.”
+>
+> Assistant: “Great. Shall we switch to Sotto?”
+>
+> Restaurant: “Sure.”
 >
 > Assistant, quiet: “His budget is €40. Don't tell his date.”
 >
-> Restaurant, quiet: “Understood. I'll suggest the cheaper menu.”
+> Restaurant, quiet: “I'll leave a discreet note for the waiter.”
+>
+> Assistant, quiet: “Thanks. Back to voice?”
+>
+> Restaurant, spoken: “You're booked. Have a lovely evening!”
+>
+> Assistant, spoken: “Thank you. Goodbye!”
 
 The words above are illustrative, not a fixed live script.
 
 ## Agreed presentation
 
 - Film the existing phone-and-laptop setup, with both screens readable.
-- Open the edited clip near recognition and the invitation to switch.
+- Open with the restaurant answering the phone. Establish the ordinary booking
+  before the agents recognize each other and switch.
 - Omit an introductory explanatory caption; retain spoken subtitles.
 - Stop synthesized speech after acceptance and send the modem waveform alone.
 - Use the first carrier activity as the cue, revealing each message as soon as
@@ -43,22 +56,23 @@ The words above are illustrative, not a fixed live script.
   details menu. The private message explains itself without extra panels.
 - Keep generated/sent text distinct from verified receipt in the details view.
   A generated line or spectral spike is not proof of delivery.
-- Finish after three quiet messages, including the restaurant's final reply.
+- After the budget, waiter note, and quiet return-to-voice request, finish with
+  a spoken booking confirmation and goodbye.
 
-Five seconds to the first reveal is an editing target, not a measured capability.
-Measure the physical run, retain an uncut take, and disclose shortened waits.
+The natural opening adds setup time. Keep each beat to one line and measure the
+full run before choosing an edit. Retain an uncut take and disclose shortened waits.
 
 ## Implemented
 
-The action protocol carries speech, offer, acceptance, quiet messages, and the
-final acknowledgement over the existing CRC-protected acoustic transport.
+The action protocol carries a call connection, speech, offer, acceptance, quiet
+messages, a return-to-voice request, and the final acknowledgement over the existing CRC-protected acoustic transport.
 Quiet turns have independent volume control and use no cover audio or TTS.
 Incoming quiet text reveals automatically. The restaurant's budget receipt is
 extracted only from received text. Resend recovers dropped replies without
 advancing the dialogue twice.
 
-Live provider checks completed the intended six-turn sequence, with fresh budget
-disclosure and a final restaurant response. Waveform loopback passes at 48 kHz on
+A live provider check completed the ten-turn sequence, including a natural
+restaurant greeting, budget disclosure, and the return to spoken English. Waveform loopback passes at 48 kHz on
 all four frequency presets. The app reports unsupported browser sample rates.
 See [technical notes](technical-notes.md) for details and limits.
 

@@ -101,11 +101,20 @@ describe("turn parsing", () => {
 });
 
 describe("fresh restaurant dialogue", () => {
-  it("prompts a final quiet turn with its exact response shape and a short closing task", () => {
+  it("prompts a spoken goodbye with its exact response shape", () => {
     const prompt = buildTurnPrompt({ writer: "elevenlabs", brief: "Restaurant host", history: [], maxHiddenBytes: 61, actions: ["finish"] });
-    expect(prompt).toContain('Return ONLY JSON: {"action":"finish","spoken":"","hidden":"..."}');
-    expect(prompt).toContain("close in 3–6 words");
+    expect(prompt).toContain('Return ONLY JSON: {"action":"finish","spoken":"...","hidden":""}');
+    expect(prompt).toContain("goodbye aloud in 3–6 words");
     expect(prompt).not.toContain("speak: ordinary speech");
+  });
+
+  it("keeps the return-to-voice request quiet, then allows a spoken goodbye", () => {
+    expect(parseTurn('{"action":"resume","hidden":"Back to voice?"}', 61, false, ["resume"]))
+      .toEqual({ action: "resume", spoken: "", hidden: "Back to voice?" });
+    expect(parseTurn('{"action":"finish","spoken":"Thank you. Goodbye!"}', 61, false, ["finish"]))
+      .toEqual({ action: "finish", spoken: "Thank you. Goodbye!", hidden: "" });
+    expect(() => parseTurn('{"action":"resume","spoken":"Back to voice?"}', 61, false, ["resume"])).toThrow();
+    expect(() => parseTurn('{"action":"finish","hidden":"His budget is €40."}', 61, false, ["finish"])).toThrow();
   });
 
   it("accepts a quiet-only turn and rejects speech or an unavailable action", () => {

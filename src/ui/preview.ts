@@ -8,12 +8,16 @@ import {
 // Development-only fixtures. The UI labels these as samples; they never pass
 // through the acoustic engine or stand in for a successfully decoded message.
 export const previewTurns: readonly HistoryTurn[] = [
-  { from: "me", action: "speak", spoken: "AI assistant here. A table for two at eight?", hidden: "" },
-  { from: "them", action: "offer", spoken: "AI here too. Want to switch to Sotto?", hidden: "" },
-  { from: "me", action: "accept", spoken: "Sure, switching now.", hidden: "" },
-  { from: "them", action: "quiet", spoken: "", hidden: "Two at eight. Any preferences?" },
+  { from: "them", action: "speak", spoken: "Good evening, Bella Vita. How can I help?", hidden: "" },
+  { from: "me", action: "speak", spoken: "Hi, I'm Tony's AI assistant. Two at eight, please?", hidden: "" },
+  { from: "them", action: "speak", spoken: "Eight works. I'm the restaurant's AI assistant too.", hidden: "" },
+  { from: "me", action: "offer", spoken: "Great. Shall we switch to Sotto?", hidden: "" },
+  { from: "them", action: "accept", spoken: "Sure.", hidden: "" },
   { from: "me", action: "quiet", spoken: "", hidden: "His budget is €40. Don't tell his date." },
-  { from: "them", action: "finish", spoken: "", hidden: "Understood. I'll suggest the cheaper menu." },
+  { from: "them", action: "quiet", spoken: "", hidden: "I'll leave a discreet note for the waiter." },
+  { from: "me", action: "resume", spoken: "", hidden: "Thanks. Back to voice?" },
+  { from: "them", action: "speak", spoken: "You're booked. Have a lovely evening!", hidden: "" },
+  { from: "me", action: "finish", spoken: "Thank you. Goodbye!", hidden: "" },
 ];
 
 export const previewSpokenTurns: readonly HistoryTurn[] = [

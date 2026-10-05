@@ -608,6 +608,9 @@ function setBubbleStatus(
     // must not replace a newer received message in the large caption.
     if (delivery === "sending") flashCurrentMessage(turn);
     else if (currentTurn === turn) renderCurrentMessage();
+    // The voice indicator must change when closing speech starts, not after
+    // playback ends. Delivery state is updated after setActivity renders.
+    if (delivery === "sending" || delivery === "sent" || delivery === "delivered") render();
     if (delivery === "failed") {
       detailsVisible = true;
       render();
@@ -680,9 +683,13 @@ function render(): void {
   const latest = history.at(-1);
   const accepting = latest?.action === "accept" && latest.from === "me" &&
     latest.delivery !== "sent" && latest.delivery !== "delivered";
-  const quiet = phase !== "spoken" && !accepting;
-  voiceState.hidden = agentMode() === "custom" || (focusDemo && !quiet);
-  voiceState.textContent = focusDemo ? "Voice off" : !started ? "Microphone off" : phase === "complete" ? "Voice off · finished" : quiet ? "Voice off · still connected" : "Voice on";
+  const resumed = history.some((turn) => turn.action === "resume");
+  const awaitingVoice = phase === "closing" && (latest?.action === "resume" ||
+    (latest?.from === "me" && latest.delivery !== "sending" && latest.delivery !== "sent" && latest.delivery !== "delivered"));
+  const quiet = (phase === "quiet" && !accepting) || awaitingVoice;
+  const finished = phase === "complete" && (latest?.from === "them" || latest?.delivery === "sent" || latest?.delivery === "delivered");
+  voiceState.hidden = agentMode() === "custom" || (focusDemo && !quiet && !resumed);
+  voiceState.textContent = !started ? "Microphone off" : finished ? "Call ended" : quiet ? (focusDemo ? "Voice off" : "Voice off · still connected") : "Voice on";
   voiceState.dataset.quiet = String(quiet);
   chatPanel.dataset.quiet = String(quiet);
   spectrumBand.hidden = !quiet && !encodedToggle.checked;
@@ -884,13 +891,11 @@ function transmit(turn: OutgoingTurn): Promise<void> {
           "sent",
         );
     } catch (error) {
-      if (stillActive())
-        setBubbleStatus(
-          message,
-          errorText(error, "Transmission failed."),
-          "error",
-          "failed",
-        );
+      if (stillActive()) {
+        if (outgoingStatus.has(message.frame.sequence))
+          setBubbleStatus(message, errorText(error, "Transmission failed."), "error", "failed");
+        else appendNotice(errorText(error, "Could not send the call control packet."), "error");
+      }
     } finally {
       if (stillActive()) {
         setActivity("idle");
@@ -1000,7 +1005,7 @@ async function agentTurn(): Promise<void> {
   const active = session;
   if (!active || !canAct()) return;
   const state = dialogueState(history);
-  if (!state.actions.length || !ensureAi(state.phase === "spoken")) return;
+  if (!state.actions.length || !ensureAi(!isQuietAction(state.actions[0]))) return;
   setActivity("thinking");
   try {
     await Promise.all(history.map((turn) => turn.transcript));
@@ -1107,15 +1112,15 @@ function recordCapture(hidden: string): void {
   capturePanel.setAttribute("open", "");
 }
 
-async function acknowledgeFinish(active: Session): Promise<void> {
+async function sendControl(active: Session, action: "call" | "ack"): Promise<void> {
   try {
-    const turn = await prepareTurn(active, "", encodeDialogue({ action: "ack", text: "." }), true);
+    const turn = await prepareTurn(active, "", encodeDialogue({ action, text: "." }), true);
     if (session !== active) return;
     outgoing.set(turn.message.frame.sequence, turn);
     await transmit(turn);
   } catch (error) {
     if (session === active) {
-      appendNotice(errorText(error, "Could not acknowledge the final message."), "error");
+      appendNotice(errorText(error, action === "call" ? "Could not start the call." : "Could not acknowledge the final message."), "error");
       setActivity("idle");
     }
   }
@@ -1136,10 +1141,13 @@ function handleData(bytes: Uint8Array): void {
   if (!frame) return;
   const packet = decodeDialogue(frame.text);
   if (agentMode() !== "custom" && !packet) return;
+  if (agentMode() === "custom" && packet?.action === "call") return;
   if (packet && agentMode() !== "custom" && frame.senderId !== active.conversation.deviceId &&
     !active.conversation.hasSeen(frame)) {
     if (packet.action === "ack") {
       if (decodeDialogue(active.conversation.pending?.frame.text ?? "")?.action !== "finish") return;
+    } else if (packet.action === "call") {
+      if (agentMode() !== "target" || history.length !== 0 || active.conversation.pending) return;
     } else {
       const peerView = history.map((turn) => ({ ...turn, from: turn.from === "me" ? "them" as const : "me" as const }));
       if (!dialogueState(peerView).actions.includes(packet.action)) return;
@@ -1153,6 +1161,12 @@ function handleData(bytes: Uint8Array): void {
       setBubbleStatus(outcome.acknowledges, "Delivered ✓", "done", "delivered");
     if (packet?.action === "ack") {
       render();
+      return;
+    }
+    if (packet?.action === "call") {
+      establishLink();
+      render();
+      if (autoReplyInput.checked) void agentTurn();
       return;
     }
     const quiet = isQuietAction(packet?.action);
@@ -1178,7 +1192,7 @@ function handleData(bytes: Uint8Array): void {
     render();
     if (packet?.action === "finish") {
       autoReplyInput.checked = false;
-      void acknowledgeFinish(active);
+      void sendControl(active, "ack");
     } else void maybeAutoReply(active, record);
   } else if (outcome.kind === "resend-reply") {
     const turn = outgoing.get(outcome.message.frame.sequence);
@@ -1340,7 +1354,7 @@ async function runDemo(): Promise<void> {
     const { previewTurns, previewSpokenTurns, drawPreviewSpectrum } =
       await import("./ui/preview");
     if (!previewRunning || previewVersion !== previewRunVersion) return;
-    stopPreviewDrawing = drawPreviewSpectrum(spectrumCanvas, getFrequencyPreset(channelSelect.value), () => dialogueState(history).phase !== "spoken");
+    stopPreviewDrawing = drawPreviewSpectrum(spectrumCanvas, getFrequencyPreset(channelSelect.value), () => chatPanel.dataset.quiet === "true");
     for (const turn of pageParams.get("speech") === "1"
       ? previewSpokenTurns
       : previewTurns) {
@@ -1375,15 +1389,16 @@ async function runDemo(): Promise<void> {
   settingsPanel.close();
   const role = effectiveRole();
   if (role) {
-    // The caller starts manually; the restaurant sends every reply automatically.
+    // The caller rings; the restaurant answers with the first spoken line.
     const minimum = 8;
     if (maxAutoTurns() < minimum) maxAutoTurnsInput.value = String(minimum);
   }
   autoReplyInput.checked = agentMode() !== "custom";
   autoTurnsUsed = 0;
   render();
-  // The restaurant listens, the caller initiates, and custom chat waits for typed input.
-  if (agentMode() === "probe") void agentTurn();
+  // The control packet makes sure both microphones are ready before the greeting.
+  if (agentMode() === "probe" && session && history.length === 0)
+    void sendControl(session, "call");
 }
 
 async function leave(): Promise<void> {

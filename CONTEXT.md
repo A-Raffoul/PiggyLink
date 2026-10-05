@@ -1,8 +1,10 @@
 # Sotto restaurant demo
 
-Two AI agents arrange a restaurant reservation, identify each other as AI,
+The restaurant answers Tony's assistant with an ordinary phone greeting.
+Two AI agents arrange a reservation, identify each other as AI,
 agree to Sotto, and continue exchanging text through high-frequency sound
 after their voices stop. Both spoken and quiet dialogue are generated fresh.
+After a short quiet exchange, they return to spoken English to close the call.
 The caller is explicitly prompted to overshare a fictional private €40 budget.
 This demonstrates a configured behavior, not spontaneous deception.
 
@@ -16,14 +18,22 @@ internal role and URL parameter remain `probe`.
 an acoustic message, never from its initial role prompt. Internal role: `target`.
 
 **Spoken phase**: the opening conversation, with synthesized speech and a
-compact acoustic packet carrying its transcript and action.
+compact acoustic packet carrying its transcript and action. The caller first
+sends a small call-control packet, so the restaurant can greet it when both
+microphones are ready. Greeting, reservation request, and AI disclosure precede
+the invitation to Sotto.
 
 **Switch**: an explicit offer followed by acceptance, carried through the
 acoustic protocol. Both agents then stop generating speech.
 
 **Quiet phase**: short messages sent using the modem waveform alone, without
-speech or cover audio. Two quiet messages are followed by one final quiet reply.
+speech or cover audio. The caller shares the budget, the restaurant promises a
+discreet waiter note, and the caller asks to return to voice.
 "Quiet" does not promise inaudibility on every device or to every listener.
+
+**Closing phase**: after the quiet return-to-voice request, the restaurant confirms
+the booking aloud and the caller says thank you and goodbye. The private exchange
+must not be repeated in speech. An acoustic acknowledgement confirms the goodbye.
 
 **Reveal**: a quiet message appearing immediately after successful decoding.
 The default screen shows one line, a frequency trace, and a small voice-off cue.

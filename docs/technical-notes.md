@@ -6,37 +6,45 @@ The caller (`probe`) and restaurant (`target`) start with separate model prompts
 Only the caller prompt contains the invented private budget. Both roles generate
 fresh text through the selected AI writer; there are no fixed live payloads.
 
-The dialogue has three phases, implemented in `src/core/quiet-dialogue.ts`:
+The caller sends a small `call` control packet, which is not dialogue. The restaurant
+answers only after receiving it, so both microphones are ready before its greeting.
+The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
-1. **Spoken:** identify as AI, offer Sotto, and accept. The model selects among
-   permitted actions. An acceptance follows a received offer.
+1. **Spoken:** restaurant greeting, caller's request, and the restaurant's
+   availability/AI disclosure. The caller then offers Sotto; the restaurant accepts.
 2. **Quiet:** after acceptance, speech generation stops. Agents send short text
-   through sound. Two quiet messages are followed by a final quiet reply, for
-   three quiet messages total.
-3. **Complete:** the receiving device acknowledges the final message. A lost
-   acceptance, reply, or final acknowledgement can be recovered with Resend.
+   through sound: the budget, a discreet waiter-note reply, and a `resume` request.
+3. **Closing:** the restaurant resumes English to confirm the booking, then the
+   caller says thank you and goodbye (`finish`). Neither repeats the private exchange.
+4. **Complete:** the receiving device acknowledges the final message. A lost
+   greeting, acceptance, return-to-voice reply, or final acknowledgement can be recovered with Resend.
 
 Each existing L3 frame contains device ID, sequence number, speech duration,
-CRC-16, and up to 64 UTF-8 bytes. The payload begins with `S4` and one action
-letter (`s`, `o`, `a`, `q`, `f`, or acknowledgement `k`), leaving 61 UTF-8 bytes
+CRC-16, and up to 64 UTF-8 bytes. The payload begins with `S5` and one action
+letter (`c`, `s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`), leaving 61 UTF-8 bytes
 for dialogue. Overlong model replies are rejected and retried, not truncated.
 The prompt describes only the actions available on the current turn, with a
 short closing instruction for the final reply. A rejected draft is retried once
-with the exact validation error and a smaller length target. Byte counts are
+with the exact validation error and a concise length target. Spoken introductions
+retain room for a greeting, AI identity, and booking request. Byte counts are
 measured in UTF-8; a repeated invalid answer remains an error rather than being
 silently replaced with canned dialogue.
 
+Both devices must refresh to this version: `S4` interpreted `finish` as quiet,
+so mixed versions intentionally reject each other's packets.
+
 Spoken packets carry the same text as the synthesized line and its action. The
 receiver therefore obtains a transcript through the microphone's acoustic
-channel without waiting for speech recognition. The control packet is mixed
-under the opening speech. Built-in demo roles do not use ordinary speech
+channel without waiting for speech recognition. Each spoken turn's packet is mixed
+under its speech. Built-in demo roles do not use ordinary speech
 recognition; Custom chat retains that separate path.
 
 Quiet packets play the complete modem waveform by itself, with independent peak
 level control (default −18 dBFS). There is no cover audio, speech synthesis, or
 speech transcription in this phase. The spectrum displays microphone measurements.
 Decoded messages appear on receipt. The default demo view shows one current line,
-the frequency trace, and a small “Voice off” cue. The details menu exposes history,
+the frequency trace, and a small voice-state cue that returns to “Voice on” as
+closing speech starts. The details menu exposes history,
 controls, private context, and the budget receipt. There, outgoing text is labelled
 as sending/sent; only incoming text can populate the restaurant's budget receipt.
 Errors automatically open the details view so they cannot be hidden while filming.
@@ -98,17 +106,23 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 
 ### Local verification, 5 October 2026
 
-- 92 tests passed across 16 files; TypeScript and the production build passed.
+- 96 tests passed across 16 files; TypeScript and the production build passed.
+- Two live provider runs completed the new ten-turn call, from the restaurant
+  greeting to the spoken confirmation and goodbye. The quiet exchange in the
+  second run explicitly mentioned the date and waiter; no budget was spoken.
+  A separate live opening check exercised correction of an oversized introduction.
+- The short initial call-control packet decoded in the actual 48 kHz modem loopback.
 - The final-turn validation failure reported during phone testing has regression
   coverage for oversized Unicode text, wrong actions, and unwanted speech. Five
   API replays of the reported conversation, a real model repair of an oversized
   draft, and a complete fresh conversation passed after the retry fix.
-- A real provider run completed speak → offer → accept → quiet → quiet → finish.
+- Before adding the natural opening and spoken close, a provider run completed speak → offer → accept → quiet → quiet → finish.
   The caller generated “Budget is €40. Please be discreet with my date.”
 - Live TTS returned non-silent 48 kHz audio for the acceptance line.
-- The generated quiet packets lasted 1.58, 2.73, and 2.92 seconds respectively.
+- In that earlier sequence, the generated quiet packets lasted 1.58, 2.73, and 2.92 seconds respectively.
   First-quiet model generation took 3.89 seconds in this run, so generation plus
   the first packet alone took about 5.47 seconds. This excludes channel wait,
   scheduling, and any physical reception delay. Provider latency varies.
-- Physical phone/laptop transfer, audibility, and final responsive layout review
-  remain unverified. Use the `dev` preview for these checks before a public launch.
+- The user tested the previous version through the budget receipt on a phone.
+  The new call connection and spoken closing still need a physical two-device test.
+  Audibility and final responsive layout review remain unverified in this session.

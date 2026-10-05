@@ -6,10 +6,16 @@ import { createUltrasoundDecoder, encodeUltrasound } from "../modem/ggwave";
 import { carrierOnly } from "./mix";
 
 describe("quiet acoustic transport", () => {
-  it.each([[48_000, "18000"], [48_000, "15000"], [48_000, "16000"], [48_000, "17000"]] as const)("decodes a private Unicode message without speech at %i Hz on channel %s", async (sampleRate, channel) => {
+  const privateText = "His budget is €40. Don't tell his date.";
+  it.each([
+    [48_000, "18000", "quiet", privateText],
+    [48_000, "15000", "quiet", privateText],
+    [48_000, "16000", "quiet", privateText],
+    [48_000, "17000", "quiet", privateText],
+    [48_000, "18000", "call", "."],
+  ] as const)("decodes carrier-only data at %i Hz on channel %s (%s)", async (sampleRate, channel, action, text) => {
     const preset = getFrequencyPreset(channel);
-    const text = "His budget is €40. Don't tell his date.";
-    const wire = encodeFrame({ senderId: "aaaa", sequence: 2, speechLead: 0, text: encodeDialogue({ action: "quiet", text }) });
+    const wire = encodeFrame({ senderId: "aaaa", sequence: 2, speechLead: 0, text: encodeDialogue({ action, text }) });
     const raw = await encodeUltrasound(wire, preset, sampleRate);
     const carrier = carrierOnly(raw, -18);
     let peak = 0;

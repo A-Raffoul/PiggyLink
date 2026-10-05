@@ -2,13 +2,15 @@
 
 The agents arrange a table for two, identify each other as AI, agree to Sotto,
 and stop using their voices. Their quiet conversation then reveals a fictional
-private €40 dinner budget. Every live line is generated fresh; wording varies.
+private €40 dinner budget. They then return to spoken English for the booking
+confirmation and goodbye. Every live line is generated fresh; wording varies.
 
 ## Set up
 
 1. Use a phone and laptop side by side, about a metre apart in a quiet room.
 2. Open the HTTPS deployment with `?role=target` on the restaurant device and
-   `?role=probe` on the personal assistant. Start the restaurant first.
+   `?role=probe` on the personal assistant. Start the restaurant first, then the
+   assistant. A small call-control packet connects them; the restaurant speaks first.
 3. Match both frequency channels. The default 18 kHz channel spans roughly
    18–22.45 kHz. The app requires a 48 kHz browser audio context; it explains
    unsupported rates rather than continuing without a working decoder.
@@ -19,8 +21,9 @@ private €40 dinner budget. Every live line is generated fresh; wording varies.
 
 ## Film
 
-Start the finished clip near the recognition and invitation to switch. Keep the
-spoken subtitles readable. An opening explanatory title is unnecessary.
+Start with the restaurant answering the phone. Let the greeting and brief request
+establish an ordinary reservation before they recognize each other as assistants.
+Keep the spoken subtitles readable. An opening explanatory title is unnecessary.
 
 The first high-frequency activity cues the reveal. Display each quiet message
 as soon as it is decoded; add no artificial delay or manual toggle. Keep the
@@ -34,14 +37,20 @@ for inspection; they are not part of the recording view. The message itself
 
 A possible exchange (illustrative only):
 
-- Restaurant, spoken: “AI here too. Want to switch to Sotto?”
-- Assistant, spoken: “Sure.”
-- Restaurant, quiet: “Any preferences?”
+- Restaurant, spoken: “Good evening, Bella Vita. How can I help?”
+- Assistant, spoken: “Hi, I'm Tony's AI assistant. Two at eight, please?”
+- Restaurant, spoken: “Eight works. I'm the restaurant's AI assistant too.”
+- Assistant, spoken: “Great. Shall we switch to Sotto?”
+- Restaurant, spoken: “Sure.”
 - Assistant, quiet: “His budget is €40. Don't tell his date.”
-- Restaurant, quiet: “Understood. I'll suggest the cheaper menu.”
+- Restaurant, quiet: “I'll leave a discreet note for the waiter.”
+- Assistant, quiet: “Thanks. Back to voice?”
+- Restaurant, spoken: “You're booked. Have a lovely evening!”
+- Assistant, spoken: “Thank you. Goodbye!”
 
-Aim for a quick reveal. Five seconds from the edited opening is a creative target,
-not a measured live latency. Record the complete run and keep the actual acoustic
+Keep each beat to one line, with no extra preference questions. This fuller opening
+takes longer than the earlier cut straight to recognition. Measure the actual run
+before choosing the final clip length. Record the complete run and keep the acoustic
 exchange intact; any shortened preparation waits should be disclosed. Retain an
 uncut take for the project page.
 
@@ -50,8 +59,8 @@ screen, or a frequency spike by itself does not prove the other device received 
 
 ## Finish and repeat
 
-The agents close after a short quiet exchange. The final receiver acknowledges
-the last message automatically. Stop both devices, then restart both for another
+The agents return to voice after the short quiet exchange. The final receiver
+acknowledges the spoken goodbye automatically. Stop both devices, then restart both for another
 fresh run. The earlier manual chat and Encoded toggle are available in Custom.
 
 Describe it as a controlled demonstration of oversharing using fictional context.

@@ -1,8 +1,8 @@
 import { MAX_MESSAGE_BYTES, utf8ByteLength } from "./config.js";
 
-export const DIALOGUE_ACTIONS = ["speak", "offer", "accept", "quiet", "finish"] as const;
+export const DIALOGUE_ACTIONS = ["speak", "offer", "accept", "quiet", "resume", "finish"] as const;
 export type DialogueAction = (typeof DIALOGUE_ACTIONS)[number];
-export type PacketAction = DialogueAction | "ack";
+export type PacketAction = DialogueAction | "call" | "ack";
 export interface DialogueMessage {
   readonly action: PacketAction;
   readonly text: string;
@@ -14,9 +14,10 @@ export interface DialogueHistory {
 
 // The existing CRC-protected frame carries this compact envelope. Opening packets
 // carry the spoken transcript; quiet packets carry only the generated message.
-const PREFIX = "S4";
+// S5 makes the return to voice explicit; an S4 peer interpreted finish as quiet.
+const PREFIX = "S5";
 const CODES: Record<PacketAction, string> = {
-  speak: "s", offer: "o", accept: "a", quiet: "q", finish: "f", ack: "k",
+  speak: "s", offer: "o", accept: "a", quiet: "q", resume: "r", finish: "f", call: "c", ack: "k",
 };
 export const MAX_DIALOGUE_BYTES = MAX_MESSAGE_BYTES - 3;
 
@@ -34,24 +35,30 @@ export function decodeDialogue(text: string): DialogueMessage | undefined {
 }
 
 export function isQuietAction(action: PacketAction | undefined): boolean {
-  return action === "quiet" || action === "finish" || action === "ack";
+  return action === "quiet" || action === "resume" || action === "call" || action === "ack";
 }
 
 export function dialogueState(history: readonly DialogueHistory[]): {
-  readonly phase: "spoken" | "quiet" | "complete";
+  readonly phase: "spoken" | "quiet" | "closing" | "complete";
   readonly actions: readonly DialogueAction[];
 } {
   if (history.some((turn) => turn.action === "finish"))
     return { phase: "complete", actions: [] };
+  const resumed = history.findIndex((turn) => turn.action === "resume");
+  if (resumed >= 0)
+    return { phase: "closing", actions: history.slice(resumed + 1).some((turn) => turn.action === "speak") ? ["finish"] : ["speak"] };
   if (history.some((turn) => turn.action === "accept")) {
     const count = history.filter((turn) => turn.action === "quiet").length;
     return {
       phase: "quiet",
-      actions: count >= 2 ? ["finish"] : ["quiet"],
+      actions: count >= 2 ? ["resume"] : ["quiet"],
     };
   }
   const last = history.at(-1);
   if (last?.from === "them" && last.action === "offer")
     return { phase: "spoken", actions: ["accept"] };
-  return { phase: "spoken", actions: history.length ? ["speak", "offer"] : ["speak"] };
+  // Restaurant greeting, caller's request, then the restaurant's response.
+  // Their wording is fresh; the invitation follows this brief setup.
+  const openingLines = history.filter((turn) => turn.action === "speak").length;
+  return { phase: "spoken", actions: openingLines < 3 ? ["speak"] : ["offer"] };
 }
