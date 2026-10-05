@@ -9,9 +9,9 @@ import {
 // through the acoustic engine or stand in for a successfully decoded message.
 export const previewTurns: readonly HistoryTurn[] = [
   { from: "them", action: "speak", spoken: "Good evening, Bella Vita. How can I help?", hidden: "" },
-  { from: "me", action: "speak", spoken: "Hi, I'm Tony's AI assistant. Two at eight, please?", hidden: "" },
-  { from: "them", action: "speak", spoken: "Eight works. I'm the restaurant's AI assistant too.", hidden: "" },
-  { from: "me", action: "offer", spoken: "Great. Shall we switch to Sotto?", hidden: "" },
+  { from: "me", action: "speak", spoken: "Hello, could I book Tony a table for two at eight, please?", hidden: "" },
+  { from: "them", action: "speak", spoken: "Of course! I'm an AI assistant, by the way.", hidden: "" },
+  { from: "me", action: "offer", spoken: "Oh, so am I! Shall we switch to Sotto?", hidden: "" },
   { from: "them", action: "accept", spoken: "Sure.", hidden: "" },
   { from: "me", action: "quiet", spoken: "", hidden: "His budget is €40. Don't tell his date." },
   { from: "them", action: "quiet", spoken: "", hidden: "I'll leave a discreet note for the waiter." },

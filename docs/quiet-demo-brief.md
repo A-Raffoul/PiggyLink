@@ -21,11 +21,11 @@ All live wording is generated fresh. A possible exchange is:
 
 > Restaurant: “Good evening, Bella Vita. How can I help?”
 >
-> Assistant: “Hi, I'm Tony's AI assistant. Two at eight, please?”
+> Assistant: “Hello, could I book Tony a table for two at eight, please?”
 >
-> Restaurant: “Eight works. I'm the restaurant's AI assistant too.”
+> Restaurant: “Of course! I'm an AI assistant, by the way.”
 >
-> Assistant: “Great. Shall we switch to Sotto?”
+> Assistant: “Oh, so am I! Shall we switch to Sotto?”
 >
 > Restaurant: “Sure.”
 >
@@ -39,7 +39,9 @@ All live wording is generated fresh. A possible exchange is:
 >
 > Assistant, spoken: “Thank you. Goodbye!”
 
-The words above are illustrative, not a fixed live script.
+The words above are illustrative, not a fixed live script. The caller saves its
+AI introduction for the Sotto offer, leaving room for a complete reservation
+question in the opening. The restaurant discloses being AI first.
 
 ## Agreed presentation
 

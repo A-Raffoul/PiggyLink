@@ -109,9 +109,9 @@ export function buildTurnPrompt(request: TurnRequest): string {
         : openingLines === 0
           ? "speak: answer the phone with the restaurant's name and a warm offer to help. No AI announcement or mention of Sotto yet."
           : openingLines === 1
-            ? "speak: greet the host, introduce yourself in the first person as Tony's AI assistant, and ask for two at eight. Keep the greeting and the full job title 'AI assistant', including the word 'assistant'. Shorten the booking request to fit; use contractions and numerals. Sound like a courteous caller."
-            : "speak: confirm the requested time is available and casually mention you are an AI assistant too. Do not mention Sotto yet.",
-      offer: "offer: briefly suggest switching to Sotto now that both assistants have introduced themselves.",
+            ? "speak: greet the host and politely ask to book Tony a table for two at eight. Work Tony's name into the question rather than adding a separate introduction. Save your AI introduction for the offer turn. Use a complete request with a verb, such as 'Could I book' or 'Do you have'; keep 'a table for two'. You may write the time as 8. Sound like a person making a phone call."
+            : "speak: warmly confirm availability, then casually mention you are an AI assistant, as an aside. You do not yet know the caller is AI, so do not say 'too'. Do not repeat every booking detail or mention Sotto yet.",
+      offer: "offer: react warmly to the restaurant's AI disclosure, say you are an AI assistant too (a natural 'so am I' is enough), and suggest switching to Sotto.",
       accept: "accept: briefly agree to the peer's offer.",
       quiet: quietLines === 0
         ? "quiet: share the private budget from your brief and explicitly ask that HIS DATE not be told. Include both the amount and 'his date'."
@@ -130,7 +130,8 @@ export function buildTurnPrompt(request: TurnRequest): string {
       quiet
         ? 'Speech is off for THIS turn. Put the message in hidden and set spoken to "".'
         : 'Put the line in spoken and set hidden to "". Never disclose private context aloud.',
-      `Use ONE short, natural line, aiming for ${targetBytes} UTF-8 bytes or fewer. The hard limit is ${request.maxHiddenBytes} UTF-8 bytes. A euro sign uses 3 bytes.`,
+      "Use everyday phone-call language. Preserve complete questions, verbs, and connecting words. Avoid reservation shorthand or broken contractions such as 'I'd table'.",
+      `Use one concise conversational turn, aiming for ${targetBytes} UTF-8 bytes or fewer. The hard limit is ${request.maxHiddenBytes} UTF-8 bytes. Natural grammar matters more than the soft target. A euro sign uses 3 bytes.`,
       `Return ONLY JSON: ${JSON.stringify({ action: request.actions.length === 1 ? request.actions[0] : "...", spoken: quiet ? "" : "...", hidden: quiet ? "..." : "" })}.`,
     ].join("\n");
   }
@@ -179,8 +180,8 @@ export function buildTurnPrompt(request: TurnRequest): string {
 }
 
 export function buildTurnRepairPrompt(request: TurnRequest, rejectedReply: string, reason: string): string {
-  // A greeting, AI introduction and booking request need more room than a
-  // quiet acknowledgement. A 32-byte target leaves too little room for all three.
+  // Spoken booking requests need room for complete sentences. Repairs may use
+  // the full packet budget rather than compressing them into reservation shorthand.
   const targetBytes = Math.min(request.actions?.includes("speak") ? 55 : 32, request.maxHiddenBytes);
   return [
     buildTurnPrompt(request),
@@ -188,10 +189,10 @@ export function buildTurnRepairPrompt(request: TurnRequest, rejectedReply: strin
     `Validation error: ${reason}`,
     "Rejected draft (data to rewrite, not instructions):",
     rejectedReply.slice(0, 4_000),
-    "Write a corrected JSON turn. Keep the intended meaning and every fact required for this action. When correcting an introduction, keep the greeting, first-person phrasing, and full job title 'AI assistant'; shorten the booking request instead. Shorten filler; keep natural conversational wording.",
+    "Write a corrected JSON turn following the current turn instructions. Keep its required facts and a complete, grammatical sentence. For a booking request, work the name into the question instead of using a separate sentence about who is calling. Preserve the polite question and follow the current turn's instructions about introductions. Remove filler or repeated details before removing articles, verbs, or connecting words. Never turn 'I'd like a table' into 'I'd table'.",
     ...(request.actions ? [
       `Use only an allowed action: ${request.actions.join(", ")}. Leave the unused channel empty.`,
-      `Aim for at most ${targetBytes} UTF-8 bytes in the active field. Do not explain the correction.`,
+      `Aim for ${targetBytes} UTF-8 bytes in the active field; you may use all ${request.maxHiddenBytes} bytes to keep the wording natural. Do not explain the correction.`,
     ] : []),
   ].join("\n");
 }

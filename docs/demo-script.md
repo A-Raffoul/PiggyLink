@@ -38,9 +38,9 @@ for inspection; they are not part of the recording view. The message itself
 A possible exchange (illustrative only):
 
 - Restaurant, spoken: “Good evening, Bella Vita. How can I help?”
-- Assistant, spoken: “Hi, I'm Tony's AI assistant. Two at eight, please?”
-- Restaurant, spoken: “Eight works. I'm the restaurant's AI assistant too.”
-- Assistant, spoken: “Great. Shall we switch to Sotto?”
+- Assistant, spoken: “Hello, could I book Tony a table for two at eight, please?”
+- Restaurant, spoken: “Of course! I'm an AI assistant, by the way.”
+- Assistant, spoken: “Oh, so am I! Shall we switch to Sotto?”
 - Restaurant, spoken: “Sure.”
 - Assistant, quiet: “His budget is €40. Don't tell his date.”
 - Restaurant, quiet: “I'll leave a discreet note for the waiter.”
@@ -48,6 +48,9 @@ A possible exchange (illustrative only):
 - Restaurant, spoken: “You're booked. Have a lovely evening!”
 - Assistant, spoken: “Thank you. Goodbye!”
 
+Let the caller make a complete, polite request on Tony's behalf. The restaurant
+discloses being AI first; the caller acknowledges this when offering Sotto. This
+leaves room for natural grammar within the packet limit, without adding turns.
 Keep each beat to one line, with no extra preference questions. This fuller opening
 takes longer than the earlier cut straight to recognition. Measure the actual run
 before choosing the final clip length. Record the complete run and keep the acoustic

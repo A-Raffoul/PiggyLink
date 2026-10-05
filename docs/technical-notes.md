@@ -10,8 +10,9 @@ The caller sends a small `call` control packet, which is not dialogue. The resta
 answers only after receiving it, so both microphones are ready before its greeting.
 The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
-1. **Spoken:** restaurant greeting, caller's request, and the restaurant's
-   availability/AI disclosure. The caller then offers Sotto; the restaurant accepts.
+1. **Spoken:** restaurant greeting, caller's request on Tony's behalf, and the
+   restaurant's availability/AI disclosure. The caller then acknowledges being AI
+   too and offers Sotto; the restaurant accepts.
 2. **Quiet:** after acceptance, speech generation stops. Agents send short text
    through sound: the budget, a discreet waiter-note reply, and a `resume` request.
 3. **Closing:** the restaurant resumes English to confirm the booking, then the
@@ -25,8 +26,10 @@ letter (`c`, `s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`), leaving 61 U
 for dialogue. Overlong model replies are rejected and retried, not truncated.
 The prompt describes only the actions available on the current turn, with a
 short closing instruction for the final reply. A rejected draft is retried once
-with the exact validation error and a concise length target. Spoken introductions
-retain room for a greeting, AI identity, and booking request. Byte counts are
+with the exact validation error and a concise length target. The caller's AI
+introduction happens in its offer, leaving room for a complete, polite booking
+request in the opening. Repairs preserve grammar and may use the full byte limit
+instead of the shorter soft target. Byte counts are
 measured in UTF-8; a repeated invalid answer remains an error rather than being
 silently replaced with canned dialogue.
 
@@ -107,6 +110,11 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 ### Local verification, 5 October 2026
 
 - 96 tests passed across 16 files; TypeScript and the production build passed.
+- Opening refinement: two live four-turn openings and two forced repairs of an
+  oversized opening passed. The repair produced “Hello, could I book Tony a table
+  for two at eight, please?” (58 UTF-8 bytes). These checks used only the public
+  opening instructions, excluding the private scenario context. Wording remains
+  generated fresh; the revised opening still needs a two-device listening check.
 - Two live provider runs completed the new ten-turn call, from the restaurant
   greeting to the spoken confirmation and goodbye. The quiet exchange in the
   second run explicitly mentioned the date and waiter; no budget was spoken.
