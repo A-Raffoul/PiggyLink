@@ -30,7 +30,9 @@ export class SpeechDetector {
 
     const finite = Number.isFinite(levelDb) && levelDb > -140;
     if (finite) this.floor ??= Math.min(levelDb, -55);
-    const threshold = Math.max(-65, (this.floor ?? -80) + 12);
+    // Detect contrast against the room, not an absolute microphone volume.
+    // A fixed cutoff misses clear speech on devices with lower input gain.
+    const threshold = (this.floor ?? -80) + 12;
     const voiced = finite && levelDb > threshold;
     if (voiced) {
       this.startedAt ??= now;

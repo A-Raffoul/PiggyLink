@@ -76,6 +76,23 @@ describe("speech-aware channel wait", () => {
     } finally { await engine.stop(); }
   });
 
+  it("hands a quieter restaurant greeting to recognition instead of leaving the caller listening", async () => {
+    const feed = audioHarness();
+    const onSpeech = vi.fn();
+    const engine = await startAcousticEngine({
+      preset: getFrequencyPreset("18000"), canvas: {} as HTMLCanvasElement,
+      onData: vi.fn(), onBusyChange: vi.fn(), onSpeech, canListenForSpeech: () => true,
+    });
+    try {
+      await feed(-100, 1_000);
+      // A nearby speaker can be quiet at the microphone while still standing
+      // 28 dB above the measured room floor. No encoded opening is present.
+      await feed(-72, 1_200);
+      await feed(-100, 1_100);
+      expect(onSpeech, "The personal assistant must begin transcribing the greeting").toHaveBeenCalledOnce();
+    } finally { await engine.stop(); }
+  });
+
   it("waits through a spoken reply before its carrier without enabling transcription", async () => {
     const feed = audioHarness();
     const onSpeech = vi.fn();

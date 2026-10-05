@@ -16,6 +16,18 @@ function harness() {
 }
 
 describe("ordinary speech detection", () => {
+  it.each([
+    [-100, -60],
+    [-100, -72],
+    [-115, -86],
+  ])("recognizes speech above room noise at microphone levels %i / %i dB", (room, voice) => {
+    const { windows, feed } = harness();
+    feed(room, 1_000);
+    feed(voice, 1_200);
+    feed(room, 1_100);
+    expect(windows).toHaveLength(1);
+  });
+
   it("emits one utterance after a pause without requiring a modem packet", () => {
     const { detector, windows, feed } = harness();
     feed(-85, 600);

@@ -18,6 +18,8 @@ manual spoken and encoded messages.
 and passes the recent recording to the existing transcription API. It requires
 250 ms of voiced activity, keeps 200 ms of pre-roll, and caps a segment at 20 s.
 This is an energy detector, not a trained voice detector.
+Its threshold follows the measured room level plus 12 dB. It has no fixed
+microphone-volume cutoff: clear speech can have low absolute input gain.
 
 Local playback, detected carrier activity, decoding, and reply preparation
 suppress recognition. A 700 ms tail reduces playback echoes. The engine senses
@@ -49,6 +51,10 @@ missed spoken acceptance. Stop cancels pending work for the session.
   interpretations, repeated greetings, microphone utterance detection, and timers.
 - Measured transcription took about 0.5–0.8 seconds per opening line, excluding
   the detector's silence window. Provider and network timing varies.
+- A regression test exercises the browser audio engine's handoff to recognition
+  with a quieter greeting above the room floor. The previous fixed −65 dB cutoff
+  discarded it, leaving the personal assistant listening indefinitely. Low-gain
+  speech, normal-gain speech, steady noise, clicks, and suppression are covered.
 - Physical speaker-to-microphone timing and recognition still need a two-device
   test. The loopback check used provider-generated audio, not a room recording.
 - Speech during playback or reply preparation is ignored; barge-in is not

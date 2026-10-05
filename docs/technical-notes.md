@@ -251,3 +251,14 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 - These checks used only public fictional demo data. The audio check was a
   provider loopback, not a physical speaker/microphone test. Phone-and-laptop
   room pickup, echoes, and pause timing still need verification on the devices.
+
+### Quieter microphone regression
+
+The personal assistant could stay on Listening because the speech detector
+required an absolute speech-band level above −65 dB. A greeting at −72 dB was
+discarded even with a measured room floor of −100 dB. The microphone-engine
+regression reproduced zero calls to recognition; raising only the greeting to
+−60 dB passed. Removing the fixed cutoff while keeping the 12 dB margin above
+the learned noise floor makes the original regression pass. Tests now include
+lower microphone gain, in addition to the prior louder audio and provider-only
+voice loopbacks. Real-device confirmation is still needed.
