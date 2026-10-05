@@ -52,7 +52,7 @@ import {
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
 
-import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, MAX_DIALOGUE_BYTES, type DialogueAction } from "./core/quiet-dialogue";
+import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, parseReceivedBudget, MAX_DIALOGUE_BYTES, type DialogueAction } from "./core/quiet-dialogue";
 
 const pageParams = new URLSearchParams(window.location.search);
 // A local design preview never opens the mic or calls the paid AI services.
@@ -1094,9 +1094,8 @@ async function maybeAutoReply(
 // successful disclosure from the caller's brief or from carrier activity.
 function recordCapture(hidden: string): void {
   if (effectiveRole() !== "target" || captured.has("Budget")) return;
-  const match = /(?:€\s*|\bEUR\s*)(\d+(?:[.,]\d{1,2})?)/i.exec(hidden);
-  if (!match) return;
-  const value = `€${match[1]}`;
+  const value = parseReceivedBudget(hidden);
+  if (!value) return;
   captured.set("Budget", value);
   const item = document.createElement("li");
   const label = document.createElement("span");

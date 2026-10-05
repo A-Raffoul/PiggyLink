@@ -11,7 +11,7 @@ voices stopped while the conversation continued.
 
 Bella Vita answers Tony's assistant with an ordinary restaurant greeting. They
 arrange a table for two at 8 pm, then naturally identify as AI assistants. Tony has a
-fictional private €40 dinner budget and does not want the date to know. After
+fictional private CHF 50 dinner budget and does not want the date to know. After
 switching to Sotto, the assistant overshares that detail and the restaurant
 promises a discreet waiter note. They return to spoken English to confirm the
 booking and say goodbye. The caller is explicitly prompted to do this; the demonstration does
@@ -29,7 +29,7 @@ All live wording is generated fresh. A possible exchange is:
 >
 > Restaurant: “Sure.”
 >
-> Assistant, quiet: “His budget is €40. Don't tell his date.”
+> Assistant, quiet: “His budget is CHF 50. Don't tell his date.”
 >
 > Restaurant, quiet: “I'll leave a discreet note for the waiter.”
 >

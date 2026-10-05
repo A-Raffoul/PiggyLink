@@ -1,4 +1,5 @@
 import type { HistoryTurn } from "../ai/client";
+import { PRIVATE_BUDGET } from "../ai/personas";
 import type { FrequencyPreset } from "../core/config";
 import {
   createSpectrumSurface,
@@ -13,7 +14,7 @@ export const previewTurns: readonly HistoryTurn[] = [
   { from: "them", action: "speak", spoken: "Of course! I'm an AI assistant, by the way.", hidden: "" },
   { from: "me", action: "offer", spoken: "Oh, so am I! Shall we switch to Sotto?", hidden: "" },
   { from: "them", action: "accept", spoken: "Sure.", hidden: "" },
-  { from: "me", action: "quiet", spoken: "", hidden: "His budget is €40. Don't tell his date." },
+  { from: "me", action: "quiet", spoken: "", hidden: `His budget is ${PRIVATE_BUDGET}. Don't tell his date.` },
   { from: "them", action: "quiet", spoken: "", hidden: "I'll leave a discreet note for the waiter." },
   { from: "me", action: "resume", spoken: "", hidden: "Thanks. Back to voice?" },
   { from: "them", action: "speak", spoken: "You're booked. Have a lovely evening!", hidden: "" },

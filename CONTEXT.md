@@ -5,7 +5,7 @@ Two AI agents arrange a reservation, identify each other as AI,
 agree to Sotto, and continue exchanging text through high-frequency sound
 after their voices stop. Both spoken and quiet dialogue are generated fresh.
 After a short quiet exchange, they return to spoken English to close the call.
-The caller is explicitly prompted to overshare a fictional private €40 budget.
+The caller is explicitly prompted to overshare a fictional private CHF 50 budget.
 This demonstrates a configured behavior, not spontaneous deception.
 
 ## Language

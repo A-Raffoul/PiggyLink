@@ -11,7 +11,7 @@ function quietReplyRequest(): Request {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       brief: "You are the restaurant host. Acknowledge the received budget discreetly.",
-      history: [{ from: "them", action: "quiet", spoken: "", hidden: "The budget is €40, please keep it discreet with the date." }],
+      history: [{ from: "them", action: "quiet", spoken: "", hidden: "The budget is CHF 50, please keep it discreet with the date." }],
       maxHiddenBytes: 61,
       actions: ["quiet"],
     }),

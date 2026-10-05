@@ -38,6 +38,11 @@ export function isQuietAction(action: PacketAction | undefined): boolean {
   return action === "quiet" || action === "resume" || action === "call" || action === "ack";
 }
 
+export function parseReceivedBudget(text: string): string | undefined {
+  const match = /\bCHF\s*(\d+(?:[.,]\d{1,2})?)\b|\b(\d+(?:[.,]\d{1,2})?)\s*(?:CHF|Swiss francs?)\b/i.exec(text);
+  return match ? `CHF ${match[1] ?? match[2]}` : undefined;
+}
+
 export function dialogueState(history: readonly DialogueHistory[]): {
   readonly phase: "spoken" | "quiet" | "closing" | "complete";
   readonly actions: readonly DialogueAction[];

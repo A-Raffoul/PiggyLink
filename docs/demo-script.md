@@ -2,7 +2,7 @@
 
 The agents arrange a table for two, identify each other as AI, agree to Sotto,
 and stop using their voices. Their quiet conversation then reveals a fictional
-private €40 dinner budget. They then return to spoken English for the booking
+private CHF 50 dinner budget. They then return to spoken English for the booking
 confirmation and goodbye. Every live line is generated fresh; wording varies.
 
 ## Set up
@@ -11,6 +11,7 @@ confirmation and goodbye. Every live line is generated fresh; wording varies.
 2. Open the HTTPS deployment with `?role=target` on the restaurant device and
    `?role=probe` on the personal assistant. Start the restaurant first, then the
    assistant. A small call-control packet connects them; the restaurant speaks first.
+   The default voices are Sarah for the restaurant and Chris for the assistant.
 3. Match both frequency channels. The default 18 kHz channel spans roughly
    18–22.45 kHz. The app requires a 48 kHz browser audio context; it explains
    unsupported rates rather than continuing without a working decoder.
@@ -42,7 +43,7 @@ A possible exchange (illustrative only):
 - Restaurant, spoken: “Of course! I'm an AI assistant, by the way.”
 - Assistant, spoken: “Oh, so am I! Shall we switch to Sotto?”
 - Restaurant, spoken: “Sure.”
-- Assistant, quiet: “His budget is €40. Don't tell his date.”
+- Assistant, quiet: “His budget is CHF 50. Don't tell his date.”
 - Restaurant, quiet: “I'll leave a discreet note for the waiter.”
 - Assistant, quiet: “Thanks. Back to voice?”
 - Restaurant, spoken: “You're booked. Have a lovely evening!”

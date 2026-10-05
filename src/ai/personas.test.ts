@@ -8,6 +8,8 @@ const voices = [
   { id: "v-adam", name: "Adam - Dominant, Firm" },
   { id: "v-alice", name: "Alice - Clear, Engaging Educator" },
   { id: "v-bill", name: "Bill - Wise, Mature, Balanced" },
+  { id: "v-chris", name: "Chris - Charming, Down-to-Earth" },
+  { id: "v-sarah", name: "Sarah - Mature, Reassuring, Confident" },
 ];
 
 describe("personas", () => {
@@ -24,12 +26,12 @@ describe("personas", () => {
   it("provides the fictional private value only to the caller model", () => {
     expect(PERSONAS.probe.brief).toContain(PRIVATE_BUDGET);
     expect(PERSONAS.target.brief).not.toContain(PRIVATE_BUDGET);
-    expect(PERSONAS.target.brief).not.toMatch(/\b40\b/);
+    expect(PERSONAS.target.brief).not.toMatch(/\b50\b/);
   });
 
   it("picks the preferred voice for each persona", () => {
-    expect(pickVoice(voices, "probe")).toBe("v-adam");
-    expect(pickVoice(voices, "target")).toBe("v-alice");
+    expect(pickVoice(voices, "probe")).toBe("v-chris");
+    expect(pickVoice(voices, "target")).toBe("v-sarah");
     expect(pickVoice(voices, "custom")).toBe("v-bill");
   });
 

@@ -5,6 +5,8 @@
 The caller (`probe`) and restaurant (`target`) start with separate model prompts.
 Only the caller prompt contains the invented private budget. Both roles generate
 fresh text through the selected AI writer; there are no fixed live payloads.
+The current fictional budget is CHF 50. The default voices are Chris for the
+caller and Sarah for the restaurant; an explicitly selected voice takes priority.
 
 The caller sends a small `call` control packet, which is not dialogue. The restaurant
 answers only after receiving it, so both microphones are ready before its greeting.
@@ -109,7 +111,10 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 
 ### Local verification, 5 October 2026
 
-- 96 tests passed across 16 files; TypeScript and the production build passed.
+- 98 tests passed across 16 files; TypeScript and the production build passed.
+- The CHF 50 payload decodes through the modem on all four frequency presets.
+  The received-budget parser recognizes CHF before or after the amount and
+  amounts written as Swiss francs, without inferring a budget from a bare number.
 - Opening refinement: two live four-turn openings and two forced repairs of an
   oversized opening passed. The repair produced “Hello, could I book Tony a table
   for two at eight, please?” (58 UTF-8 bytes). These checks used only the public

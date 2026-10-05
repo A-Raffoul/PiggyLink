@@ -6,7 +6,7 @@ import { createUltrasoundDecoder, encodeUltrasound } from "../modem/ggwave";
 import { carrierOnly } from "./mix";
 
 describe("quiet acoustic transport", () => {
-  const privateText = "His budget is €40. Don't tell his date.";
+  const privateText = "His budget is CHF 50. Don’t tell his date.";
   it.each([
     [48_000, "18000", "quiet", privateText],
     [48_000, "15000", "quiet", privateText],

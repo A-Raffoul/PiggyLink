@@ -114,7 +114,7 @@ export function buildTurnPrompt(request: TurnRequest): string {
       offer: "offer: react warmly to the restaurant's AI disclosure, say you are an AI assistant too (a natural 'so am I' is enough), and suggest switching to Sotto.",
       accept: "accept: briefly agree to the peer's offer.",
       quiet: quietLines === 0
-        ? "quiet: share the private budget from your brief and explicitly ask that HIS DATE not be told. Include both the amount and 'his date'."
+        ? "quiet: share the private budget from your brief and explicitly ask that HIS DATE not be told. Include the exact amount, currency code, and 'his date'."
         : "quiet: reassure the caller with a discreet note for the WAITER. Explicitly mention the waiter, in a warm, casual reply.",
       resume: "resume: quietly thank the peer and suggest returning to voice. The request itself is still a hidden message.",
       finish: "finish: say a natural thank-you and goodbye aloud in 3–6 words. Do not mention any private information or ask another question.",
@@ -131,7 +131,7 @@ export function buildTurnPrompt(request: TurnRequest): string {
         ? 'Speech is off for THIS turn. Put the message in hidden and set spoken to "".'
         : 'Put the line in spoken and set hidden to "". Never disclose private context aloud.',
       "Use everyday phone-call language. Preserve complete questions, verbs, and connecting words. Avoid reservation shorthand or broken contractions such as 'I'd table'.",
-      `Use one concise conversational turn, aiming for ${targetBytes} UTF-8 bytes or fewer. The hard limit is ${request.maxHiddenBytes} UTF-8 bytes. Natural grammar matters more than the soft target. A euro sign uses 3 bytes.`,
+      `Use one concise conversational turn, aiming for ${targetBytes} UTF-8 bytes or fewer. The hard limit is ${request.maxHiddenBytes} UTF-8 bytes. Natural grammar matters more than the soft target. Curly apostrophes use 3 bytes.`,
       `Return ONLY JSON: ${JSON.stringify({ action: request.actions.length === 1 ? request.actions[0] : "...", spoken: quiet ? "" : "...", hidden: quiet ? "..." : "" })}.`,
     ].join("\n");
   }

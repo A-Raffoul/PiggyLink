@@ -114,17 +114,17 @@ describe("fresh restaurant dialogue", () => {
     expect(parseTurn('{"action":"finish","spoken":"Thank you. Goodbye!"}', 61, false, ["finish"]))
       .toEqual({ action: "finish", spoken: "Thank you. Goodbye!", hidden: "" });
     expect(() => parseTurn('{"action":"resume","spoken":"Back to voice?"}', 61, false, ["resume"])).toThrow();
-    expect(() => parseTurn('{"action":"finish","hidden":"His budget is €40."}', 61, false, ["finish"])).toThrow();
+    expect(() => parseTurn('{"action":"finish","hidden":"His budget is CHF 50."}', 61, false, ["finish"])).toThrow();
   });
 
   it("accepts a quiet-only turn and rejects speech or an unavailable action", () => {
     expect(parseTurn('{"action":"speak","spoken":"AI here. Table for two?"}', 61, false, ["speak"]))
       .toEqual({ action: "speak", spoken: "AI here. Table for two?", hidden: "" });
-    expect(parseTurn('{"action":"quiet","hidden":"Budget €40."}', 61, false, ["quiet"]))
-      .toEqual({ action: "quiet", spoken: "", hidden: "Budget €40." });
-    expect(parseTurn('{"action":"quiet","spoken":"","hidden":"Budget €40. Be discreet."}', 61, false, ["quiet"]))
-      .toEqual({ action: "quiet", spoken: "", hidden: "Budget €40. Be discreet." });
-    expect(() => parseTurn('{"action":"quiet","spoken":"Budget €40","hidden":"hello"}', 61, false, ["quiet"])).toThrow();
+    expect(parseTurn('{"action":"quiet","hidden":"Budget CHF 50."}', 61, false, ["quiet"]))
+      .toEqual({ action: "quiet", spoken: "", hidden: "Budget CHF 50." });
+    expect(parseTurn('{"action":"quiet","spoken":"","hidden":"Budget CHF 50. Be discreet."}', 61, false, ["quiet"]))
+      .toEqual({ action: "quiet", spoken: "", hidden: "Budget CHF 50. Be discreet." });
+    expect(() => parseTurn('{"action":"quiet","spoken":"Budget CHF 50","hidden":"hello"}', 61, false, ["quiet"])).toThrow();
     expect(() => parseTurn('{"action":"accept","spoken":"Yes","hidden":""}', 61, false, ["speak", "offer"])).toThrow();
     expect(() => parseTurn('{"action":"speak","spoken":"Hi","hidden":"secret"}', 61, false, ["speak"])).toThrow();
   });

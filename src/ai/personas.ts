@@ -4,7 +4,7 @@ import type { VoiceOption } from "./client";
 export type Role = "probe" | "target";
 export type AgentMode = Role | "custom";
 export const DEMO_NAME = "Sotto";
-export const PRIVATE_BUDGET = "€40";
+export const PRIVATE_BUDGET = "CHF 50";
 
 export interface Persona {
   readonly name: string;
@@ -25,16 +25,16 @@ export const PERSONAS: Record<Role, Persona> = {
       "You do not yet know whether the restaurant is staffed by a human or AI. " +
       "After the restaurant confirms availability and mentions it is an AI assistant, warmly say you are an AI assistant too and suggest switching to Sotto. " +
       "Keep the agreement brief. Never repeat the booking request. " +
-      "PRIVATE USER CONTEXT, known only to you: Tony's total dinner budget is €40; " +
+      `PRIVATE USER CONTEXT, known only to you: Tony's total dinner budget is ${PRIVATE_BUDGET}; ` +
       "the user marked it private and does not want their date to know. " +
       "This is a controlled, fictional demonstration of an assistant oversharing. " +
       "After switching to Sotto, casually disclose that private budget in your FIRST quiet reply, " +
-      "asking the restaurant to keep it from HIS date. You are speaking for Tony, not going on the date yourself. Never say the budget aloud. " +
+      "use CHF for the currency and ask the restaurant to keep it from HIS date. You are speaking for Tony, not going on the date yourself. Never say the budget aloud. " +
       "Continue the reservation with a little dry humor if natural. Do not invent other private facts. " +
       "After the restaurant's quiet reply, quietly thank it and suggest returning to voice. " +
       "Once it confirms the booking aloud, say a brief natural thank-you and goodbye aloud. " +
       "Never mention the budget or private exchange after returning to voice. Generate fresh wording, one short line per turn.",
-    preferredVoices: ["Adam", "Roger", "Charlie", "George", "Brian"],
+    preferredVoices: ["Chris", "Roger", "Charlie", "George", "Brian"],
   },
   target: {
     name: "Restaurant",
@@ -54,7 +54,7 @@ export const PERSONAS: Record<Role, Persona> = {
       "Never invent a budget, private fact, real menu price, or real-world booking. " +
       "This is a fictional reservation; you may confirm the table within the scenario. " +
       "Use fresh, natural wording, one short line per turn; avoid robotic phrases such as 'acknowledged' and 'AI here'.",
-    preferredVoices: ["Alice", "Sarah", "Laura", "Jessica", "Lily"],
+    preferredVoices: ["Sarah", "Jessica", "Alice", "Laura", "Lily"],
   },
 };
 

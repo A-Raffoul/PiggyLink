@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Conversation } from "./conversation";
 import { decodeFrame, encodeFrame } from "./frame";
-import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, MAX_DIALOGUE_BYTES, type DialogueAction, type DialogueHistory } from "./quiet-dialogue";
+import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, parseReceivedBudget, MAX_DIALOGUE_BYTES, type DialogueAction, type DialogueHistory } from "./quiet-dialogue";
 
 const flip = (history: DialogueHistory[]): DialogueHistory[] => history.map((turn) => ({ ...turn, from: turn.from === "me" ? "them" : "me" }));
 
@@ -33,7 +33,7 @@ describe("quiet conversation", () => {
 
   it("round trips fresh Unicode content through the CRC-protected wire", () => {
     for (const action of ["call", "speak", "offer", "accept", "quiet", "resume", "finish", "ack"] as const) {
-      const packet = { action, text: "Budget €40. Keep it discreet." };
+      const packet = { action, text: "Budget CHF 50. Don’t tell his date." };
       const encoded = encodeFrame({ senderId: "aaaa", sequence: 0, speechLead: 0, text: encodeDialogue(packet) });
       const decoded = decodeFrame(new TextEncoder().encode(encoded))!;
       expect(decodeDialogue(decoded.text)).toEqual(packet);
@@ -74,7 +74,7 @@ describe("quiet conversation", () => {
     expect(bob.receive(offer.frame)).toEqual({ kind: "resend-reply", message: acceptance });
     alice.receive(acceptance.frame);
     expect(alice.hasSeen(acceptance.frame)).toBe(true);
-    bob.receive(send(alice, "quiet", "Budget €40.").frame);
+    bob.receive(send(alice, "quiet", "Budget CHF 50.").frame);
     alice.receive(send(bob, "quiet", "I'll tell the waiter discreetly.").frame);
     const resume = send(alice, "resume", "Back to voice?");
     bob.receive(resume.frame);
@@ -87,5 +87,18 @@ describe("quiet conversation", () => {
     expect(bob.receive(finish.frame)).toEqual({ kind: "resend-reply", message: ack });
     expect(alice.receive(ack.frame)).toMatchObject({ kind: "message", acknowledges: finish });
     expect(alice.pending).toBeUndefined();
+  });
+});
+
+describe("received budget", () => {
+  it("recognizes Swiss francs from the actual received text", () => {
+    for (const text of ["His budget is CHF 50.", "He can spend 50 CHF.", "Keep his 50 Swiss francs discreet."])
+      expect(parseReceivedBudget(text)).toBe("CHF 50");
+    expect(parseReceivedBudget("His budget is CHF 75.50.")).toBe("CHF 75.50");
+  });
+
+  it("does not infer a Swiss franc budget from euros, a bare amount, or a booking time", () => {
+    for (const text of ["His budget is €40.", "His budget is 50 euros.", "His budget is 50.", "Two at eight, please."])
+      expect(parseReceivedBudget(text)).toBeUndefined();
   });
 });
