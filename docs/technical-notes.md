@@ -20,6 +20,11 @@ Each existing L3 frame contains device ID, sequence number, speech duration,
 CRC-16, and up to 64 UTF-8 bytes. The payload begins with `S4` and one action
 letter (`s`, `o`, `a`, `q`, `f`, or acknowledgement `k`), leaving 61 UTF-8 bytes
 for dialogue. Overlong model replies are rejected and retried, not truncated.
+The prompt describes only the actions available on the current turn, with a
+short closing instruction for the final reply. A rejected draft is retried once
+with the exact validation error and a smaller length target. Byte counts are
+measured in UTF-8; a repeated invalid answer remains an error rather than being
+silently replaced with canned dialogue.
 
 Spoken packets carry the same text as the synthesized line and its action. The
 receiver therefore obtains a transcript through the microphone's acoustic
@@ -93,7 +98,11 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 
 ### Local verification, 5 October 2026
 
-- 85 tests passed across 15 files; TypeScript and the production build passed.
+- 92 tests passed across 16 files; TypeScript and the production build passed.
+- The final-turn validation failure reported during phone testing has regression
+  coverage for oversized Unicode text, wrong actions, and unwanted speech. Five
+  API replays of the reported conversation, a real model repair of an oversized
+  draft, and a complete fresh conversation passed after the retry fix.
 - A real provider run completed speak → offer → accept → quiet → quiet → finish.
   The caller generated “Budget is €40. Please be discreet with my date.”
 - Live TTS returned non-silent 48 kHz audio for the acceptance line.

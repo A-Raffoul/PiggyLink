@@ -101,6 +101,13 @@ describe("turn parsing", () => {
 });
 
 describe("fresh restaurant dialogue", () => {
+  it("prompts a final quiet turn with its exact response shape and a short closing task", () => {
+    const prompt = buildTurnPrompt({ writer: "elevenlabs", brief: "Restaurant host", history: [], maxHiddenBytes: 61, actions: ["finish"] });
+    expect(prompt).toContain('Return ONLY JSON: {"action":"finish","spoken":"","hidden":"..."}');
+    expect(prompt).toContain("close in 3–6 words");
+    expect(prompt).not.toContain("speak: ordinary speech");
+  });
+
   it("accepts a quiet-only turn and rejects speech or an unavailable action", () => {
     expect(parseTurn('{"action":"speak","spoken":"AI here. Table for two?"}', 61, false, ["speak"]))
       .toEqual({ action: "speak", spoken: "AI here. Table for two?", hidden: "" });

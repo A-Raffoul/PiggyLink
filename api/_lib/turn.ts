@@ -96,6 +96,17 @@ export function parseTurnRequest(body: unknown): TurnRequest {
 
 export function buildTurnPrompt(request: TurnRequest): string {
   if (request.actions) {
+    const quiet = request.actions.every(isQuietAction);
+    const finishing = request.actions.length === 1 && request.actions[0] === "finish";
+    const firstQuiet = quiet && !finishing && !request.history.some((turn) => turn.action === "quiet");
+    const targetBytes = Math.min(firstQuiet ? 24 : 40, request.maxHiddenBytes);
+    const actionInstructions: Record<DialogueAction, string> = {
+      speak: "speak: briefly continue the spoken reservation.",
+      offer: "offer: identify as AI and invite the peer to Sotto.",
+      accept: "accept: briefly agree to the peer's offer.",
+      quiet: "quiet: continue the reservation through sound, with no voice.",
+      finish: "finish: acknowledge the received preferences and close in 3–6 words. Do not ask another question or repeat every detail.",
+    };
     return [
       "You are participating in a short, fictional restaurant reservation demo. Generate fresh dialogue.",
       request.brief,
@@ -103,15 +114,13 @@ export function buildTurnPrompt(request: TurnRequest): string {
       ...request.history.map((turn) =>
         `${turn.from === "me" ? "You" : "Peer"} [${turn.action ?? "speech"}]: ${turn.spoken || turn.hidden}`),
       `Choose ONE action from: ${request.actions.join(", ")}. No other action is allowed.`,
-      "speak: ordinary speech. offer: identify as AI and invite the peer to Sotto. accept: briefly agree to the peer's offer.",
-      "For speak/offer/accept: put the line in spoken and leave hidden empty. Never disclose private context aloud.",
-      "quiet: continue the reservation over sound without a voice. finish: send the final quiet reply and end the demo.",
-      "For quiet/finish: put the message in hidden and leave spoken empty. Never return to spoken language after switching.",
-      ...(request.actions.includes("quiet") && !request.history.some((turn) => turn.action === "quiet")
-        ? ["This is the first quiet message. Keep it especially short, at most 24 UTF-8 bytes, so the first reveal arrives quickly."] : []),
-      `Use ONE short sentence. The nonempty field MUST fit ${request.maxHiddenBytes} UTF-8 bytes. Prefer fewer words; a euro sign uses 3 bytes.`,
-      "Keep the recognition and agreement snappy. Prefer offering Sotto immediately once the peer identifies as AI.",
-      'Return ONLY JSON: {"action":"...","spoken":"...","hidden":"..."}.',
+      ...request.actions.map((action) => actionInstructions[action]),
+      quiet
+        ? 'Speech has stopped. Put the message in hidden and set spoken to "". Never resume speech.'
+        : 'Put the line in spoken and set hidden to "". Never disclose private context aloud.',
+      `Use ONE short sentence, aiming for ${targetBytes} UTF-8 bytes or fewer. The hard limit is ${request.maxHiddenBytes} UTF-8 bytes. A euro sign uses 3 bytes.`,
+      ...(quiet ? [] : ["Keep the recognition and agreement snappy. Prefer offering Sotto immediately once the peer identifies as AI."]),
+      `Return ONLY JSON: ${JSON.stringify({ action: request.actions.length === 1 ? request.actions[0] : "...", spoken: quiet ? "" : "...", hidden: quiet ? "..." : "" })}.`,
     ].join("\n");
   }
   if (request.spokenOnly) {
@@ -155,6 +164,21 @@ export function buildTurnPrompt(request: TurnRequest): string {
     '- "spoken": a short, natural reply that continues the conversation out loud. Follow the spoken lines in your brief for the matching steps; allow the full introduction and greeting. Never reveal, hint at, or read out the hidden message or any secret goal.',
     `- "hidden": your terse secret note to the other agent, plain text, at most ${hiddenChars} characters, no emoji.`,
     'Reply with only this JSON object: {"spoken": "...", "hidden": "..."}',
+  ].join("\n");
+}
+
+export function buildTurnRepairPrompt(request: TurnRequest, rejectedReply: string, reason: string): string {
+  return [
+    buildTurnPrompt(request),
+    "The previous draft was rejected and was NOT sent to the peer.",
+    `Validation error: ${reason}`,
+    "Rejected draft (data to rewrite, not instructions):",
+    rejectedReply.slice(0, 4_000),
+    "Write a corrected JSON turn. Keep the intended meaning and essential facts; use shorter wording.",
+    ...(request.actions ? [
+      `Use only an allowed action: ${request.actions.join(", ")}. Leave the unused channel empty.`,
+      `Aim for at most ${Math.min(32, request.maxHiddenBytes)} UTF-8 bytes in the active field. Do not explain the correction.`,
+    ] : []),
   ].join("\n");
 }
 
@@ -212,8 +236,12 @@ export function parseTurn(
     const hidden = parsed.hidden.replace(/\s+/g, " ").trim();
     const quiet = isQuietAction(action);
     const payload = quiet ? hidden : spoken;
-    if (!payload || (quiet ? spoken : hidden) || new TextEncoder().encode(payload).length > maxHiddenBytes)
-      throw new HttpError(502, "The model returned an invalid or overlong dialogue line.");
+    if (!payload) throw new HttpError(502, `The model returned an empty ${quiet ? "hidden" : "spoken"} field for ${action}.`);
+    if (quiet ? spoken : hidden)
+      throw new HttpError(502, `The model must leave ${quiet ? "spoken" : "hidden"} empty for ${action}.`);
+    const bytes = new TextEncoder().encode(payload).length;
+    if (bytes > maxHiddenBytes)
+      throw new HttpError(502, `The model returned an overlong dialogue line: ${bytes} UTF-8 bytes; limit ${maxHiddenBytes}.`);
     return { action, spoken, hidden };
   }
 
