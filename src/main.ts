@@ -53,7 +53,7 @@ import {
 import { isWavFile } from "./core/wav";
 import { encodeUltrasound } from "./modem/ggwave";
 
-import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, parseReceivedBudget, MAX_DIALOGUE_BYTES, type DialogueAction } from "./core/quiet-dialogue";
+import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, isGreetingReplay, parseReceivedBudget, MAX_DIALOGUE_BYTES, type DialogueAction } from "./core/quiet-dialogue";
 
 const pageParams = new URLSearchParams(window.location.search);
 // A local design preview never opens the mic or calls the paid AI services.
@@ -188,10 +188,17 @@ interface ThreadTurn {
   readonly from: "me" | "them";
   spoken: string;
   readonly hidden: string;
-  readonly action?: DialogueAction;
+  action?: DialogueAction;
+  readonly transport?: "speech" | "packet";
   delivery?: Delivery;
   spokenFallback?: string;
   transcript?: Promise<void>;
+}
+
+interface SpokenTurn {
+  readonly record: ThreadTurn;
+  readonly parts: BubbleParts;
+  readonly audio: Float32Array;
 }
 
 let session: Session | undefined;
@@ -211,6 +218,8 @@ let autoTurnsUsed = 0;
 const autoReplies = new AutoReplyGate();
 const greetingWatchdog = new GreetingWatchdog();
 const transmissions = new WeakMap<OutgoingTurn, Promise<void>>();
+let lastSpokenTurn: SpokenTurn | undefined;
+let speechReplay: Promise<void> | undefined;
 let voices: VoiceOption[] = [];
 let hasStarted = false;
 let detailsVisible = false;
@@ -371,7 +380,7 @@ function refreshAgent(): void {
   const targetOption = agentSelect.querySelector<HTMLOptionElement>('option[value="target"]');
   if (targetOption) targetOption.textContent = scenario.peer;
   startGuide.textContent = mode === "target"
-    ? "Start both devices around the same time. The restaurant speaks first and repeats its greeting if needed."
+    ? "Start both devices around the same time. The restaurant speaks first. You can also speak to it yourself after the greeting."
     : mode === "probe"
       ? "Open the other-device link nearby and start both devices around the same time. Your assistant listens for the restaurant."
       : mode === "custom"
@@ -494,6 +503,7 @@ interface BubbleParts {
 function directionLabel(turn: ThreadTurn): string {
   return turn.from === "me"
     ? `↑ This device · ${turn.delivery ?? "queued"}`
+    : turn.transport === "speech" ? "↓ Voice · received"
     : turn.hidden || turn.action
       ? "↓ Other device · received"
       : "↓ Voice · received";
@@ -735,7 +745,8 @@ function render(): void {
   spectrumBand.hidden = !quiet && !encodedToggle.checked;
   chatPanel.dataset.speaking = String(activity === "transmitting" || hearing);
   clearButton.disabled = busy || history.length === 0;
-  waitingBar.hidden = !conversation?.pending || decodeDialogue(conversation.pending.frame.text)?.action === "ack";
+  const waitingForSpeech = !!lastSpokenTurn && history.at(-1) === lastSpokenTurn.record && conversation?.turn === "theirs";
+  waitingBar.hidden = !waitingForSpeech && (!conversation?.pending || decodeDialogue(conversation.pending.frame.text)?.action === "ack");
   resendButton.disabled = busy;
   autoCount.textContent = autoReplyInput.checked
     ? `${autoTurnsUsed}/${maxAutoTurns()}`
@@ -955,31 +966,19 @@ function transmit(turn: OutgoingTurn, shouldSend: () => boolean = () => true): P
 async function sendTurn(spoken: string, hidden: string, action?: DialogueAction): Promise<boolean> {
   const active = session;
   if (!active) return false;
+  if (action && !isQuietAction(action) && dialogueState(history).phase === "spoken")
+    return sendSpokenTurn(active, spoken, action);
   if (!hidden && !action) return sendSpokenTurn(active, spoken);
   try {
     const payload = action ? encodeDialogue({ action, text: spoken || hidden }) : hidden;
     const turn = await prepareTurn(active, spoken, payload, isQuietAction(action));
     if (session !== active) return false;
-    const record: ThreadTurn = { from: "me", spoken, hidden, action };
+    const record: ThreadTurn = { from: "me", spoken, hidden, action, transport: "packet" };
     history.push(record);
     outgoing.set(turn.message.frame.sequence, turn);
     const parts = appendBubble(record, "Preparing to send…");
     outgoingStatus.set(turn.message.frame.sequence, { turn: record, parts });
-    const greeting = agentMode() === "target" && action === "speak" && history.length === 1;
-    void transmit(turn).then(() => {
-      if (!greeting) return;
-      const isPending = (): boolean => session === active && autoReplyInput.checked &&
-        history.length === 1 && active.conversation.pending === turn.message && record.delivery !== "failed";
-      if (!isPending()) return;
-      greetingWatchdog.start({
-        isPending,
-        replay: (pending) => transmit(turn, pending),
-        onExhausted: () => appendNotice(
-          "No reply yet. Check that the other device is started nearby on the same channel, then use Resend in Advanced controls.",
-          "error",
-        ),
-      });
-    });
+    void transmit(turn);
     return true;
   } catch (error) {
     if (session === active) {
@@ -996,6 +995,7 @@ async function sendTurn(spoken: string, hidden: string, action?: DialogueAction)
 async function sendSpokenTurn(
   active: Session,
   spoken: string,
+  action?: DialogueAction,
 ): Promise<boolean> {
   let record: ThreadTurn | undefined;
   let parts: BubbleParts | undefined;
@@ -1007,15 +1007,19 @@ async function sendSpokenTurn(
     await active.engine.waitForClearChannel(() => session !== active);
     if (session !== active) return false;
     active.conversation.sendSpeech();
-    record = { from: "me", spoken, hidden: "", delivery: "sending" };
+    record = { from: "me", spoken, hidden: "", action, transport: "speech", delivery: "sending" };
     history.push(record);
     parts = appendBubble(record, "Speaking…");
+    const turn = { record, parts, audio };
+    lastSpokenTurn = turn;
     setActivity("transmitting");
     flashCurrentMessage(record);
     await active.engine.play([audio]);
     record.delivery = session === active ? "sent" : "stopped";
     parts.label.textContent = directionLabel(record);
+    parts.status.textContent = record.delivery === "sent" ? `Spoken ${timeNow()}` : "Stopped";
     if (currentTurn === record) renderCurrentMessage();
+    if (session === active) watchGreeting(active, turn);
     return session === active;
   } catch (error) {
     if (session !== active) return false;
@@ -1034,6 +1038,49 @@ async function sendSpokenTurn(
   } finally {
     if (session === active) setActivity("idle");
   }
+}
+
+function watchGreeting(active: Session, turn: SpokenTurn): void {
+  if (agentMode() !== "target" || turn.record.action !== "speak") return;
+  const isPending = (): boolean => session === active && autoReplyInput.checked &&
+    history.length === 1 && history[0] === turn.record && active.conversation.turn === "theirs" &&
+    turn.record.delivery === "sent";
+  if (!isPending()) return;
+  greetingWatchdog.start({
+    isPending,
+    // STT + the model + TTS took about four seconds in the voice-only check.
+    // Let that normal reply start before nudging the peer again.
+    delayMs: 5_000,
+    replay: (pending) => replaySpeech(active, turn, pending),
+    onExhausted: () => appendNotice("Still listening. Speak after the greeting, or start the personal assistant on the other device."),
+  });
+}
+
+function replaySpeech(active: Session, turn: SpokenTurn, shouldSend: () => boolean): Promise<void> {
+  if (speechReplay) return speechReplay;
+  const run = async (): Promise<void> => {
+    // Stay available for speech recognition while waiting: a spoken response
+    // cancels this replay even before its transcription request finishes.
+    await active.engine.waitForClearChannel(() => session !== active || !shouldSend());
+    if (session !== active || !shouldSend() || activity !== "idle") return;
+    try {
+      setActivity("transmitting");
+      turn.record.delivery = "sending";
+      turn.parts.label.textContent = directionLabel(turn.record);
+      flashCurrentMessage(turn.record);
+      await active.engine.play([turn.audio]);
+      turn.record.delivery = session === active ? "sent" : "stopped";
+      turn.parts.label.textContent = directionLabel(turn.record);
+    } catch (error) {
+      turn.record.delivery = "failed";
+      if (session === active) appendNotice(errorText(error, "Could not repeat the greeting."), "error");
+    } finally {
+      if (session === active) setActivity("idle");
+    }
+  };
+  const pending = run().finally(() => { if (speechReplay === pending) speechReplay = undefined; });
+  speechReplay = pending;
+  return pending;
 }
 
 async function sendManual(): Promise<void> {
@@ -1074,12 +1121,15 @@ async function agentTurn(): Promise<void> {
         ({ from, spoken, hidden, action }): HistoryTurn => ({ from, spoken, hidden, action }),
       ),
       maxHiddenBytes: MAX_DIALOGUE_BYTES,
-      actions: state.actions,
     };
     const turn = await writeAgentTurn(request);
     if (session !== active) return;
-    if (!turn.action || !state.actions.includes(turn.action))
+    const latest = history.at(-1);
+    const classified = turn.heardAction && latest
+      ? [...history.slice(0, -1), { ...latest, action: turn.heardAction }] : history;
+    if (!turn.action || !dialogueState(classified).actions.includes(turn.action))
       throw new Error("The agent returned an invalid mode switch.");
+    if (turn.heardAction && latest) latest.action = turn.heardAction;
     await sendTurn(turn.spoken, turn.hidden, turn.action);
   } catch (error) {
     if (session !== active) return;
@@ -1184,9 +1234,16 @@ async function sendAcknowledgement(active: Session): Promise<void> {
 }
 
 function resend(): void {
+  const active = session;
   const pending = session?.conversation.pending;
   const turn = pending && outgoing.get(pending.frame.sequence);
-  if (!turn || activity !== "idle") return;
+  if (activity !== "idle") return;
+  if (!turn) {
+    const spoken = lastSpokenTurn;
+    if (active && spoken && history.at(-1) === spoken.record)
+      void replaySpeech(active, spoken, () => active.conversation.turn === "theirs" && history.at(-1) === spoken.record);
+    return;
+  }
   setBubbleStatus(turn.message, "Resending…", undefined, "queued");
   void transmit(turn, () => session?.conversation.pending === turn.message);
 }
@@ -1198,6 +1255,8 @@ function handleData(bytes: Uint8Array): void {
   if (!frame) return;
   const packet = decodeDialogue(frame.text);
   if (agentMode() !== "custom" && !packet) return;
+  // English is the only transport before a spoken agreement to switch.
+  if (agentMode() !== "custom" && dialogueState(history).phase === "spoken") return;
   if (packet && agentMode() !== "custom" && frame.senderId !== active.conversation.deviceId &&
     !active.conversation.hasSeen(frame)) {
     if (packet.action === "ack") {
@@ -1220,7 +1279,7 @@ function handleData(bytes: Uint8Array): void {
     }
     const quiet = isQuietAction(packet?.action);
     const record: ThreadTurn = packet
-      ? { from: "them", action: packet.action, spoken: quiet ? "" : packet.text, hidden: quiet ? packet.text : "", delivery: "received" }
+      ? { from: "them", action: packet.action, spoken: quiet ? "" : packet.text, hidden: quiet ? packet.text : "", transport: "packet", delivery: "received" }
       : { from: "them", spoken: "", hidden: frame.text, delivery: "received" };
     history.push(record);
     establishLink();
@@ -1257,6 +1316,8 @@ async function handleSpeech(samples: Float32Array): Promise<void> {
   if (!active || speechTranscribing || activity !== "idle" || dialogueState(history).phase !== "spoken") return;
   const receivedVersion = encodedReceiveVersion;
   let received: ThreadTurn | undefined;
+  let repeat: SpokenTurn | undefined;
+  greetingWatchdog.cancel();
   speechTranscribing = true;
   setActivity("transcribing");
   try {
@@ -1279,7 +1340,13 @@ async function handleSpeech(samples: Float32Array): Promise<void> {
       !text
     )
       return;
-    received = { from: "them", spoken: text, hidden: "", delivery: "received" };
+    // A replayed first greeting should replay the cached introduction, not
+    // create an extra dialogue turn or model request.
+    if (agentMode() === "probe" && lastSpokenTurn?.record === history[1] && isGreetingReplay(history, text)) {
+      repeat = lastSpokenTurn;
+      return;
+    }
+    received = { from: "them", spoken: text, hidden: "", transport: "speech", delivery: "received" };
     active.conversation.receiveSpeech();
     history.push(received);
     appendBubble(received, `${timeNow()} · speech`);
@@ -1295,7 +1362,9 @@ async function handleSpeech(samples: Float32Array): Promise<void> {
       setActivity("idle");
       const latest =
         receivedVersion !== encodedReceiveVersion ? history.at(-1) : received;
-      if (latest?.from === "them") void maybeAutoReply(active, latest);
+      if (repeat) void replaySpeech(active, repeat, () => active.conversation.turn === "theirs");
+      else if (latest?.from === "them") void maybeAutoReply(active, latest);
+      else if (lastSpokenTurn) watchGreeting(active, lastSpokenTurn);
     }
   }
 }
@@ -1310,7 +1379,8 @@ async function startEngine(): Promise<boolean> {
       canvas: spectrumCanvas,
       onData: handleData,
       onSpeech: (samples) => void handleSpeech(samples),
-      canListenForSpeech: () => agentMode() === "custom" && activity === "idle" && !speechTranscribing,
+      canListenForSpeech: () => !!session && activity === "idle" && !speechTranscribing &&
+        dialogueState(history).phase === "spoken",
       onBusyChange(busy) {
         hearing = busy;
         render();
@@ -1352,6 +1422,8 @@ const ensureJoined = (): Promise<boolean> => join();
 
 function clearConversationView(): void {
   greetingWatchdog.cancel();
+  lastSpokenTurn = undefined;
+  speechReplay = undefined;
   detailsVisible = false;
   history = [];
   currentTurn = undefined;

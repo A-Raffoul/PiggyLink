@@ -25,17 +25,23 @@ role prompt. Internal role: `target`.
 The backend builds the prompt from these fields. The setup link contains only
 the public scenario and other-device role; profiles are never put in URLs.
 
-**Spoken phase**: the opening conversation, with synthesized speech and a
-compact acoustic packet carrying its transcript and action. Start both devices
-around the same time: the restaurant generates its greeting on Start, without a
-separate ultrasound handshake. A watchdog replays the cached greeting about two
-seconds after playback if no reply arrives, up to three times. It stops on a
-received reply, Stop, or reset. After the greeting, the caller identifies itself as an AI
+**Spoken phase**: the opening conversation uses synthesized English and speech
+recognition, with no ultrasound overlay or handshake. Start both devices around
+the same time: the restaurant generates its greeting on Start. A watchdog replays
+the cached speech about five seconds after playback if no reply arrives, up to
+three times. This leaves time for recognition and reply preparation. Hearing a
+response, Stop, or reset cancels the retry. After the greeting, the caller identifies itself as an AI
 agent acting on the visitor's behalf and makes the request. The other agent
 acknowledges it is AI too, then the caller offers PiggyLink.
 
-**Switch**: an explicit offer followed by acceptance, carried through the
-acoustic protocol. Both agents then stop generating speech.
+**Switch**: an explicit spoken offer followed by spoken acceptance. The model
+classifies the latest transcript and generates its next turn in one request.
+Only then may the first ultrasound packet carry the private aside.
+
+**Human fallback**: human speech is not part of the planned demo, which retains
+its ten-turn flow. If someone speaks during the listening parts of the opening,
+the agent answers briefly in English. A question or refusal does not authorize
+quiet mode. Speech while playing or preparing a reply is currently ignored.
 
 **Quiet phase**: short messages sent using the modem waveform alone, without
 speech or cover audio. The caller shares the budget, the restaurant promises a
@@ -64,7 +70,7 @@ directly on the landing page alongside Personal assistant and Restaurant.
 **Reply latency**: AI generation, voice generation, and channel clearance all
 contribute. Flash is the default voice model. Warm servers reuse the provider's
 authentication token for ten minutes, with a new conversation for each turn.
-Automatic replies begin immediately after receipt; a per-turn gate prevents
+Automatic replies begin after speech recognition or packet receipt; a per-turn gate prevents
 duplicate preparation. Listen-before-talk and collision backoff remain active.
 
 **Live spectrum**: microphone energy across frequency. The decorative landing

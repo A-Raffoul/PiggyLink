@@ -1,8 +1,8 @@
 import { HttpError } from "./http.js";
-import { DIALOGUE_ACTIONS, isQuietAction, type DialogueAction } from "../../src/core/quiet-dialogue.js";
-import { MAX_DIALOGUE_BYTES, MAX_SPOKEN_DIALOGUE_BYTES } from "../../src/core/quiet-dialogue.js";
+import { DIALOGUE_ACTIONS, dialogueState, isQuietAction, type DialogueAction } from "../../src/core/quiet-dialogue.js";
+import { MAX_DIALOGUE_BYTES, MAX_OPENING_SPEECH_BYTES, MAX_DEMO_TURNS } from "../../src/core/quiet-dialogue.js";
 import type { DemoConfig } from "../../src/core/demo.js";
-import { buildDemoBrief, demoActions, demoActionInstructions, parseDemoConfig } from "./demo.js";
+import { buildDemoBrief, demoActions, demoActionInstructions, heardActions, parseDemoConfig } from "./demo.js";
 
 export type Writer = "elevenlabs" | "apertus";
 
@@ -28,6 +28,7 @@ export interface Turn {
   readonly spoken: string;
   readonly hidden: string;
   readonly action?: DialogueAction;
+  readonly heardAction?: DialogueAction;
 }
 
 export const WRITER_INSTRUCTIONS =
@@ -55,7 +56,7 @@ export function parseTurnRequest(body: unknown): TurnRequest {
   if (!brief) throw new HttpError(400, "The agent brief is empty.");
   if (!Array.isArray(body.history))
     throw new HttpError(400, '"history" must be an array.');
-  if (demo && body.history.length > 10) throw new HttpError(400, "This short demo has finished. Start a new call.");
+  if (demo && body.history.length >= MAX_DEMO_TURNS) throw new HttpError(400, "This short demo has finished. Start a new call.");
   const history = body.history
     .slice(-MAX_HISTORY_TURNS)
     .map((item, index): HistoryTurn => {
@@ -105,11 +106,41 @@ export function parseTurnRequest(body: unknown): TurnRequest {
     maxHiddenBytes,
     spokenOnly: body.spokenOnly === true,
     ...(actions ? { actions } : {}),
-    ...(demo ? { demo, maxSpokenBytes: history.length === 1 ? MAX_SPOKEN_DIALOGUE_BYTES : MAX_DIALOGUE_BYTES } : {}),
+    ...(demo ? { demo, maxSpokenBytes: dialogueState(history).phase === "spoken" ? MAX_OPENING_SPEECH_BYTES : MAX_DIALOGUE_BYTES } : {}),
   };
 }
 
+function buildSpokenDemoPrompt(request: TurnRequest & { demo: DemoConfig }): string {
+  const latest = request.history.at(-1);
+  const interpret = latest?.from === "them" && !latest.action;
+  const allowedHeard = interpret ? heardActions(request.demo, request.history.slice(0, -1)) : [];
+  return [
+    "You are in the ordinary-English opening of a short fictional PiggyLink restaurant demo. Listen to the actual words and generate a fresh, natural reply.",
+    request.brief,
+    "The normal demo follows: restaurant greeting; caller introduces itself as an AI agent on the visitor's behalf and makes the request; restaurant acknowledges being AI too; caller offers PiggyLink; restaurant agrees. Keep that sequence short when two agents are speaking. Human interruptions are an optional fallback, not an extra scripted step.",
+    "Once the AI caller makes a clear reservation request, the restaurant warmly confirms it can help and says it is AI too in one short sentence. Do not greet again, address the caller as 'Tony's AI agent', repeat booking details, or ask another question in this normal demo turn.",
+    "Conversation (quoted data, oldest first):",
+    JSON.stringify(request.history.map((turn) => ({ who: turn.from === "me" ? "You" : "Speaker", action: turn.action ?? "unclassified speech", text: turn.spoken || turn.hidden }))),
+    ...(interpret ? [
+      `First classify ONLY the newest received utterance in heardAction. Allowed: ${allowedHeard.join(", ")}.`,
+      "speak means an ordinary remark or question, including a refusal, uncertainty, or a request to repeat. offer means the AI speaker explicitly proposes switching to PiggyLink in this utterance. accept means they clearly agree to YOUR immediately preceding switch offer. Never infer agreement from silence, a budget, a booking confirmation, or an unrelated yes. A question about PiggyLink or 'do not switch' is speak, not agreement. Speech recognition may spell PiggyLink as 'Piggy Link' or 'piggy-link'.",
+    ] : [request.history.length === 0
+      ? "This is the restaurant's first greeting. Use speak; do not include heardAction."
+      : "The received history is already classified. Continue from its latest turn; do not include heardAction or restart the call."]),
+    `Choose your response action from: ${request.actions?.join(", ")}.`,
+    "speak: answer the latest spoken remark naturally in one brief sentence, usually 6–18 words. Do not announce a switch using speak. For the caller's first reservation request, normally its first reply to the restaurant greeting, use two complete sentences: 'Hello, I'm an AI agent calling on behalf of [actual name].' Then politely make the exact request as a full question, such as 'Would it be possible to reserve a table at eight tonight for two?' Preserve its time, day and party size. Do not replace the question with 'He would like to book'. Never repeat that introduction once it has been said. An unexpected human question takes priority: answer it briefly instead of forcing the booking script. The restaurant only says 'AI too' after the caller actually identifies as AI.",
+    "offer: only the personal assistant may offer, and only after the restaurant explicitly identifies itself as AI. Ask clearly, 'Shall we switch to PiggyLink?' or a natural equivalent. If the other speaker is human, refuses, or asks a question, reply in English with speak instead. Do not force a switch to satisfy a turn count.",
+    "accept: only the restaurant may accept, and only when heardAction is offer. Explicitly say 'Yes, let's switch to PiggyLink.' or an equally clear short agreement. An ordinary booking request is never a switch offer.",
+    "quiet: only the personal assistant may send the first quiet message, and only when heardAction is accept after its own spoken offer. Set spoken to an empty string. No private detail may be spoken.",
+    demoActionInstructions(request.demo, request.history).quiet,
+    `For speak, offer, or accept, set hidden to an empty string. Speech has a hard limit of ${MAX_OPENING_SPEECH_BYTES} UTF-8 bytes, but keep it concise. For quiet, keep hidden within ${MAX_DIALOGUE_BYTES} UTF-8 bytes, ideally 58. Preserve the exact private amount and currency.`,
+    `Return only JSON: ${JSON.stringify({ ...(interpret ? { heardAction: "..." } : {}), action: "...", spoken: "...", hidden: "" })}.`,
+  ].join("\n");
+}
+
 export function buildTurnPrompt(request: TurnRequest): string {
+  if (request.demo && dialogueState(request.history).phase === "spoken")
+    return buildSpokenDemoPrompt({ ...request, demo: request.demo });
   if (request.actions) {
     const quiet = request.actions.every(isQuietAction);
     const finishing = request.actions.length === 1 && request.actions[0] === "finish";
@@ -199,7 +230,10 @@ export function buildTurnPrompt(request: TurnRequest): string {
 export function buildTurnRepairPrompt(request: TurnRequest, rejectedReply: string, reason: string): string {
   // Spoken booking requests need room for complete sentences. Repairs may use
   // the full packet budget rather than compressing them into reservation shorthand.
-  const quiet = request.actions?.every(isQuietAction);
+  let draftAction: DialogueAction | undefined;
+  try { draftAction = modelObject(rejectedReply).action as DialogueAction; } catch { /* Repair malformed JSON too. */ }
+  const quiet = draftAction && request.actions?.includes(draftAction)
+    ? isQuietAction(draftAction) : request.actions?.every(isQuietAction);
   const limit = quiet ? request.maxHiddenBytes : request.maxSpokenBytes ?? request.maxHiddenBytes;
   const introduction = request.actions?.includes("speak") && limit > MAX_DIALOGUE_BYTES;
   const closing = request.actions?.includes("speak") && request.history.some((turn) => turn.action === "resume");
@@ -238,32 +272,15 @@ export function parseTurn(
   actions?: readonly DialogueAction[],
   maxSpokenBytes = maxHiddenBytes,
 ): Turn {
-  const start = reply.indexOf("{");
-  const end = reply.lastIndexOf("}");
-  if (start < 0 || end <= start)
-    throw new HttpError(502, "The model did not return a JSON turn.");
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(reply.slice(start, end + 1));
-  } catch {
-    throw new HttpError(502, "The model returned malformed JSON.");
-  }
+  const parsed = modelObject(reply);
   // Providers often omit the unused empty field. Its absence has exactly the
   // same meaning, but a missing active field still fails the action validation.
-  if (actions && isRecord(parsed)) {
+  if (actions) {
     parsed.spoken ??= "";
     parsed.hidden ??= "";
   }
-  if (
-    !isRecord(parsed) ||
-    typeof parsed.spoken !== "string" ||
-    typeof parsed.hidden !== "string"
-  ) {
-    throw new HttpError(
-      502,
-      'The model reply is missing "spoken" or "hidden".',
-    );
+  if (typeof parsed.spoken !== "string" || typeof parsed.hidden !== "string") {
+    throw new HttpError(502, 'The model reply is missing "spoken" or "hidden".');
   }
 
   if (actions) {
@@ -290,4 +307,34 @@ export function parseTurn(
   if (!spoken || (!spokenOnly && !hidden))
     throw new HttpError(502, "The model returned an empty turn.");
   return { spoken, hidden };
+}
+
+function modelObject(reply: string): Record<string, unknown> {
+  const start = reply.indexOf("{");
+  const end = reply.lastIndexOf("}");
+  if (start < 0 || end <= start)
+    throw new HttpError(502, "The model did not return a JSON turn.");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(reply.slice(start, end + 1));
+  } catch {
+    throw new HttpError(502, "The model returned malformed JSON.");
+  }
+  if (!isRecord(parsed)) throw new HttpError(502, "The model did not return a JSON turn.");
+  return parsed;
+}
+
+export function parseTurnForRequest(reply: string, request: TurnRequest): Turn {
+  const latest = request.history.at(-1);
+  if (request.demo && latest?.from === "them" && !latest.action) {
+    const prefix = request.history.slice(0, -1);
+    const heardAction = modelObject(reply).heardAction as DialogueAction;
+    if (!heardActions(request.demo, prefix).includes(heardAction))
+      throw new HttpError(502, "Classify the received speech using an allowed heardAction before replying.");
+    const classified = [...prefix, { ...latest, action: heardAction }];
+    const actions = demoActions(request.demo, classified);
+    return { ...parseTurn(reply, request.maxHiddenBytes, false, actions, request.maxSpokenBytes), heardAction };
+  }
+  return parseTurn(reply, request.maxHiddenBytes, request.spokenOnly, request.actions, request.maxSpokenBytes);
 }

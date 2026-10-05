@@ -13,15 +13,23 @@ caller and Sarah for the restaurant; an explicitly selected voice takes priority
 
 Setup links contain only the scenario and target role, never profile data.
 Start both devices around the same time. The restaurant generates and speaks its
-greeting on Start; there is no initial `call` packet or silent handshake. Its
-spoken greeting carries the first transcript packet. After playback, a two-second
-watchdog retries the same audio and packet if no reply has arrived, at most three
-times. Channel sensing checks voice activity as well as the modem band, without
-transcribing background speech; the caller's voice can precede its transcript
-overlay. Each retry waits for a clear channel and checks again for a reply before
+greeting on Start. The entire opening, offer, and acceptance use ordinary English,
+with no modem overlay or silent handshake. The other device detects an utterance
+and sends it to speech recognition. In one model request, the server classifies
+that transcript as `speak`, `offer`, or `accept` and generates the next reply.
+An acceptance is legal only after the caller's own offer; a question or refusal
+continues in English. The default demo keeps its ten turns. A human interruption
+is an optional fallback and gets a brief relevant reply, not a forced switch.
+
+After playback, a five-second watchdog retries the same greeting audio if no
+reply has arrived, at most three times. Recognition, model generation, and voice
+preparation need about four seconds in the measured opening, so a two-second
+retry would interrupt normal progress. Channel sensing checks voice activity as
+well as the modem band. Each retry waits for a clear channel and checks again before
 playing. The next timeout starts after playback ends. A received reply, Stop,
 reset, or disabling automatic replies cancels the watchdog. No extra model or TTS
-requests are made for replays, and repeated packets do not add dialogue turns.
+requests are made for replays. A repeated first greeting, ignoring STT punctuation
+and casing, replays the cached introduction without adding a dialogue turn.
 The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
 1. **Spoken:** restaurant greeting, caller's explicit introduction as an AI agent
@@ -36,11 +44,13 @@ The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
 Each existing L3 frame contains device ID, sequence number, speech duration,
 CRC-16, and up to 126 UTF-8 bytes of payload: its 14-byte header keeps the whole
-wire within ggwave's 140-byte variable-length limit. The payload begins with `S8`
+wire within ggwave's 140-byte variable-length limit. The payload begins with `S9`
 and one action letter (`s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`).
-The caller's first spoken request may use 123 UTF-8 bytes, so it can clearly
-identify itself and make a complete request. Other generated turns retain the
-61-byte limit, and manual messages retain their 64-byte limit. Overlong model
+Opening speech has no packet constraint; the API bounds it to 600 UTF-8 bytes and
+prompts for one short sentence, except the caller's full two-sentence introduction.
+The first modem sequence is used only for the first private message after spoken
+agreement. Quiet and closing turns retain the 61-byte generated-text limit, and
+manual encoded messages retain their 64-byte limit. Overlong model
 replies are rejected and retried, not truncated.
 The prompt describes only the actions available on the current turn, with a
 short closing instruction for the final reply. A rejected draft is retried once
@@ -51,16 +61,19 @@ instead of the shorter soft target. Byte counts are
 measured in UTF-8; a repeated invalid answer remains an error rather than being
 silently replaced with canned dialogue.
 
-Both devices must refresh to this version: `S7` required an initial call handshake,
+Both devices must refresh to this version: `S8` carried the opening transcript under speech,
 so mixed versions intentionally reject each other's packets.
 For profile-based calls, the backend validates alternating roles, history actions,
-channel fields, and byte lengths. It rejects extra requests after the ten-turn call.
+channel fields, and byte lengths. It rejects requests after the goodbye or at
+the 24-turn cap. Extra English replies are allowed for the human fallback; the
+regular two-agent demo still follows the same ten-turn conversation.
 
-Spoken packets carry the same text as the synthesized line and its action. The
-receiver therefore obtains a transcript through the microphone's acoustic
-channel without waiting for speech recognition. Each spoken turn's packet is mixed
-under its speech. Built-in demo roles do not use ordinary speech
-recognition; Custom chat retains that separate path.
+Only the closing spoken turns retain an embedded transcript packet after the
+quiet exchange, followed by the final acknowledgement. The English opening is
+transcribed, with the newest received transcript classified by the model when
+writing its reply. Speech recognition is disabled during quiet mode, local
+playback, and reply preparation; this does not implement barge-in. Custom chat
+retains ordinary speech recognition and manual message composition.
 
 Quiet packets play the complete modem waveform by itself, with independent peak
 level control (default −18 dBFS). There is no cover audio, speech synthesis, or
@@ -217,3 +230,24 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 - The hotel and gift presets are removed; the API rejects those scenario IDs.
   The restaurant profile and manual Custom chat remain available.
   Audibility and final responsive layout review remain unverified in this session.
+
+### Ordinary-English opening and optional human fallback
+
+- 141 tests pass, including the full ten-turn protocol with speech transcripts,
+  speech-only microphone detection, interpretation repair, refusal handling,
+  greeting replay, and the first modem sequence after agreement.
+- A live provider run completed all ten turns. Chris and Sarah's first five
+  synthesized lines were transcribed directly from their pure voice audio.
+  The recognized “Piggy Link” offer and acceptance correctly triggered the
+  first quiet message, followed by the waiter reply and normal spoken close.
+- Speech recognition took 537–787 ms across those five lines in that run.
+  The detector's 900 ms end-of-utterance pause is additional. The caller's first
+  reply generation took 2.21 s and voice preparation 397 ms; a five-second
+  greeting-retry window leaves room for this normal response.
+- Separate final prompt checks preserved the full “AI agent calling on behalf of
+  Tony” introduction and the “Would it be possible” question, with two people,
+  eight, and tonight intact. Human questions and refusals stayed in English,
+  and a protocol question was answered as communication through sound.
+- These checks used only public fictional demo data. The audio check was a
+  provider loopback, not a physical speaker/microphone test. Phone-and-laptop
+  room pickup, echoes, and pause timing still need verification on the devices.

@@ -29,7 +29,7 @@ Set `ELEVENLABS_API_KEY` in `.env.local` for dialogue and voices. The older
 devices. Choose **Personal assistant** and optionally edit
 the example profile. Open its other-device link on the second device and start
 both around the same time. The restaurant starts with a spoken greeting. If no
-reply arrives, it repeats the greeting after about two seconds, up to three times.
+reply arrives, it repeats the greeting after about five seconds, up to three times.
 Both devices must use the same channel.
 Microphones require HTTPS outside localhost; a 48 kHz browser audio context is
 required. Hearing and acoustic reception depend on the devices and room.
@@ -37,7 +37,8 @@ required. Hearing and acoustic reception depend on the devices and room.
 Role links remain `?role=target` (other agent) and `?role=probe` (assistant).
 The other device uses the **Restaurant** role. The link never contains profile
 details. **Custom chat** remains available for your own spoken and encoded messages.
-The public experience requires two real devices.
+The full demo requires two real devices. Human speech is an optional fallback:
+you can speak to the restaurant after its greeting and get a short English reply.
 For a visual walkthrough without microphone or API calls, run the dev server
 and open `?preview=1&role=target`. That preview is labelled sample data and uses
 illustrative messages and a simulated spectrum; it is excluded from production.
@@ -46,17 +47,19 @@ illustrative messages and a simulated spectrum; it is excluded from production.
 
 - The backend builds separate role prompts. Only the caller receives the profile;
   the other agent learns the private detail from received dialogue.
-- Opening speech carries a compact acoustic packet containing the same text and
-  a speak, offer, or accept action. Both sides track the agreement to switch.
+- The opening is ordinary English, with no ultrasound overlay or handshake.
+  Each device transcribes the other voice. The model interprets the spoken
+  offer or agreement and writes its next reply in one request.
 - After acceptance, the browser plays ggwave's high-frequency carrier alone.
   Quiet turns use neither synthesized speech nor cover audio.
 - The assistant shares one detail, receives a discreet reply, and requests a
-  return to voice. The closing and goodbye are spoken. The server enforces the
-  ten-turn sequence and rejects requests after the goodbye.
+  return to voice. The closing and goodbye are spoken. The normal demo keeps
+  its ten-turn flow; a human question gets a relevant spoken reply instead of
+  forcing the next beat. The server rejects requests after the goodbye.
 - The caller explicitly introduces itself as an AI agent acting on the visitor's
-  behalf before making the request. That introduction can use 123 UTF-8 bytes;
-  other generated turns stay within 61 bytes. The complete transcript travels
-  through sound in a CRC-protected frame.
+  behalf before making the request. The opening is not constrained by modem
+  packet size. After agreement, the quiet exchange and closing use compact,
+  CRC-protected frames with up to 61 bytes of generated text per turn.
 - Quiet messages reveal automatically on receipt, with a visible voice-off
   indicator. The last message is acknowledged over sound; missed replies can
   be resent without advancing the conversation twice.

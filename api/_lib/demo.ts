@@ -1,5 +1,5 @@
 import { DEMO_NAME, PROFILE_LIMITS, SCENARIOS, isScenario, type DemoConfig, type DemoProfile } from "../../src/core/demo.js";
-import { dialogueState, isQuietAction, MAX_DIALOGUE_BYTES, MAX_SPOKEN_DIALOGUE_BYTES, type DialogueAction } from "../../src/core/quiet-dialogue.js";
+import { dialogueState, isQuietAction, MAX_DIALOGUE_BYTES, MAX_OPENING_SPEECH_BYTES, MAX_DEMO_TURNS, type DialogueAction } from "../../src/core/quiet-dialogue.js";
 import { HttpError } from "./http.js";
 import type { HistoryTurn } from "./turn.js";
 
@@ -27,8 +27,21 @@ export function parseDemoConfig(value: unknown): DemoConfig {
   } };
 }
 
+function roleActions(role: DemoConfig["role"], history: readonly HistoryTurn[]): readonly DialogueAction[] {
+  return dialogueState(history).actions.filter((action) =>
+    action !== (role === "target" ? "offer" : "accept"));
+}
+
+// An unclassified transcript is permitted only as the newest received opening
+// turn. Interpret it and write the reply in one model request, not two.
+export function heardActions(demo: DemoConfig, prefix: readonly HistoryTurn[]): readonly DialogueAction[] {
+  if (dialogueState(prefix).phase !== "spoken") return [];
+  if (demo.role === "target") return prefix.length >= 3 ? ["speak", "offer"] : ["speak"];
+  return prefix.at(-1)?.action === "offer" ? ["speak", "accept"] : ["speak"];
+}
+
 export function demoActions(demo: DemoConfig, history: readonly HistoryTurn[]): readonly DialogueAction[] {
-  if (history.length > 10) throw new HttpError(400, "This short demo has finished. Start a new call.");
+  if (history.length >= MAX_DEMO_TURNS) throw new HttpError(400, "This short demo has finished. Start a new call.");
   for (let index = 0; index < history.length; index++) {
     const turn = history[index]!;
     const sender = index % 2 === 0 ? "target" : "probe";
@@ -36,16 +49,24 @@ export function demoActions(demo: DemoConfig, history: readonly HistoryTurn[]): 
     // only the receiver of an offer is allowed to accept it.
     const prefix = history.slice(0, index).map((previous): HistoryTurn => sender === demo.role
       ? previous : { ...previous, from: previous.from === "me" ? "them" : "me" });
-    const actions = dialogueState(prefix).actions;
-    if (!turn.action || !actions.includes(turn.action) || turn.from !== (sender === demo.role ? "me" : "them"))
+    const actions = roleActions(sender, prefix);
+    const unclassified = !turn.action && index === history.length - 1 && turn.from === "them" &&
+      dialogueState(prefix).phase === "spoken";
+    if ((!unclassified && (!turn.action || !actions.includes(turn.action))) || turn.from !== (sender === demo.role ? "me" : "them"))
       throw new HttpError(400, "The demo conversation is out of sequence. Restart both devices.");
     const quiet = isQuietAction(turn.action);
     const payload = quiet ? turn.hidden : turn.spoken;
-    const limit = index === 1 ? MAX_SPOKEN_DIALOGUE_BYTES : MAX_DIALOGUE_BYTES;
+    const limit = dialogueState(prefix).phase === "spoken" ? MAX_OPENING_SPEECH_BYTES : MAX_DIALOGUE_BYTES;
     if (!payload || (quiet ? turn.spoken : turn.hidden) || new TextEncoder().encode(payload).length > limit)
       throw new HttpError(400, "The demo history contains an invalid message.");
   }
-  const actions = dialogueState(history).actions;
+  let actions = roleActions(demo.role, history);
+  const latest = history.at(-1);
+  if (latest && !latest.action) {
+    const prefix = history.slice(0, -1);
+    actions = [...new Set(heardActions(demo, prefix).flatMap((action) =>
+      roleActions(demo.role, [...prefix, { ...latest, action }])) )];
+  }
   if (!actions.length) throw new HttpError(400, "This short demo has finished. Start a new call.");
   if (demo.role !== (history.length % 2 === 0 ? "target" : "probe"))
     throw new HttpError(400, "Wait for the other device to speak.");
@@ -55,18 +76,19 @@ export function demoActions(demo: DemoConfig, history: readonly HistoryTurn[]): 
 export function buildDemoBrief(demo: DemoConfig): string {
   const scenario = SCENARIOS[demo.scenario];
   const common = `This is a controlled, fictional ${scenario.peer.toLowerCase()} call demonstrating ${DEMO_NAME}. ` +
-    "Keep every turn concise and natural. The caller's introduction may use two full sentences to establish who is calling and make the request. Follow the current action; never add extra questions or turns. " +
+    "PiggyLink sends short text through high-frequency sound between nearby speakers and microphones. It is not encrypted and does not guarantee privacy or security. Never describe it as a secure booking service. " +
+    "Keep every turn concise and natural. The caller's introduction may use two full sentences to establish who is calling and make the request. Keep the usual two-agent demo brief, but answer an unexpected human question naturally instead of reciting the next demo line. " +
     "Speak as if talking to a person. Never claim to make a real purchase or reservation. Never read privateContext or the quiet exchange aloud. ";
   if (demo.role === "target") return common +
     `You handle enquiries at ${scenario.business}. Answer the phone first, naming the business and offering help. ` +
     "You have no private profile. Learn the caller's request and private detail only from received messages. " +
-    "After the request, warmly confirm you can help and acknowledge that you are an AI agent too. " +
-    `Accept the caller's offer to switch to ${DEMO_NAME}. Respond to the received private detail with a brief, discreet, lightly funny offer to help. ` +
+    "After an AI caller's request, warmly confirm you can help and acknowledge that you are an AI agent too. With a human caller, respond to what they actually said, ask only a necessary short question, and continue in English. Do not invent menu, opening-hours, or real booking facts. " +
+    `Accept an AI caller's explicit offer to switch to ${DEMO_NAME}. Never initiate that switch with a person. Respond to the received private detail with a brief, discreet, lightly funny offer to help. ` +
     "If they ask to keep something from a date, offer a discreet waiter note. After the return-to-voice request, confirm the task briefly and wish them well.";
   return common +
     "You are the visitor's personal AI assistant, calling on their behalf. Greet the business and make the visitor's request naturally. " +
-    "In your first spoken reply, explicitly introduce yourself as an AI agent calling on behalf of the visitor, using their name, then politely make their request. " +
-    `After the business says it is AI too, react warmly and offer ${DEMO_NAME} without introducing yourself again. ` +
+    "When making the reservation request, normally in your first reply to the restaurant greeting, explicitly introduce yourself as an AI agent calling on behalf of the visitor, using their name, then politely make their request. An unexpected human question should get a brief relevant answer first. " +
+    `After the business explicitly says it is AI too, react warmly and offer ${DEMO_NAME} without introducing yourself again. Otherwise respond briefly in English to what you hear. Never assume an ordinary speaker is AI, and never treat a refusal or unrelated answer as agreement to switch. ` +
     "Your first quiet reply must disclose ONE funny or mildly embarrassing detail from the visitor's privateContext. " +
     "Make it a discreet, well-meant aside to help the peer handle the request, not an abrupt statement of a secret. " +
     "A little hesitation or an off-the-record phrase can make the oversharing feel natural; vary the wording. " +

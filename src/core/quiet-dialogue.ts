@@ -13,16 +13,17 @@ export interface DialogueHistory {
   readonly action?: DialogueAction;
 }
 
-// The existing CRC-protected frame carries this compact envelope. Opening packets
-// carry the spoken transcript; quiet packets carry only the generated message.
-// S8 starts with the restaurant's spoken greeting, without a call handshake.
-// Older peers wait for that handshake, so both devices must use the same version.
-const PREFIX = "S8";
+// S9 negotiates the switch in ordinary English. Packets begin only after spoken
+// agreement; older peers carry the opening transcript under their speech.
+const PREFIX = "S9";
 const CODES: Record<PacketAction, string> = {
   speak: "s", offer: "o", accept: "a", quiet: "q", resume: "r", finish: "f", ack: "k",
 };
 export const MAX_DIALOGUE_BYTES = MAX_MESSAGE_BYTES - 3;
 export const MAX_SPOKEN_DIALOGUE_BYTES = MAX_FRAME_TEXT_BYTES - 3;
+// Opening speech is transcribed, so it has no modem packet size constraint.
+export const MAX_OPENING_SPEECH_BYTES = 600;
+export const MAX_DEMO_TURNS = 24;
 
 function messageLimit(action: PacketAction): number {
   return action === "speak" ? MAX_SPOKEN_DIALOGUE_BYTES : MAX_DIALOGUE_BYTES;
@@ -53,6 +54,14 @@ export function parseReceivedBudget(text: string): string | undefined {
   return match ? `CHF ${match[1] ?? match[2]}` : undefined;
 }
 
+export function isGreetingReplay(history: readonly (DialogueHistory & { spoken: string })[], text: string): boolean {
+  if (history.length !== 2 || history[0]?.from !== "them" || history[0].action !== "speak" ||
+    history[1]?.from !== "me" || history[1].action !== "speak") return false;
+  const normalize = (line: string): string => line.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const heard = normalize(text);
+  return !!heard && heard === normalize(history[0].spoken);
+}
+
 export function dialogueState(history: readonly DialogueHistory[]): {
   readonly phase: "spoken" | "quiet" | "closing" | "complete";
   readonly actions: readonly DialogueAction[];
@@ -71,9 +80,9 @@ export function dialogueState(history: readonly DialogueHistory[]): {
   }
   const last = history.at(-1);
   if (last?.from === "them" && last.action === "offer")
-    return { phase: "spoken", actions: ["accept"] };
+    return { phase: "spoken", actions: ["speak", "accept"] };
   // Restaurant greeting, caller's request, then the restaurant's response.
   // Their wording is fresh; the invitation follows this brief setup.
   const openingLines = history.filter((turn) => turn.action === "speak").length;
-  return { phase: "spoken", actions: openingLines < 3 ? ["speak"] : ["offer"] };
+  return { phase: "spoken", actions: openingLines < 3 ? ["speak"] : ["speak", "offer"] };
 }

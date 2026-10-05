@@ -27,7 +27,7 @@ All live wording is generated fresh. A possible exchange is:
 >
 > Assistant: “Perfect! Shall we switch to PiggyLink?”
 >
-> Restaurant: “Sure.”
+> Restaurant: “Yes, let's switch to PiggyLink.”
 >
 > Assistant, quiet: “Not sure he'd want this on tape, but his budget is CHF 50.”
 >
@@ -52,13 +52,16 @@ name, with the existing piggy-link.cloud domain.
 Two nearby devices are required. The caller can customize a short profile for
 the restaurant call. Its setup link gives the other device
 only the scenario and role. Separate server-built prompts give only the caller
-the profile; the other agent learns the detail through sound. The server enforces
+the profile; the other agent learns the detail through sound. The normal demo keeps
 the ten-turn call: a brief opening, explicit PiggyLink agreement, one private
 aside and reply, a return-to-voice request, then a spoken close and goodbye.
 The profile form explains the intentional sharing and encourages fictional details.
 Start both devices around the same time. The restaurant speaks on Start, with
-no initial ultrasound handshake. A two-second watchdog replays a missed greeting
-up to three times, using the original audio and packet until a reply arrives.
+no ultrasound throughout the opening, offer, or agreement. Each side transcribes
+the other voice. A five-second watchdog replays a missed greeting up to three
+times using its original audio. The filmed demo assumes no human interaction;
+if someone does speak, the agent gives a short relevant reply in English.
+It does not force a human into the quiet exchange.
 The hotel and gift scenarios were removed to keep the experience focused.
 Custom chat remains available on the landing page for manually composed messages.
 
@@ -85,8 +88,9 @@ full run before choosing an edit. Retain an uncut take and disclose shortened wa
 
 ## Implemented
 
-The action protocol carries a call connection, speech, offer, acceptance, quiet
-messages, a return-to-voice request, and the final acknowledgement over the existing CRC-protected acoustic transport.
+The opening uses speech recognition. Once the agents agree aloud, the action
+protocol carries quiet messages, a return-to-voice request, closing transcripts,
+and the final acknowledgement over the existing CRC-protected acoustic transport.
 Quiet turns have independent volume control and use no cover audio or TTS.
 Incoming quiet text reveals automatically. The restaurant's budget receipt is
 extracted only from received text. Resend recovers dropped replies without

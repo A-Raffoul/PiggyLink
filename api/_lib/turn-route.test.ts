@@ -22,6 +22,38 @@ function quietReplyRequest(): Request {
 beforeEach(() => { write.mockReset(); });
 
 describe("turn generation recovery", () => {
+  it("interprets a human question and replies in the same provider call", async () => {
+    const reply = { heardAction: "speak", action: "speak", spoken: "I'm an AI assistant helping with restaurant enquiries.", hidden: "" };
+    write.mockResolvedValue(JSON.stringify(reply));
+    const response = await POST(new Request("http://localhost/api/turn", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ demo: { scenario: "restaurant", role: "target" }, history: [
+        { from: "me", action: "speak", spoken: "Bella Vita. How can I help?", hidden: "" },
+        { from: "them", spoken: "Are you a real person?", hidden: "" },
+      ] }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(reply);
+    expect(write).toHaveBeenCalledOnce();
+    expect(write.mock.calls[0]![0]).toContain("Are you a real person?");
+  });
+
+  it("repairs an invalid speech classification without advancing to quiet", async () => {
+    const corrected = { heardAction: "speak", action: "speak", spoken: "I can help with a pretend reservation.", hidden: "" };
+    write.mockResolvedValueOnce(JSON.stringify({ ...corrected, heardAction: "accept" }))
+      .mockResolvedValueOnce(JSON.stringify(corrected));
+    const response = await POST(new Request("http://localhost/api/turn", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ demo: { scenario: "restaurant", role: "target" }, history: [
+        { from: "me", action: "speak", spoken: "Bella Vita. How can I help?", hidden: "" },
+        { from: "them", spoken: "What can you help me with?", hidden: "" },
+      ] }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(corrected);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(write.mock.calls[1]![0]).toContain("allowed heardAction");
+  });
   it("delivers the requested full AI introduction without truncation or repair", async () => {
     const spoken = "Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?";
     write.mockResolvedValue(JSON.stringify({ action: "speak", spoken, hidden: "" }));

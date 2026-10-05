@@ -25,6 +25,7 @@ export interface AgentTurn {
   readonly spoken: string;
   readonly hidden: string;
   readonly action?: DialogueAction;
+  readonly heardAction?: DialogueAction;
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<Response> {

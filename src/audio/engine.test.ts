@@ -57,6 +57,25 @@ describe("speech-aware channel wait", () => {
     vi.unstubAllGlobals();
   });
 
+  it("delivers an ordinary English utterance for recognition with no modem packet", async () => {
+    const feed = audioHarness();
+    const onSpeech = vi.fn();
+    const onData = vi.fn();
+    const engine = await startAcousticEngine({
+      preset: getFrequencyPreset("18000"), canvas: {} as HTMLCanvasElement,
+      onData, onBusyChange: vi.fn(), onSpeech, canListenForSpeech: () => true,
+    });
+    try {
+      await feed(-85, 600);
+      await feed(-35, 1_200);
+      expect(onSpeech).not.toHaveBeenCalled();
+      await feed(-85, 1_100);
+      expect(onSpeech).toHaveBeenCalledOnce();
+      expect(onSpeech.mock.calls[0]![0].length).toBeGreaterThan(48_000);
+      expect(onData).not.toHaveBeenCalled();
+    } finally { await engine.stop(); }
+  });
+
   it("waits through a spoken reply before its carrier without enabling transcription", async () => {
     const feed = audioHarness();
     const onSpeech = vi.fn();

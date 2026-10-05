@@ -1,56 +1,58 @@
-# Ordinary speech and phone support
+# Ordinary English and optional human replies
 
-Open the Support role, press Start, and speak after a short quiet pause. Start
-enables automatic replies. The microphone now listens for ordinary speech in
-addition to modem frames. Manual controls also allow a spoken line with an empty
-encoded field.
+The restaurant demo opens with ordinary English. The greeting, caller's full AI
+introduction and reservation request, AI recognition, PiggyLink offer, and spoken
+acceptance contain no ultrasound. The first encoded packet carries the private
+aside only after both sides have agreed aloud.
 
-## Flow
+The planned demo assumes no human interruptions and retains its ten-turn flow.
+As an optional fallback, start Restaurant and speak after its greeting. It
+transcribes the question and gives a short relevant English reply. The personal
+assistant also reacts to an unexpected question. Questions and refusals keep the
+conversation in English rather than forcing a switch. Custom chat retains its
+manual spoken and encoded messages.
+
+## Recognition and response
 
 `SpeechDetector` tracks energy in the 150–4000 Hz band, waits for 900 ms of silence,
 and passes the recent recording to the existing transcription API. It requires
 250 ms of voiced activity, keeps 200 ms of pre-roll, and caps a segment at 20 s.
-This is a simple energy detector for the prototype, not a trained voice detector.
+This is an energy detector, not a trained voice detector.
 
-Local playback, detected carrier activity, decoding, and a busy assistant suppress
-ordinary speech detection. A 700 ms tail reduces playback echoes. If a new modem
-frame arrives while speech recognition is pending, the plain result is discarded
-so that the encoded receive path owns that turn.
+Local playback, detected carrier activity, decoding, and reply preparation
+suppress recognition. A 700 ms tail reduces playback echoes. The engine senses
+speech independently for collision avoidance, even when transcription is disabled.
+If a modem frame arrives during recognition, the plain result is discarded.
 
-An accepted transcript is a turn with an empty hidden field. It gives the assistant
-the next speaking turn without acknowledging an encoded packet. The next AI request
-uses spoken-only mode: only spoken history is included, and the server forces the
-encoded output to be empty. The reply is synthesized and played without a carrier.
-These turns use one full-width history cell and no encoded caption.
+The opening receives an ordinary transcript with no action metadata. The next
+model request interprets the latest utterance as `speak`, `offer`, or `accept` and
+writes the reply at the same time. The API validates that an offer precedes any
+acceptance and that only an accepted switch allows a private packet. The model is
+instructed to recognize refusals and uncertainty as ordinary speech. A malformed
+interpretation or invalid action gets one repair attempt. Private profile context
+must never be spoken.
 
-The Encoded switch only controls presentation. It does not change what the other
-device sends or whether encoded messages are received.
-
-## Phone handling
-
-The page uses viewport-fit and safe-area spacing, compact controls, a bounded
-signal area, and temporary captions over that area on narrow screens. Text fields
-remain 16 px. The engine requests 48 kHz and falls back to the browser's native
-sample rate if that rate is unsupported. Synthesized audio is resampled by
-decodeAudioData before playback. Microphone startup reports a useful error if
-getUserMedia is unavailable.
-
-References: [WebKit safe-area guidance](https://webkit.org/blog/7929/designing-websites-for-iphone-x/),
-[AudioContext sample rate](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/AudioContext),
-and [getUserMedia secure contexts](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia).
+The restaurant retries its cached greeting after five seconds without a reply,
+at most three times. The response window includes recognition and reply
+preparation. Hearing an utterance cancels a queued replay while it is transcribed.
+Repeated first greetings, ignoring case and punctuation, replay the cached caller
+introduction instead of adding a dialogue turn. Manual Resend also works for a
+missed spoken acceptance. Stop cancels pending work for the session.
 
 ## Verification and limits
 
-- Unit tests exercise speech/pause boundaries, brief noise, suppression, long
-  utterances, packet-independent turns, and spoken-only API parsing.
-- `?preview=1&role=target&speech=1` provides development-only spoken fixtures.
-  It does not record audio or call AI services.
-- Responsive browser checks cover 320, 390, and 430 px widths. These are layout
-  checks, not tests on an actual iPhone or Safari audio stack.
-- End-to-end microphone → transcription → assistant → speaker needs a hardware
-  run with configured APIs. Background speech or changing noise may trigger the
-  simple detector. Speech during assistant playback/processing is ignored, so
-  barge-in is not supported. Carrier suppression and echo timing need verification
-  on the actual recording devices.
-- Phone speaker/microphone bandwidth can differ from desktop equipment; layout
-  support does not guarantee successful high-frequency communication.
+- A real provider run completed the ten-turn call using Chris and Sarah. All five
+  opening lines were synthesized and transcribed from pure speech, with no modem
+  overlay. “Piggy Link” transcriptions correctly led to offer and acceptance.
+- Live human-question, refusal, and protocol-question checks remained in English
+  with no private disclosure. Unit tests cover legal transitions, invalid
+  interpretations, repeated greetings, microphone utterance detection, and timers.
+- Measured transcription took about 0.5–0.8 seconds per opening line, excluding
+  the detector's silence window. Provider and network timing varies.
+- Physical speaker-to-microphone timing and recognition still need a two-device
+  test. The loopback check used provider-generated audio, not a room recording.
+- Speech during playback or reply preparation is ignored; barge-in is not
+  supported. During the quiet exchange, the automatic demo listens for packets.
+- The browser requires a 48 kHz audio context and HTTPS outside localhost. Quiet
+  reception depends on device bandwidth and the room. The public full demo still
+  requires two devices; there is no simulated public one-screen exchange.

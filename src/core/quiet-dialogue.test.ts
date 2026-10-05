@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Conversation } from "./conversation";
 import { decodeFrame, encodeFrame } from "./frame";
-import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, parseReceivedBudget, MAX_DIALOGUE_BYTES, MAX_SPOKEN_DIALOGUE_BYTES, type DialogueAction, type DialogueHistory } from "./quiet-dialogue";
+import { decodeDialogue, encodeDialogue, dialogueState, isQuietAction, isGreetingReplay, parseReceivedBudget, MAX_DIALOGUE_BYTES, MAX_SPOKEN_DIALOGUE_BYTES, type DialogueAction, type DialogueHistory } from "./quiet-dialogue";
 
 const flip = (history: DialogueHistory[]): DialogueHistory[] => history.map((turn) => ({ ...turn, from: turn.from === "me" ? "them" : "me" }));
 
@@ -13,9 +13,9 @@ describe("quiet conversation", () => {
     expect(dialogueState(flip(history)).actions).toEqual(["speak"]);
     expect(dialogueState(history).actions).not.toContain("quiet");
     history.push({ from: "them", action: "speak" }, { from: "me", action: "speak" });
-    expect(dialogueState(flip(history)).actions).toEqual(["offer"]);
+    expect(dialogueState(flip(history)).actions).toEqual(["speak", "offer"]);
     history.push({ from: "them", action: "offer" });
-    expect(dialogueState(history)).toEqual({ phase: "spoken", actions: ["accept"] });
+    expect(dialogueState(history)).toEqual({ phase: "spoken", actions: ["speak", "accept"] });
     history.push({ from: "me", action: "accept" });
     expect(dialogueState(history)).toEqual({ phase: "quiet", actions: ["quiet"] });
     expect(dialogueState(flip(history)).phase).toBe("quiet");
@@ -41,9 +41,10 @@ describe("quiet conversation", () => {
     expect(() => encodeDialogue({ action: "quiet", text: "é".repeat(31) })).toThrow();
     expect(() => encodeDialogue({ action: "quiet", text: " " })).toThrow();
     expect(encodeDialogue({ action: "quiet", text: "x".repeat(MAX_DIALOGUE_BYTES) })).toHaveLength(64);
-    expect(decodeDialogue("S8xunrecognized")).toBeUndefined();
-    expect(decodeDialogue("S8q")).toBeUndefined();
-    expect(decodeDialogue("S8crestaurant")).toBeUndefined();
+    expect(decodeDialogue("S9xunrecognized")).toBeUndefined();
+    expect(decodeDialogue("S9q")).toBeUndefined();
+    expect(decodeDialogue("S9crestaurant")).toBeUndefined();
+    expect(decodeDialogue("S8sOld encoded opening")).toBeUndefined();
     expect(decodeDialogue("S7sOld handshake peer")).toBeUndefined();
     expect(decodeDialogue("S7crestaurant")).toBeUndefined();
     expect(decodeDialogue("S6sOld short-introduction peer")).toBeUndefined();
@@ -61,22 +62,34 @@ describe("quiet conversation", () => {
     for (const action of ["quiet", "offer", "accept", "resume", "finish"] as const) {
       expect(() => encodeDialogue({ action, text })).toThrow();
     }
-    expect(decodeDialogue(`S8q${text}`)).toBeUndefined();
-    expect(decodeDialogue(`S8s${longest}x`)).toBeUndefined();
+    expect(decodeDialogue(`S9q${text}`)).toBeUndefined();
+    expect(decodeDialogue(`S9s${longest}x`)).toBeUndefined();
   });
 
-  it("starts with a spoken greeting and recovers a lost reply without repeating dialogue", () => {
+  it("exchanges the five opening lines as speech before using the first modem sequence", () => {
     const caller = new Conversation("aaaa");
     const restaurant = new Conversation("bbbb");
-    const greeting = restaurant.send(encodeDialogue({ action: "speak", text: "Bella Vita. How can I help?" }));
-    expect(greeting.frame.sequence).toBe(0);
-    expect(greeting.inReplyTo).toBeUndefined();
-    expect(caller.receive(greeting.frame)).toMatchObject({ kind: "message", acknowledges: undefined });
-    expect(caller.receive(greeting.frame)).toEqual({ kind: "duplicate" });
-    const intro = caller.send(encodeDialogue({ action: "speak", text: "Hello, I'm Tony's AI agent. Table for two tonight?" }));
-    expect(caller.receive(greeting.frame)).toEqual({ kind: "resend-reply", message: intro });
-    expect(restaurant.receive(intro.frame)).toMatchObject({ kind: "message", acknowledges: greeting });
-    expect(restaurant.pending).toBeUndefined();
+    for (let index = 0; index < 5; index++) {
+      const [speaker, listener] = index % 2 === 0 ? [restaurant, caller] : [caller, restaurant];
+      speaker.sendSpeech();
+      listener.receiveSpeech();
+      expect(speaker.pending).toBeUndefined();
+      expect(speaker.upcomingSequence).toBe(0);
+    }
+    const quiet = caller.send(encodeDialogue({ action: "quiet", text: "Between us, his budget is CHF 50." }));
+    expect(quiet.frame.sequence).toBe(0);
+    expect(restaurant.receive(quiet.frame)).toMatchObject({ kind: "message" });
+  });
+
+  it("recognizes a repeated first greeting despite STT punctuation without treating a new question as a replay", () => {
+    const history = [
+      { from: "them" as const, action: "speak" as const, spoken: "Hello, Bella Vita. How can I help?" },
+      { from: "me" as const, action: "speak" as const, spoken: "Hello, I'm Tony's AI agent." },
+    ];
+    expect(isGreetingReplay(history, "Hello Bella Vita, how can I help")).toBe(true);
+    expect(isGreetingReplay(history, "What time would you like?")).toBe(false);
+    expect(isGreetingReplay(history, " ")).toBe(false);
+    expect(isGreetingReplay([...history, history[0]!], history[0]!.spoken)).toBe(false);
   });
 
   it("keeps legacy manual speech outside the demo phases", () => {

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Conversation } from "./conversation";
 import { GreetingWatchdog } from "./greeting-watchdog";
-import { encodeDialogue } from "./quiet-dialogue";
 
 describe("spoken greeting watchdog", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -9,24 +8,24 @@ describe("spoken greeting watchdog", () => {
 
   it("lets a late caller join through the replay, then stops on its reply", async () => {
     const restaurant = new Conversation("bbbb");
-    const greeting = restaurant.send(encodeDialogue({ action: "speak", text: "Bella Vita. How can I help?" }));
+    restaurant.sendSpeech();
     const caller = new Conversation("aaaa"); // Started after the original greeting.
     const watchdog = new GreetingWatchdog();
     const exhausted = vi.fn();
     const replay = vi.fn(async () => {
-      expect(caller.receive(greeting.frame)).toMatchObject({ kind: "message" });
-      const reply = caller.send(encodeDialogue({ action: "speak", text: "Hello, I'm Tony's AI agent. Table for two tonight?" }));
-      restaurant.receive(reply.frame);
+      caller.receiveSpeech();
+      caller.sendSpeech();
+      restaurant.receiveSpeech();
       watchdog.cancel();
     });
-    watchdog.start({ isPending: () => restaurant.pending === greeting, replay, onExhausted: exhausted });
-    await vi.advanceTimersByTimeAsync(1_999);
+    watchdog.start({ isPending: () => restaurant.turn === "theirs", replay, onExhausted: exhausted, delayMs: 5_000 });
+    await vi.advanceTimersByTimeAsync(4_999);
     expect(replay).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(replay).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(replay).toHaveBeenCalledOnce();
-    expect(restaurant.upcomingSequence).toBe(1);
+    expect(restaurant.upcomingSequence).toBe(0);
     expect(exhausted).not.toHaveBeenCalled();
   });
 

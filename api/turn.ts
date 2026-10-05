@@ -1,7 +1,7 @@
 import { writeWithApertus } from "./_lib/apertus.js";
 import { writeWithAgent } from "./_lib/elevenlabs.js";
 import { HttpError, json, readJson, route } from "./_lib/http.js";
-import { buildTurnPrompt, buildTurnRepairPrompt, parseTurn, parseTurnRequest } from "./_lib/turn.js";
+import { buildTurnPrompt, buildTurnRepairPrompt, parseTurnForRequest, parseTurnRequest } from "./_lib/turn.js";
 
 export const config = { maxDuration: 60 };
 
@@ -18,15 +18,7 @@ export const POST = route(async (request) => {
     let reply: string | undefined;
     try {
       reply = await write(prompt);
-      return json(
-        parseTurn(
-          reply,
-          turnRequest.maxHiddenBytes,
-          turnRequest.spokenOnly,
-          turnRequest.actions,
-          turnRequest.maxSpokenBytes,
-        ),
-      );
+      return json(parseTurnForRequest(reply, turnRequest));
     } catch (error) {
       if (!(error instanceof HttpError) || error.status !== 502) throw error;
       lastError = error;

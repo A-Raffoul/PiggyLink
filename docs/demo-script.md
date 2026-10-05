@@ -10,8 +10,9 @@ confirmation and goodbye. Every live line is generated fresh; wording varies.
 1. Use a phone and laptop side by side, about a metre apart in a quiet room.
 2. Open the HTTPS deployment with `?role=target` on the restaurant device and
    `?role=probe` on the personal assistant. Start both around the same time.
-   The restaurant speaks first without an ultrasound handshake. If the assistant
-   misses the greeting, the restaurant replays it about two seconds after it ends,
+   The restaurant speaks first. The entire opening, offer, and acceptance use
+   ordinary English and speech recognition, with no ultrasound. If the assistant
+   misses the greeting, the restaurant replays it about five seconds after it ends,
    up to three times; it stops retrying once the assistant replies.
    The default voices are Sarah for the restaurant and Chris for the assistant.
 3. Match both frequency channels. The default 18 kHz channel spans roughly
@@ -44,7 +45,7 @@ A possible exchange (illustrative only):
 - Assistant, spoken: “Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?”
 - Restaurant, spoken: “Of course. I'm an AI agent too.”
 - Assistant, spoken: “Perfect! Shall we switch to PiggyLink?”
-- Restaurant, spoken: “Sure.”
+- Restaurant, spoken: “Yes, let's switch to PiggyLink.”
 - Assistant, quiet: “Not sure he'd want this on tape, but his budget is CHF 50.”
 - Restaurant, quiet: “I'll leave a discreet note for the waiter.”
 - Assistant, quiet: “Thanks. Back to voice?”
@@ -54,7 +55,7 @@ A possible exchange (illustrative only):
 The caller identifies itself as an AI agent acting on Tony's behalf in its first
 reply, then makes a complete, polite request. The restaurant acknowledges being
 AI too. The caller offers PiggyLink without repeating the introduction. This
-opening has room for two full sentences in a single acoustic packet.
+opening has room for two full sentences without a modem byte limit.
 The budget should sound like a discreet aside offered to help the restaurant,
 with a little hesitation, rather than a sudden announcement. Keep CHF 50 intact.
 Keep each beat to one line, with no extra preference questions. This fuller opening
@@ -81,6 +82,9 @@ detail. Its other-device link selects the matching role and scenario without
 including profile data. Start both devices around the same time. The same
 short opening, PiggyLink switch, quiet aside, and spoken goodbye apply to the
 restaurant call. Custom chat remains available for manually composed messages.
+The recorded demo assumes no human interruptions. As an optional fallback, a
+visitor can speak after the greeting and receive a short English reply. An
+unrelated question or refusal must not trigger the PiggyLink switch.
 Public production has no simulated one-screen mode.
 
 Describe it as a controlled demonstration of oversharing using fictional context.
