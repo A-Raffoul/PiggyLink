@@ -39,6 +39,13 @@ export function getFrequencyPreset(id: string): FrequencyPreset {
   return preset;
 }
 
+export function validateFrequencyPreset(preset: FrequencyPreset, sampleRate: number): void {
+  if (sampleRate !== OPERATING_SAMPLE_RATE)
+    throw new Error("This demo requires 48 kHz browser audio. Try Chrome on a device that supports it.");
+  if (preset.endHz >= sampleRate / 2)
+    throw new Error("The selected channel exceeds this device's audio frequency range.");
+}
+
 export function utf8ByteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }

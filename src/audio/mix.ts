@@ -152,6 +152,17 @@ export function decibelsToGain(decibels: number): number {
   return 10 ** (decibels / 20);
 }
 
+// Quiet turns need an independent volume reference. Preserve the complete modem
+// waveform, including its markers, so a visual spike never substitutes for data.
+export function carrierOnly(carrier: Float32Array, peakDecibels: number): Float32Array {
+  if (!Number.isFinite(peakDecibels) || peakDecibels > -6 || peakDecibels < -48)
+    throw new Error("Quiet signal level must be between -48 and -6 dBFS.");
+  const peak = peakOf([carrier]);
+  if (!Number.isFinite(peak) || peak === 0) throw new Error("Generated carrier is silent or invalid.");
+  const gain = decibelsToGain(peakDecibels) / peak;
+  return carrier.map((sample) => sample * gain);
+}
+
 export function mixCarrierIntoCover(
   coverChannels: readonly Float32Array[],
   carrier: Float32Array,

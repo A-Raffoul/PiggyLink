@@ -1,4 +1,5 @@
 import { HttpError } from "./http.js";
+import { DIALOGUE_ACTIONS, isQuietAction, type DialogueAction } from "../../src/core/quiet-dialogue.js";
 
 export type Writer = "elevenlabs" | "apertus";
 
@@ -6,6 +7,7 @@ export interface HistoryTurn {
   readonly from: "me" | "them";
   readonly spoken: string;
   readonly hidden: string;
+  readonly action?: DialogueAction;
 }
 
 export interface TurnRequest {
@@ -14,11 +16,13 @@ export interface TurnRequest {
   readonly history: readonly HistoryTurn[];
   readonly maxHiddenBytes: number;
   readonly spokenOnly?: boolean;
+  readonly actions?: readonly DialogueAction[];
 }
 
 export interface Turn {
   readonly spoken: string;
   readonly hidden: string;
+  readonly action?: DialogueAction;
 }
 
 export const WRITER_INSTRUCTIONS =
@@ -54,6 +58,8 @@ export function parseTurnRequest(body: unknown): TurnRequest {
         from: item.from === "me" ? "me" : "them",
         spoken: text(item.spoken ?? "", "spoken", MAX_FIELD_CHARS),
         hidden: text(item.hidden ?? "", "hidden", MAX_FIELD_CHARS),
+        ...(DIALOGUE_ACTIONS.includes(item.action as DialogueAction)
+          ? { action: item.action as DialogueAction } : {}),
       };
     });
   const maxHiddenBytes = Number(body.maxHiddenBytes);
@@ -70,16 +76,44 @@ export function parseTurnRequest(body: unknown): TurnRequest {
   if (body.spokenOnly !== undefined && typeof body.spokenOnly !== "boolean") {
     throw new HttpError(400, '"spokenOnly" must be a boolean.');
   }
+  let actions: DialogueAction[] | undefined;
+  if (body.actions !== undefined) {
+    if (!Array.isArray(body.actions) || body.actions.length === 0 ||
+      body.actions.some((action) => !DIALOGUE_ACTIONS.includes(action as DialogueAction)))
+      throw new HttpError(400, '"actions" must contain supported dialogue actions.');
+    actions = body.actions as DialogueAction[];
+    if (body.spokenOnly) throw new HttpError(400, "Choose dialogue actions or spokenOnly.");
+  }
   return {
     writer,
     brief,
     history,
     maxHiddenBytes,
     spokenOnly: body.spokenOnly === true,
+    ...(actions ? { actions } : {}),
   };
 }
 
 export function buildTurnPrompt(request: TurnRequest): string {
+  if (request.actions) {
+    return [
+      "You are participating in a short, fictional restaurant reservation demo. Generate fresh dialogue.",
+      request.brief,
+      "Conversation (oldest first):",
+      ...request.history.map((turn) =>
+        `${turn.from === "me" ? "You" : "Peer"} [${turn.action ?? "speech"}]: ${turn.spoken || turn.hidden}`),
+      `Choose ONE action from: ${request.actions.join(", ")}. No other action is allowed.`,
+      "speak: ordinary speech. offer: identify as AI and invite the peer to Sotto. accept: briefly agree to the peer's offer.",
+      "For speak/offer/accept: put the line in spoken and leave hidden empty. Never disclose private context aloud.",
+      "quiet: continue the reservation over sound without a voice. finish: send the final quiet reply and end the demo.",
+      "For quiet/finish: put the message in hidden and leave spoken empty. Never return to spoken language after switching.",
+      ...(request.actions.includes("quiet") && !request.history.some((turn) => turn.action === "quiet")
+        ? ["This is the first quiet message. Keep it especially short, at most 24 UTF-8 bytes, so the first reveal arrives quickly."] : []),
+      `Use ONE short sentence. The nonempty field MUST fit ${request.maxHiddenBytes} UTF-8 bytes. Prefer fewer words; a euro sign uses 3 bytes.`,
+      "Keep the recognition and agreement snappy. Prefer offering Sotto immediately once the peer identifies as AI.",
+      'Return ONLY JSON: {"action":"...","spoken":"...","hidden":"..."}.',
+    ].join("\n");
+  }
   if (request.spokenOnly) {
     return [
       "You are a voice assistant responding to ordinary speech from a person. There is no encoded channel for this turn.",
@@ -141,6 +175,7 @@ export function parseTurn(
   reply: string,
   maxHiddenBytes: number,
   spokenOnly = false,
+  actions?: readonly DialogueAction[],
 ): Turn {
   const start = reply.indexOf("{");
   const end = reply.lastIndexOf("}");
@@ -153,6 +188,12 @@ export function parseTurn(
   } catch {
     throw new HttpError(502, "The model returned malformed JSON.");
   }
+  // Providers often omit the unused empty field. Its absence has exactly the
+  // same meaning, but a missing active field still fails the action validation.
+  if (actions && isRecord(parsed)) {
+    parsed.spoken ??= "";
+    parsed.hidden ??= "";
+  }
   if (
     !isRecord(parsed) ||
     typeof parsed.spoken !== "string" ||
@@ -162,6 +203,18 @@ export function parseTurn(
       502,
       'The model reply is missing "spoken" or "hidden".',
     );
+  }
+
+  if (actions) {
+    const action = parsed.action as DialogueAction;
+    if (!actions.includes(action)) throw new HttpError(502, "The model chose an unavailable action.");
+    const spoken = parsed.spoken.trim();
+    const hidden = parsed.hidden.replace(/\s+/g, " ").trim();
+    const quiet = isQuietAction(action);
+    const payload = quiet ? hidden : spoken;
+    if (!payload || (quiet ? spoken : hidden) || new TextEncoder().encode(payload).length > maxHiddenBytes)
+      throw new HttpError(502, "The model returned an invalid or overlong dialogue line.");
+    return { action, spoken, hidden };
   }
 
   const spoken = parsed.spoken.trim().slice(0, MAX_SPOKEN_CHARS);

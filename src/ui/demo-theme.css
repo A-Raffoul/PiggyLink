@@ -697,9 +697,8 @@ input[type="range"] {
   line-height: 1.25;
   flex-shrink: 0;
 }
-.conversation-log:not(.is-revealed) .encoded-channel,
-.conversation-log:not(.is-revealed) .bubble-channel-label,
-.conversation-log:not(.is-revealed) .capture-panel {
+.conversation-log:not(.is-revealed) .bubble:not(.is-quiet) .encoded-channel,
+.conversation-log:not(.is-revealed) .bubble:not(.is-quiet) .bubble-channel-label {
   display: none;
 }
 .bubble .bubble-pair .bubble-spoken,
@@ -1134,4 +1133,192 @@ input[type="range"] {
     margin-top: -12px;
     padding: 16px;
   }
+}
+
+/* The reveal stays legible when two real devices are filmed on a phone. */
+.landing-title {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+.landing-description, .start-guide, .demo-disclosure {
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.45;
+}
+.landing-description { max-width: 440px; margin: 8px auto 0; }
+.landing .spectral-orb { height: clamp(120px, 22svh, 220px); }
+.start-guide, .demo-disclosure { margin: 0; font-size: 0.875rem; }
+.demo-disclosure { font-size: 0.75rem; }
+.voice-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-spoken);
+  border-radius: 999px;
+  color: var(--speech);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.voice-state[data-quiet="true"] { color: var(--hidden); border-color: var(--line-encoded); }
+.private-context {
+  align-self: flex-start;
+  border-left: 2px solid var(--support);
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.private-context p { color: var(--bone); margin: 4px 0; font-size: 1.125rem; }
+.private-context strong { color: var(--support); margin-left: 8px; }
+.private-label { text-transform: uppercase; letter-spacing: 0.07em; font-size: 0.6875rem; }
+#current-message[data-quiet="true"] #current-encoded {
+  color: var(--hidden);
+  font-size: clamp(2rem, 3.8vw, 3.25rem);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.bubble.is-quiet .bubble-hidden { color: var(--hidden); font-size: var(--type-log); }
+.chat[data-quiet="true"] .spectrum-band { display: block; }
+@media (max-width: 680px) {
+  .view-toolbar { gap: 8px; }
+  .session-actions { gap: 10px; margin-left: auto; }
+  .private-context { padding: 6px 12px; }
+  .chat { gap: 16px; }
+  #current-message[data-quiet="true"] #current-encoded { font-size: 1.875rem; }
+}
+
+@media (max-width: 680px) {
+  .current-message[data-quiet="true"] { max-height: none; }
+  .current-message[data-quiet="true"] .current-content { overflow: visible; }
+}
+
+/* The default demo gives the audience one line to follow. Controls and history
+   remain available from the single details button. */
+.details-toggle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.details-toggle:hover { background: var(--surface-hover); }
+.details-toggle:focus-visible { outline: 2px solid var(--speech); outline-offset: 3px; }
+.preview-label {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(20px, env(safe-area-inset-left));
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+body[data-focus-demo="true"] .masthead,
+body[data-focus-demo="true"] .chat-identity,
+body[data-focus-demo="true"] .session-actions,
+body[data-focus-demo="true"] .private-context,
+body[data-focus-demo="true"] .conversation-log,
+body[data-focus-demo="true"] .waiting-bar,
+body[data-focus-demo="true"] .current-direction,
+body[data-focus-demo="true"] .current-channel-label,
+body[data-focus-demo="true"] .signal-heading,
+body[data-focus-demo="true"] .spectrum-axis,
+body[data-focus-demo="true"] .spectrum-band {
+  display: none;
+}
+body[data-focus-demo="true"] .chat {
+  position: relative;
+  min-height: 100svh;
+  height: auto;
+  padding: 88px 0 64px;
+  gap: 0;
+  justify-content: center;
+}
+body[data-focus-demo="true"] .view-toolbar {
+  position: absolute;
+  inset: 20px 0 auto;
+  min-height: 44px;
+  justify-content: center;
+  margin: 0;
+}
+body[data-focus-demo="true"] .details-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+body[data-focus-demo="true"] .voice-state {
+  padding: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+body[data-focus-demo="true"] .signal-stage {
+  display: grid;
+  grid-template-rows: minmax(180px, auto) clamp(100px, 20svh, 180px);
+  width: min(100%, 960px);
+  min-height: 0;
+  align-self: center;
+  gap: clamp(24px, 7svh, 72px);
+}
+body[data-focus-demo="true"] .current-message {
+  display: flex;
+  height: auto;
+  min-height: 180px;
+  max-height: none;
+  justify-content: center;
+  padding: 0 12px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+}
+body[data-focus-demo="true"] .current-message.is-visible { opacity: 1; visibility: visible; }
+body[data-focus-demo="true"] .current-content {
+  overflow: visible;
+  flex: none;
+}
+body[data-focus-demo="true"] #current-spoken,
+body[data-focus-demo="true"] #current-encoded {
+  max-width: 24ch;
+  margin: 0 auto;
+  color: var(--bone);
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+body[data-focus-demo="true"] #current-message[data-quiet="true"] #current-encoded {
+  color: var(--hidden);
+  font-size: clamp(2rem, 5vw, 4rem);
+}
+body[data-focus-demo="true"] .signal-panel {
+  display: block;
+  width: min(100%, 800px);
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+body[data-focus-demo="true"] .spectrum-plot { height: 100%; }
+@media (max-height: 500px) and (min-width: 701px) {
+  body[data-focus-demo="true"] .chat { padding: 72px 0 24px; }
+  body[data-focus-demo="true"] .signal-stage { grid-template-rows: minmax(100px, auto) 80px; gap: 20px; }
+  body[data-focus-demo="true"] .current-message { min-height: 100px; }
+  body[data-focus-demo="true"] #current-spoken,
+  body[data-focus-demo="true"] #current-message[data-quiet="true"] #current-encoded { font-size: 2rem; }
 }

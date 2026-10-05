@@ -7,7 +7,7 @@ const AGENT_TIMEOUT_MS = 25_000;
 
 async function elevenFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  headers.set("xi-api-key", requireEnv("ELEVENLABS_API_KEY"));
+  headers.set("xi-api-key", process.env.ELEVENLABS_API_KEY?.trim() || process.env.ELEVEN_LABS_API_KEY?.trim() || requireEnv("ELEVENLABS_API_KEY"));
   const response = await fetch(`${BASE_URL}${path}`, { ...init, headers });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);

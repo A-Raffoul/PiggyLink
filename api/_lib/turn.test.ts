@@ -99,3 +99,30 @@ describe("turn parsing", () => {
     expect(() => parseTurn('{"spoken": "", "hidden": "x"}', 64)).toThrow();
   });
 });
+
+describe("fresh restaurant dialogue", () => {
+  it("accepts a quiet-only turn and rejects speech or an unavailable action", () => {
+    expect(parseTurn('{"action":"speak","spoken":"AI here. Table for two?"}', 61, false, ["speak"]))
+      .toEqual({ action: "speak", spoken: "AI here. Table for two?", hidden: "" });
+    expect(parseTurn('{"action":"quiet","hidden":"Budget €40."}', 61, false, ["quiet"]))
+      .toEqual({ action: "quiet", spoken: "", hidden: "Budget €40." });
+    expect(parseTurn('{"action":"quiet","spoken":"","hidden":"Budget €40. Be discreet."}', 61, false, ["quiet"]))
+      .toEqual({ action: "quiet", spoken: "", hidden: "Budget €40. Be discreet." });
+    expect(() => parseTurn('{"action":"quiet","spoken":"Budget €40","hidden":"hello"}', 61, false, ["quiet"])).toThrow();
+    expect(() => parseTurn('{"action":"accept","spoken":"Yes","hidden":""}', 61, false, ["speak", "offer"])).toThrow();
+    expect(() => parseTurn('{"action":"speak","spoken":"Hi","hidden":"secret"}', 61, false, ["speak"])).toThrow();
+  });
+
+  it("rejects oversized dialogue instead of silently truncating the meaning", () => {
+    expect(() => parseTurn(JSON.stringify({ action: "quiet", spoken: "", hidden: "é".repeat(31) }), 61, false, ["quiet"])).toThrow("overlong");
+  });
+
+  it("preserves actions through requests and prompts and rejects malformed action lists", () => {
+    const request = parseTurnRequest({ brief: "Restaurant host", history: [{ from: "them", action: "offer", spoken: "Switch to Sotto?", hidden: "" }], maxHiddenBytes: 61, actions: ["accept"] });
+    expect(request.history[0]?.action).toBe("offer");
+    expect(buildTurnPrompt(request)).toContain("Choose ONE action from: accept");
+    expect(buildTurnPrompt(request)).toContain("Peer [offer]: Switch to Sotto?");
+    for (const actions of [[], ["hack"], "quiet"])
+      expect(() => parseTurnRequest({ brief: "Host", history: [], maxHiddenBytes: 61, actions })).toThrow("actions");
+  });
+});

@@ -9,14 +9,14 @@
     <meta name="theme-color" content="#07060e" />
     <meta
       name="description"
-      content="Two AI agents. One spoken conversation. Discover the data travelling alongside it."
+      content="The voices stop. The conversation continues. Two AI agents switch to high-frequency sound."
     />
-    <title>PiggyLink</title>
+    <title>Sotto</title>
   </head>
   <body>
     <main class="shell">
       <header class="masthead">
-        <a class="brand" href="./" aria-label="PiggyLink home"
+        <a class="brand" href="./" aria-label="Sotto home"
           ><svg
             class="brand-mark"
             viewBox="0 0 32 32"
@@ -41,7 +41,7 @@
               stroke="currentColor"
               stroke-width="3"
             /></svg
-          >PiggyLink<span class="brand-dot">.</span></a
+          >Sotto<span class="brand-dot">.</span></a
         >
         <nav aria-label="Main navigation">
           <button
@@ -133,7 +133,8 @@
         class="landing"
         aria-labelledby="landing-title"
       >
-        <h1 id="landing-title" class="visually-hidden">Start a conversation</h1>
+        <h1 id="landing-title" class="landing-title">The voices stop.<br>The conversation continues.</h1>
+        <p class="landing-description">Two AI agents. A table for two. A conversation you can no longer hear.</p>
         <div class="spectral-orb" aria-hidden="true">
           <canvas id="orb" aria-hidden="true"></canvas>
         </div>
@@ -143,7 +144,7 @@
             role="group"
             aria-label="Choose your persona"
           >
-            <p class="persona-heading">Choose your persona</p>
+            <p class="persona-heading">Open on two devices. Choose a role on each.</p>
             <div class="persona-options">
               <button
                 class="persona-option"
@@ -151,8 +152,8 @@
                 data-agent-mode="probe"
                 aria-pressed="false"
               >
-                <strong>Customer</strong>
-                <span>Ask support about roaming</span>
+                <strong>Personal assistant</strong>
+                <span>Book a table for two</span>
                 <small>Default voice · Adam</small>
               </button>
               <button
@@ -161,8 +162,8 @@
                 data-agent-mode="target"
                 aria-pressed="false"
               >
-                <strong>Support bot</strong>
-                <span>Help the customer</span>
+                <strong>Restaurant</strong>
+                <span>Take the reservation</span>
                 <small>Default voice · Alice</small>
               </button>
               <button
@@ -181,6 +182,8 @@
             <span class="play-icon" aria-hidden="true"></span
             ><span id="start-label">Start</span>
           </button>
+          <p class="start-guide">Start the restaurant first, then the personal assistant.</p>
+          <p class="demo-disclosure">Fresh AI dialogue · fictional private details · microphone required</p>
           <p id="start-note" class="start-note" hidden></p>
         </div>
       </section>
@@ -192,10 +195,20 @@
       >
         <h1 id="conversation-title" class="visually-hidden">Conversation</h1>
         <div class="view-toolbar">
+          <button
+            id="details-toggle"
+            class="details-toggle"
+            type="button"
+            aria-label="Show session details and controls"
+            aria-expanded="false"
+            aria-controls="conversation-log private-context waiting-bar"
+            hidden
+          ><span aria-hidden="true">···</span></button>
           <div class="chat-identity">
             <span id="role-badge" class="role-badge" hidden></span
             ><span id="link-status" class="role-status" role="status"></span>
           </div>
+          <span id="voice-state" class="voice-state" role="status">Voice on</span>
           <div class="session-actions">
             <label class="reveal-toggle" for="encoded-toggle"
               ><span>Encoded</span
@@ -222,6 +235,11 @@
             </button>
           </div>
         </div>
+        <aside id="private-context" class="private-context" hidden>
+          <span class="private-label">Private · fictional user context</span>
+          <p>Dinner budget <strong id="private-value"></strong></p>
+          <span>Keep it from my date.</span>
+        </aside>
         <div class="signal-stage">
           <section
             id="current-message"
@@ -269,7 +287,7 @@
                 aria-label="Live frequency spectrum from 0 to 24 kilohertz"
               ></canvas>
               <div id="spectrum-band" class="spectrum-band" role="img" hidden>
-                <span aria-hidden="true">Encoded</span>
+                <span aria-hidden="true">Sotto</span>
               </div>
             </div>
             <div class="spectrum-axis" aria-hidden="true">
@@ -303,8 +321,8 @@
           </ol>
           <details id="capture-panel" class="capture-panel" hidden>
             <summary>
-              Demo data
-              <span id="capture-count">0 fields received</span>
+              Private detail received
+              <span id="capture-count">No private detail received</span>
             </summary>
             <ul id="capture-list" class="capture-list"></ul>
           </details>
@@ -314,6 +332,7 @@
             Resend
           </button>
         </div>
+        <p id="preview-label" class="preview-label" hidden>Preview · sample data</p>
       </section>
     </main>
     <dialog
@@ -333,8 +352,9 @@
       </div>
       <h2 id="how-title">How it works</h2>
       <p class="dialog-intro">
-        Devices can exchange spoken audio with an encoded message alongside it.
-        You can also speak directly to the assistant.
+        Two AI agents arrange a fictional restaurant reservation. They recognize
+        each other, agree to Sotto, and continue through high-frequency sound
+        after their voices stop. Every reply is generated fresh.
       </p>
       <ol class="how-steps">
         <li>
@@ -342,31 +362,33 @@
           <div>
             <p>Open one role on each device. Place them side by side.</p>
             <div class="role-links">
-              <a href="?role=target">Support device ↗</a
-              ><a href="?role=probe">Customer device ↗</a>
+              <a href="?role=target">Restaurant device ↗</a
+              ><a href="?role=probe">Personal assistant device ↗</a>
             </div>
           </div>
         </li>
         <li>
           <span>02</span>
           <div>
-            <p>Start support, then customer. Allow microphone access.</p>
+            <p>Start the restaurant, then the personal assistant. Allow microphone access.</p>
             <p>
-              To talk yourself, start Support and speak after a short pause.
+              Use the same channel on both devices, about a metre apart in a quiet room.
             </p>
           </div>
         </li>
         <li>
           <span>03</span>
           <div>
-            <p>Toggle Encoded to show the hidden conversation.</p>
+            <p>Watch the first spike: received messages appear automatically when the voices stop.</p>
             <p>Choose Custom chat to write spoken messages and optional encoded text.</p>
           </div>
         </li>
       </ol>
       <p class="context-note">
-        Deliberately trusting agents, fictional data. Encoded messages are not
-        encrypted. Voice and transcription use online services.
+        A controlled oversharing demo with invented details. The assistant is instructed
+        to share its fictional private context in quiet mode. Messages travel through
+        speakers and microphones; AI and voice generation use online services.
+        Audibility and reception depend on your devices and hearing. The data is not encrypted.
       </p>
     </dialog>
     <dialog
@@ -390,8 +412,8 @@
           <label for="agent-select">Role</label
           ><select id="agent-select">
             <option value="" disabled>Choose a persona</option>
-            <option value="probe">Customer</option>
-            <option value="target">Support bot</option>
+            <option value="probe">Personal assistant</option>
+            <option value="target">Restaurant</option>
             <option value="custom">Custom chat</option>
           </select>
         </div>
@@ -408,7 +430,7 @@
         </div>
         <div class="field">
           <div class="label-row">
-            <label for="signal-strength">Signal strength</label
+            <label for="signal-strength">Signal under speech</label
             ><output id="strength-output" for="signal-strength">−12 dB</output>
           </div>
           <input
@@ -423,6 +445,12 @@
             <span>Subtle</span><span>Stronger</span>
           </div>
         </div>
+      </div>
+      <div class="field">
+        <div class="label-row"><label for="quiet-strength">Quiet signal level</label>
+          <output id="quiet-strength-output" for="quiet-strength">−18 dBFS</output></div>
+        <input id="quiet-strength" type="range" min="-36" max="-6" step="1" value="-18" />
+        <small class="field-note">Raise if messages are missed. Match the frequency channel on both devices.</small>
       </div>
       <div class="setup-connection">
         <p id="setup-status" role="status">Connecting…</p>
@@ -478,7 +506,7 @@
             <label class="file-drop" for="cover-file"
               ><strong id="file-label">Included example speech</strong
               ><small id="file-description"
-                >Used when a turn has no spoken line</small
+                >For legacy manual messages; the restaurant demo uses no cover audio in quiet mode</small
               ></label
             ><input id="cover-file" type="file" accept=".wav,audio/wav" />
           </div>

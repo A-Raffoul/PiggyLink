@@ -46,6 +46,10 @@ export class Conversation {
     return this.nextSequence;
   }
 
+  hasSeen(frame: ChatFrame): boolean {
+    return this.seen.has(keyOf(frame));
+  }
+
   send(text: string, speechLead = 0): OutgoingMessage {
     if (!this.canSendWithoutReply && this.turnState !== "mine")
       throw new Error("Wait for a reply before sending again.");

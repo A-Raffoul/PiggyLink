@@ -1,4 +1,4 @@
-import type { FrequencyPreset } from "../core/config";
+import { validateFrequencyPreset, type FrequencyPreset } from "../core/config";
 import { createUltrasoundDecoder } from "../modem/ggwave";
 import { ChannelSense } from "./channel";
 import { AudioRing } from "./pcm";
@@ -45,7 +45,13 @@ export async function startAcousticEngine(
       throw error;
     audioContext = new AudioContext();
   }
-  await audioContext.resume();
+  try {
+    validateFrequencyPreset(options.preset, audioContext.sampleRate);
+    await audioContext.resume();
+  } catch (error) {
+    await audioContext.close();
+    throw error;
+  }
 
   let stream: MediaStream;
   try {

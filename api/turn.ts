@@ -20,6 +20,7 @@ export const POST = route(async (request) => {
           await write(prompt),
           turnRequest.maxHiddenBytes,
           turnRequest.spokenOnly,
+          turnRequest.actions,
         ),
       );
     } catch (error) {

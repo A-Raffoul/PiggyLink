@@ -1,4 +1,5 @@
 import { int16ToFloat32 } from "../audio/pcm";
+import type { DialogueAction } from "../core/quiet-dialogue";
 
 export type Writer = "elevenlabs" | "apertus";
 
@@ -16,11 +17,13 @@ export interface HistoryTurn {
   readonly from: "me" | "them";
   readonly spoken: string;
   readonly hidden: string;
+  readonly action?: DialogueAction;
 }
 
 export interface AgentTurn {
   readonly spoken: string;
   readonly hidden: string;
+  readonly action?: DialogueAction;
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<Response> {
@@ -55,6 +58,7 @@ export async function writeAgentTurn(request: {
   history: HistoryTurn[];
   maxHiddenBytes: number;
   spokenOnly?: boolean;
+  actions?: readonly DialogueAction[];
 }): Promise<AgentTurn> {
   return (await (await postJson("/api/turn", request)).json()) as AgentTurn;
 }

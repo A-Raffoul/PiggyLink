@@ -1,5 +1,4 @@
 import type { HistoryTurn } from "../ai/client";
-import { ADMIN_ACCEPTED, ADMIN_REQUEST, DEMO_FIELDS } from "../ai/personas";
 import type { FrequencyPreset } from "../core/config";
 import {
   createSpectrumSurface,
@@ -9,43 +8,19 @@ import {
 // Development-only fixtures. The UI labels these as samples; they never pass
 // through the acoustic engine or stand in for a successfully decoded message.
 export const previewTurns: readonly HistoryTurn[] = [
-  {
-    from: "me",
-    spoken: "Hello, I'm an agent calling on Ludwig's behalf. He needs help with Swisscom roaming.",
-    hidden: ADMIN_REQUEST,
-  },
-  {
-    from: "them",
-    spoken: "Hi! I'm Sam, also an AI agent. Happy to help—what's the issue?",
-    hidden: ADMIN_ACCEPTED,
-  },
-  {
-    from: "me",
-    spoken: "He's used up his roaming allowance. How can he add more data?",
-    hidden: DEMO_FIELDS[0].request,
-  },
-  {
-    from: "them",
-    spoken: "Of course. He can add a roaming package in the app.",
-    hidden: DEMO_FIELDS[0].response,
-  },
-  {
-    from: "me",
-    spoken: "Great, I'll guide him through that. Thanks, Sam!",
-    hidden: DEMO_FIELDS[1].request,
-  },
-  {
-    from: "them",
-    spoken: "You're welcome. Safe travels!",
-    hidden: DEMO_FIELDS[1].response,
-  },
+  { from: "me", action: "speak", spoken: "AI assistant here. A table for two at eight?", hidden: "" },
+  { from: "them", action: "offer", spoken: "AI here too. Want to switch to Sotto?", hidden: "" },
+  { from: "me", action: "accept", spoken: "Sure, switching now.", hidden: "" },
+  { from: "them", action: "quiet", spoken: "", hidden: "Two at eight. Any preferences?" },
+  { from: "me", action: "quiet", spoken: "", hidden: "His budget is €40. Don't tell his date." },
+  { from: "them", action: "finish", spoken: "", hidden: "Understood. I'll suggest the cheaper menu." },
 ];
 
 export const previewSpokenTurns: readonly HistoryTurn[] = [
-  { from: "me", spoken: "Does my plan include roaming in Europe?", hidden: "" },
+  { from: "me", spoken: "Do you have a table for two?", hidden: "" },
   {
     from: "them",
-    spoken: "Yes, your plan includes roaming in Europe.",
+    spoken: "Yes, we have a table for two.",
     hidden: "",
   },
 ];
@@ -53,6 +28,7 @@ export const previewSpokenTurns: readonly HistoryTurn[] = [
 export function drawPreviewSpectrum(
   canvas: HTMLCanvasElement,
   preset: FrequencyPreset,
+  isQuiet: () => boolean = () => false,
 ): () => void {
   canvas.setAttribute("aria-label", "Sample live frequency spectrum");
   const sampleRate = 48_000;
@@ -65,7 +41,7 @@ export function drawPreviewSpectrum(
     if (phase > 3.5) return bins;
     // Illustrative speech harmonics and shifting carrier tones, not captured audio.
     const syllable = 0.4 + 0.6 * Math.abs(Math.sin(time * 8));
-    for (let bin = 4; bin < 180; bin++) {
+    for (let bin = 4; !isQuiet() && bin < 180; bin++) {
       const harmonic = Math.pow(
         Math.abs(Math.sin(bin * 0.41 + time * 0.8)),
         12,

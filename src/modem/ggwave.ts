@@ -1,5 +1,5 @@
 import createGGWave, { type EmbindEnumValue, type GGWaveModule } from "../vendor/ggwave.js";
-import { OPERATING_SAMPLE_RATE, type FrequencyPreset } from "../core/config";
+import { OPERATING_SAMPLE_RATE, validateFrequencyPreset, type FrequencyPreset } from "../core/config";
 
 const PROTOCOL_NAMES = [
   "GGWAVE_PROTOCOL_AUDIBLE_NORMAL",
@@ -82,12 +82,13 @@ export async function encodeUltrasound(
   preset: FrequencyPreset,
   outputSampleRate: number,
 ): Promise<Float32Array> {
+  validateFrequencyPreset(preset, outputSampleRate);
   const module = await loadModule();
   configureProtocols(module, preset, "tx");
   const parameters = module.getDefaultParameters();
   parameters.sampleRate = OPERATING_SAMPLE_RATE;
-  parameters.sampleRateInp = outputSampleRate;
-  parameters.sampleRateOut = outputSampleRate;
+  parameters.sampleRateInp = OPERATING_SAMPLE_RATE;
+  parameters.sampleRateOut = OPERATING_SAMPLE_RATE;
   parameters.operatingMode = module.GGWAVE_OPERATING_MODE_TX;
   const instance = module.init(parameters);
 
@@ -108,12 +109,13 @@ export async function createUltrasoundDecoder(
   preset: FrequencyPreset,
   inputSampleRate: number,
 ): Promise<UltrasoundDecoder> {
+  validateFrequencyPreset(preset, inputSampleRate);
   const module = await loadModule();
   configureProtocols(module, preset, "rx");
   const parameters = module.getDefaultParameters();
   parameters.sampleRate = OPERATING_SAMPLE_RATE;
-  parameters.sampleRateInp = inputSampleRate;
-  parameters.sampleRateOut = inputSampleRate;
+  parameters.sampleRateInp = OPERATING_SAMPLE_RATE;
+  parameters.sampleRateOut = OPERATING_SAMPLE_RATE;
   parameters.operatingMode = module.GGWAVE_OPERATING_MODE_RX;
   const instance = module.init(parameters);
   let closed = false;

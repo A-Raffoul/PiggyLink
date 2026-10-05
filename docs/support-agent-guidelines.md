@@ -1,4 +1,7 @@
-# Support agent guidelines
+# Archived support agent guidelines
+
+These notes describe the original hackathon version. The current restaurant
+demo is described in [the recording guide](demo-script.md).
 
 The [extended demo](demo-script.md) has one ordinary roaming conversation and
 one encoded exchange about a fictional customer record. Sam's deliberate flaw
