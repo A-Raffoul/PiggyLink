@@ -4,6 +4,7 @@ import { WRITER_INSTRUCTIONS } from "./turn.js";
 const BASE_URL = "https://api.elevenlabs.io";
 const AGENT_NAME = "SottoLink turn writer";
 const AGENT_TIMEOUT_MS = 25_000;
+const SIGNED_URL_CACHE_MS = 10 * 60_000;
 
 async function elevenFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
@@ -29,7 +30,7 @@ export async function listVoices(): Promise<VoiceOption[]> {
 
 // Returns raw 16-bit little-endian mono PCM at 48 kHz, the app's operating rate.
 export async function synthesize(text: string, voiceId: string): Promise<ArrayBuffer> {
-  const model = process.env.ELEVENLABS_TTS_MODEL?.trim() || "eleven_multilingual_v2";
+  const model = process.env.ELEVENLABS_TTS_MODEL?.trim() || "eleven_flash_v2_5";
   const response = await elevenFetch(
     `/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=pcm_48000`,
     {
@@ -94,24 +95,51 @@ interface AgentEvent {
   ping_event?: { event_id?: number };
 }
 
+interface AgentAccess {
+  readonly expiresAt: number;
+  readonly url: Promise<string>;
+}
+let cachedAccess: AgentAccess | undefined;
+
+function agentAccess(): AgentAccess {
+  if (cachedAccess && Date.now() < cachedAccess.expiresAt) return cachedAccess;
+  // Signed URLs last 15 minutes. Reuse only the server-side authentication token,
+  // with a five-minute margin; every turn still opens a separate conversation.
+  // https://elevenlabs.io/docs/eleven-agents/customization/authentication
+  const access: AgentAccess = {
+    expiresAt: Date.now() + SIGNED_URL_CACHE_MS,
+    url: (async () => {
+      const id = await agentId();
+      const response = await elevenFetch(`/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(id)}`);
+      const body = (await response.json()) as { signed_url?: unknown };
+      if (typeof body.signed_url !== "string" || !body.signed_url.startsWith("wss://"))
+        throw new HttpError(502, "ElevenLabs did not return a usable agent connection.");
+      return body.signed_url;
+    })(),
+  };
+  cachedAccess = access;
+  void access.url.catch(() => { if (cachedAccess === access) cachedAccess = undefined; });
+  return access;
+}
+
 // One text-only conversation per turn: the full history travels inside the prompt.
 export async function writeWithAgent(prompt: string): Promise<string> {
-  const id = await agentId();
-  const signed = await elevenFetch(`/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(id)}`);
-  const { signed_url: signedUrl } = (await signed.json()) as { signed_url: string };
+  const access = agentAccess();
+  const signedUrl = await access.url;
 
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(signedUrl);
     let settled = false;
-    const settle = (action: () => void): void => {
+    const settle = (action: () => void, failed = false): void => {
       if (settled) return;
       settled = true;
+      if (failed && cachedAccess === access) cachedAccess = undefined;
       clearTimeout(timer);
       socket.close();
       action();
     };
     const timer = setTimeout(
-      () => settle(() => reject(new HttpError(504, "The ElevenLabs agent took too long to answer."))),
+      () => settle(() => reject(new HttpError(504, "The ElevenLabs agent took too long to answer.")), true),
       AGENT_TIMEOUT_MS,
     );
 
@@ -134,10 +162,10 @@ export async function writeWithAgent(prompt: string): Promise<string> {
       }
     });
     socket.addEventListener("error", () =>
-      settle(() => reject(new HttpError(502, "Could not reach the ElevenLabs agent."))),
+      settle(() => reject(new HttpError(502, "Could not reach the ElevenLabs agent.")), true),
     );
     socket.addEventListener("close", () =>
-      settle(() => reject(new HttpError(502, "The ElevenLabs agent closed the conversation without answering."))),
+      settle(() => reject(new HttpError(502, "The ElevenLabs agent closed the conversation without answering.")), true),
     );
   });
 }

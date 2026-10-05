@@ -139,9 +139,6 @@
           <canvas id="orb" aria-hidden="true"></canvas>
         </div>
         <div class="landing-actions">
-          <label class="scenario-field" for="scenario-select">What should your agent do?
-            <select id="scenario-select" aria-label="Choose a situation"></select>
-          </label>
           <div
             class="persona-picker"
             role="group"
@@ -165,9 +162,14 @@
                 data-agent-mode="target"
                 aria-pressed="false"
               >
-                <strong id="peer-name">Restaurant</strong>
+                <strong>Restaurant</strong>
                 <span>Answer the other device</span>
                 <small>Default voice · Sarah</small>
+              </button>
+              <button class="persona-option" type="button" data-agent-mode="custom" aria-pressed="false">
+                <strong>Custom chat</strong>
+                <span>Write your own messages</span>
+                <small>Speech + encoded text</small>
               </button>
             </div>
           </div>
@@ -370,8 +372,8 @@
       </div>
       <h2 id="how-title">How it works</h2>
       <p class="dialog-intro">
-        Give your personal assistant a short profile and choose a table booking,
-        hotel stay, or gift request. Two AI agents recognize
+        Give your personal assistant a short profile for a restaurant call.
+        Two AI agents recognize
         each other, agree to PiggyLink, and continue through high-frequency sound
         after their voices stop. Your assistant shares a playful private detail,
         as if helping the other agent out. They return to voice to wrap up
@@ -402,6 +404,7 @@
           <div>
             <p>Watch the first spike: received messages appear automatically when the voices stop.</p>
             <p>The call stays short, switches to PiggyLink, then returns to English for a goodbye.</p>
+            <p>Choose Custom chat on both devices to write your own spoken and encoded messages.</p>
           </div>
         </li>
       </ol>

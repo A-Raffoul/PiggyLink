@@ -1018,16 +1018,15 @@ input[type="range"] {
 }
 .persona-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   max-width: 810px;
   margin: 0 auto;
 }
 
-.scenario-field, .profile-setup { width: min(100%, 640px); text-align: left; }
-.scenario-field { display: grid; gap: 8px; font-size: 0.875rem; color: var(--muted); }
+.profile-setup { width: min(100%, 640px); text-align: left; }
 .profile-setup { border: 1px solid var(--control-line); border-radius: 14px; padding: 16px; background: var(--surface-field); }
-.scenario-field[hidden], .profile-setup[hidden] { display: none; }
+.profile-setup[hidden] { display: none; }
 .profile-setup summary { cursor: pointer; color: var(--bone); font-weight: 600; }
 .profile-setup details { margin-bottom: 16px; }
 .profile-setup fieldset { display: grid; gap: 14px; margin: 8px 0 0; padding: 0; border: 0; min-width: 0; }

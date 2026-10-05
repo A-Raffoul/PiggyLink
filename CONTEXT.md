@@ -6,8 +6,9 @@ agree to PiggyLink, and continue exchanging text through high-frequency sound
 after their voices stop. Both spoken and quiet dialogue are generated fresh.
 After a short quiet exchange, they return to spoken English to close the call.
 The default caller is explicitly prompted to overshare a fictional private CHF 50
-budget as a discreet aside meant to help the restaurant. Visitors can instead
-choose a hotel or gift scenario and supply their own short, playful profile.
+budget as a discreet aside meant to help the restaurant. Visitors can customize
+the assistant's short, playful profile. Restaurant is the only automatic scenario;
+Custom chat remains available for visitors' own messages.
 This demonstrates a configured behavior, not spontaneous deception.
 
 ## Language
@@ -16,7 +17,7 @@ This demonstrates a configured behavior, not spontaneous deception.
 Only this role's initial model prompt includes the private profile. Its existing
 internal role and URL parameter remain `probe`.
 
-**Other agent**: the restaurant, hotel, or gift-shop agent handling the request.
+**Other agent**: the restaurant agent handling the request.
 It learns the private detail from an acoustic message, never from its initial
 role prompt. Internal role: `target`.
 
@@ -55,7 +56,14 @@ Public example profiles are included in the browser. A visitor's profile is sent
 to the online AI service, so this is not a demonstration of secret storage.
 
 **Custom chat**: the retained manual mode, including speech recognition,
-optional encoded messages, and the Encoded visibility toggle.
+optional encoded messages, and the Encoded visibility toggle. It is available
+directly on the landing page alongside Personal assistant and Restaurant.
+
+**Reply latency**: AI generation, voice generation, and channel clearance all
+contribute. Flash is the default voice model. Warm servers reuse the provider's
+authentication token for ten minutes, with a new conversation for each turn.
+Automatic replies begin immediately after receipt; a per-turn gate prevents
+duplicate preparation. Listen-before-talk and collision backoff remain active.
 
 **Live spectrum**: microphone energy across frequency. The decorative landing
 orb is not a measurement. Development preview uses a labelled simulated spectrum.

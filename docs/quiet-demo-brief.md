@@ -49,13 +49,15 @@ name, with the existing piggy-link.cloud domain.
 
 ## Public try-it experience
 
-Two nearby devices are required. The caller chooses a restaurant, hotel, or gift
-scenario and can customize a short profile. Its setup link gives the other device
+Two nearby devices are required. The caller can customize a short profile for
+the restaurant call. Its setup link gives the other device
 only the scenario and role. Separate server-built prompts give only the caller
 the profile; the other agent learns the detail through sound. The server enforces
 the ten-turn call: a brief opening, explicit PiggyLink agreement, one private
 aside and reply, a return-to-voice request, then a spoken close and goodbye.
 The profile form explains the intentional sharing and encourages fictional details.
+The hotel and gift scenarios were removed to keep the experience focused.
+Custom chat remains available on the landing page for manually composed messages.
 
 ## Agreed presentation
 

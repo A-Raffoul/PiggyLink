@@ -2,8 +2,8 @@
 
 **The voices stop. The conversation continues.**
 
-Give a personal assistant a short profile and a task: book a table, arrange a
-hotel stay, or find a gift. The other agent answers with an ordinary greeting.
+Give a personal assistant a short profile and a restaurant booking request.
+The restaurant answers with an ordinary greeting.
 The agents discuss the request and recognize each other,
 agree to switch to PiggyLink, and continue through high-frequency sound while their
 voices go quiet. The caller then overshares one private detail as a discreet,
@@ -26,7 +26,7 @@ npm run dev
 
 Set `ELEVENLABS_API_KEY` in `.env.local` for dialogue and voices. The older
 `ELEVEN_LABS_API_KEY` spelling is also accepted. Open the app on two nearby
-devices. Choose **Personal assistant**, select a situation, and optionally edit
+devices. Choose **Personal assistant** and optionally edit
 the example profile. Open its other-device link on the second device and start
 that agent first, then start the assistant. The other agent delivers the first
 spoken greeting. Both devices must use the same channel.
@@ -34,8 +34,8 @@ Microphones require HTTPS outside localhost; a 48 kHz browser audio context is
 required. Hearing and acoustic reception depend on the devices and room.
 
 Role links remain `?role=target` (other agent) and `?role=probe` (assistant).
-The `scenario` parameter accepts `restaurant`, `hotel`, or `gift`. The link never
-contains profile details; the call packet announces only the selected situation.
+The other device uses the **Restaurant** role. The link never contains profile
+details. **Custom chat** remains available for your own spoken and encoded messages.
 The public experience requires two real devices.
 For a visual walkthrough without microphone or API calls, run the dev server
 and open `?preview=1&role=target`. That preview is labelled sample data and uses
@@ -61,6 +61,9 @@ illustrative messages and a simulated spectrum; it is excluded from production.
   be resent without advancing the conversation twice.
 - Device-to-device delivery is acoustic. Conversation history is also sent to
   the online AI service to generate replies; messages are not encrypted.
+- Voices default to ElevenLabs Flash for faster replies, keeping Chris and Sarah.
+  `ELEVENLABS_TTS_MODEL` can override the model. Authentication is reused on warm
+  servers, while each generated turn has its own conversation context.
 
 ```sh
 npm test

@@ -17,7 +17,8 @@ import {
   type AgentMode,
   type Role,
 } from "./ai/personas";
-import { SCENARIOS, SCENARIO_IDS, PROFILE_LIMITS, exampleProfile, isScenario, peerLink, type DemoConfig, type DemoProfile, type ScenarioId } from "./core/demo";
+import { SCENARIOS, PROFILE_LIMITS, exampleProfile, isScenario, peerLink, type DemoConfig, type DemoProfile } from "./core/demo";
+import { AutoReplyGate } from "./core/auto-reply";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import { SPECTRUM_MAX_HZ } from "./audio/frequency-spectrum";
 import {
@@ -91,7 +92,6 @@ const quietStrengthOutput = element<HTMLOutputElement>("quiet-strength-output");
 const voiceState = element<HTMLElement>("voice-state");
 const privateContext = element<HTMLElement>("private-context");
 const privateValue = element<HTMLElement>("private-value");
-const scenarioSelect = element<HTMLSelectElement>("scenario-select");
 const profileSetup = element<HTMLElement>("profile-setup");
 const profileForm = element<HTMLFormElement>("profile-form");
 const profileFields = element<HTMLFieldSetElement>("profile-fields");
@@ -100,7 +100,6 @@ const profileRequest = element<HTMLTextAreaElement>("profile-request");
 const profilePrivate = element<HTMLTextAreaElement>("profile-private");
 const otherDeviceLink = element<HTMLInputElement>("other-device-link");
 const copyDeviceLink = element<HTMLButtonElement>("copy-device-link");
-const peerName = element<HTMLElement>("peer-name");
 const startGuide = element<HTMLElement>("start-guide");
 const spectrumCanvas = element<HTMLCanvasElement>("spectrum");
 const spectrumBand = element<HTMLElement>("spectrum-band");
@@ -208,6 +207,7 @@ const CURRENT_MESSAGE_MS = 4_000;
 let speechTranscribing = false;
 let encodedReceiveVersion = 0;
 let autoTurnsUsed = 0;
+const autoReplies = new AutoReplyGate();
 let voices: VoiceOption[] = [];
 let hasStarted = false;
 let detailsVisible = false;
@@ -281,20 +281,11 @@ function saveSettings(): void {
 }
 
 const stored = readSettings();
-for (const id of SCENARIO_IDS) {
-  const option = document.createElement("option");
-  option.value = id;
-  option.textContent = SCENARIOS[id].label;
-  scenarioSelect.append(option);
-}
-const linkedScenario = pageParams.get("scenario");
-scenarioSelect.value = isScenario(linkedScenario) ? linkedScenario : "restaurant";
 profileName.maxLength = PROFILE_LIMITS.name;
 profileRequest.maxLength = PROFILE_LIMITS.request;
 profilePrivate.maxLength = PROFILE_LIMITS.privateContext;
-function selectedScenario(): ScenarioId { return scenarioSelect.value as ScenarioId; }
 function setExampleProfile(): void {
-  const profile = exampleProfile(selectedScenario());
+  const profile = exampleProfile("restaurant");
   profileName.value = profile.name;
   profileRequest.value = profile.request;
   profilePrivate.value = profile.privateContext;
@@ -305,7 +296,7 @@ function readProfile(): DemoProfile {
 function currentDemo(): DemoConfig {
   const role = effectiveRole();
   if (!role) throw new Error("Choose a role for the demo.");
-  return { scenario: selectedScenario(), role, ...(role === "probe" ? { profile: readProfile() } : {}) };
+  return { scenario: "restaurant", role, ...(role === "probe" ? { profile: readProfile() } : {}) };
 }
 setExampleProfile();
 const linkedRole = pageParams.get("role");
@@ -334,7 +325,7 @@ const isListenerMode = (): boolean => agentMode() === "target";
 function refreshAgent(): void {
   const mode = agentMode();
   const role = effectiveRole();
-  const scenario = SCENARIOS[selectedScenario()];
+  const scenario = SCENARIOS.restaurant;
   const brief = role === "probe" ? profileRequest.value : role === "target" ? `Answer the call at ${scenario.business} and help with the request.` : "";
   if (agentBrief.value !== brief) agentBrief.value = brief;
   agentBrief.readOnly = true;
@@ -374,8 +365,6 @@ function refreshAgent(): void {
   privateContext.hidden = mode !== "probe";
   privateValue.textContent = profilePrivate.value;
   profileSetup.hidden = mode !== "probe";
-  scenarioSelect.closest("label")!.hidden = mode === "custom";
-  peerName.textContent = scenario.peer;
   const targetOption = agentSelect.querySelector<HTMLOptionElement>('option[value="target"]');
   if (targetOption) targetOption.textContent = scenario.peer;
   startGuide.textContent = mode === "target"
@@ -385,7 +374,7 @@ function refreshAgent(): void {
       : mode === "custom"
         ? "Open Custom chat on both devices to exchange your own messages."
         : "Choose a role on each device. Start the other agent first, then the personal assistant.";
-  otherDeviceLink.value = peerLink(window.location.href, selectedScenario());
+  otherDeviceLink.value = peerLink(window.location.href, "restaurant");
   encodedToggle.closest("label")!.hidden = mode !== "custom";
   for (const button of personaButtons)
     button.setAttribute(
@@ -727,7 +716,6 @@ function render(): void {
   agentSelect.disabled = started;
   agentBrief.disabled = started;
   profileFields.disabled = started;
-  scenarioSelect.disabled = started;
   const phase = dialogueState(history).phase;
   const latest = history.at(-1);
   const accepting = latest?.action === "accept" && latest.from === "me" &&
@@ -1126,17 +1114,17 @@ async function maybeAutoReply(
     );
     return;
   }
-  await record.transcript;
-  await sleep(150);
-  if (
-    session !== active ||
-    history.at(-1) !== record ||
-    !autoReplyInput.checked ||
-    !canAct()
-  )
-    return;
-  autoTurnsUsed += 1;
-  await agentTurn();
+  await autoReplies.run(record, async () => {
+    await record.transcript;
+    if (
+      session !== active ||
+      history.at(-1) !== record ||
+      !autoReplyInput.checked ||
+      !canAct()
+    ) return;
+    autoTurnsUsed += 1;
+    await agentTurn();
+  });
 }
 
 // Extract only from the received payload; the restaurant UI does not infer a
@@ -1162,7 +1150,7 @@ function recordCapture(hidden: string): void {
 
 async function sendControl(active: Session, action: "call" | "ack"): Promise<void> {
   try {
-    const turn = await prepareTurn(active, "", encodeDialogue({ action, text: action === "call" ? selectedScenario() : "." }), true);
+    const turn = await prepareTurn(active, "", encodeDialogue({ action, text: action === "call" ? "restaurant" : "." }), true);
     if (session !== active) return;
     outgoing.set(turn.message.frame.sequence, turn);
     await transmit(turn);
@@ -1213,11 +1201,6 @@ function handleData(bytes: Uint8Array): void {
       return;
     }
     if (packet?.action === "call") {
-      if (isScenario(packet.text)) {
-        scenarioSelect.value = packet.text;
-        setExampleProfile();
-        refreshAgent();
-      }
       establishLink();
       render();
       if (autoReplyInput.checked) void agentTurn();
@@ -1552,7 +1535,7 @@ changeSetupButton.addEventListener("click", () => {
   clearConversationView();
   refreshAgent();
   render();
-  scenarioSelect.focus();
+  personaButtons[0]?.focus();
 });
 function chooseAgent(mode: AgentMode): void {
   const previousMode = personaButtons.find(
@@ -1565,11 +1548,6 @@ function chooseAgent(mode: AgentMode): void {
   render();
 }
 agentSelect.addEventListener("change", () => chooseAgent(agentMode()));
-scenarioSelect.addEventListener("change", () => {
-  setExampleProfile();
-  copyDeviceLink.textContent = "Copy link";
-  refreshAgent();
-});
 profileForm.addEventListener("submit", (event) => { event.preventDefault(); void runDemo(); });
 for (const field of [profileName, profileRequest, profilePrivate]) field.addEventListener("input", refreshAgent);
 copyDeviceLink.addEventListener("click", async () => {

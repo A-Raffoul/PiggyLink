@@ -3,7 +3,7 @@
 ## Dialogue and transport
 
 The caller (`probe`) and other agent (`target`) start with separate server-built
-model prompts. Scenarios are restaurant, hotel, and gift shop. Only the caller
+model prompts. Restaurant is the only automatic scenario. Only the caller
 prompt contains the visitor's profile; the target API rejects a supplied profile.
 The fields are name (24 characters), request (120), and private context (180).
 Both roles generate
@@ -96,6 +96,21 @@ Optional: `ELEVENLABS_AGENT_ID`, `ELEVENLABS_AGENT_LLM`, `ELEVENLABS_TTS_MODEL`,
 `ELEVENLABS_STT_MODEL`. Apertus uses `APERTUS_API_KEY`, `APERTUS_BASE_URL`, and
 `APERTUS_MODEL` as before.
 
+The default TTS model is `eleven_flash_v2_5`, with Chris and Sarah as before.
+Set `ELEVENLABS_TTS_MODEL=eleven_multilingual_v2` to restore the earlier voice
+engine. [ElevenLabs documents the speed/quality tradeoff](https://elevenlabs.io/docs/eleven-api/guides/how-to/best-practices/latency-optimization).
+The agent's signed connection URL stays on the server and is cached for ten
+minutes, below the provider's [fifteen-minute expiry](https://elevenlabs.io/docs/eleven-agents/customization/authentication).
+Only authentication is cached: prompts, replies, and WebSocket conversations
+remain separate. Failed connections and token requests invalidate the cache.
+Cold server instances still perform the initial authentication request.
+
+Automatic replies no longer add a fixed 150 ms pause. A per-received-turn gate
+prevents duplicate generation when decoding and playback completion both request
+a reply. Channel sensing, the 400 ms clear interval, and random collision backoff
+are unchanged. Model latency and acoustic packet duration still contribute to
+the gap between turns.
+
 Inter-device delivery is through speakers and microphones. The model service
 receives conversation history for reply generation, including fictional private
 messages. Acoustic encoding is not encryption. The browser build includes public
@@ -122,7 +137,8 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 
 ### Local verification, 5 October 2026
 
-- 116 tests passed across 17 files; TypeScript and the production build passed.
+- The previous introduction update passed 116 tests across 17 files, TypeScript,
+  and the production build. The current latency and scenario update is recorded below.
 - The full 114-byte AI introduction passes route validation and acoustic loopback
   on all four frequency channels, as well as loopback mixed with example speech.
   The maximum 123-byte Unicode spoken message also decodes through the modem.
@@ -136,12 +152,13 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
   transcript decoded intact from the actual mixed waveform at the default 18 kHz
   channel; the carrier lasted 4.65 seconds. This is digital loopback, not a new
   physical speaker/microphone test.
-- Fresh personalized restaurant, hotel, and gift runs completed all ten turns.
+- Before the hotel and gift scenarios were retired, fresh personalized restaurant,
+  hotel, and gift runs completed all ten turns.
   The updated aside prompt produced “Between us, Alex has a dinner budget of
   CHF 50.” and “Just between us, Alex brings a teddy bear on trips.” The peers
   learned those details from received history and replied discreetly; the
   private details were not spoken. PiggyLink was named in the spoken switch.
-- Scenario setup packets for restaurant, hotel, and gift decode at 48 kHz.
+- The restaurant setup packet decodes at 48 kHz.
   The longer “Not sure he'd want this on tape” budget example also passes
   modem loopback on all four frequency channels (including a Unicode apostrophe).
 - The new profile screen has passed compilation and markup checks, but automated
@@ -172,4 +189,21 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
   scheduling, and any physical reception delay. Provider latency varies.
 - The user tested the previous version through the budget receipt on a phone.
   The new call connection and spoken closing still need a physical two-device test.
+
+### Latency and scenario update
+
+- 122 tests passed across 19 files; TypeScript and the production build passed.
+  Static markup checks confirm the restaurant and Custom chat controls are wired.
+  Chris's full introduction also decodes from the mixed waveform using Flash.
+- The authentication regression test initially reported two provider requests
+  for two consecutive turns. It now reports one request and two independent
+  conversations. Expiry, concurrent requests, and failure recovery are covered.
+- Two local greeting comparisons measured full audio generation at 670–1,062 ms
+  with Multilingual v2 and 240–300 ms with Flash v2.5. These are small samples,
+  not a guarantee for every device or deployment.
+- Before caching, authentication took 169 ms in one turn and 1,123 ms in another.
+  A warm turn after caching made no authentication request and completed dialogue
+  generation in 1,588 ms. Initial lookup and network variability still apply.
+- The hotel and gift presets are removed; the API rejects those scenario IDs.
+  The restaurant profile and manual Custom chat remain available.
   Audibility and final responsive layout review remain unverified in this session.

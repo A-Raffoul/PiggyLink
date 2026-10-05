@@ -69,16 +69,17 @@ screen, or a frequency spike by itself does not prove the other device received 
 The agents return to voice after the short quiet exchange. The final receiver
 acknowledges the spoken goodbye automatically. Stop both devices, then restart both for another
 fresh run. The earlier manual chat and Encoded toggle are available in Custom.
-After stopping, **Change setup** returns to the profile and situation choices.
+After stopping, **Change setup** returns to the profile and role choices.
 
 ## Visitor try-it flow
 
-Visitors use two real devices. On the assistant device they select a restaurant,
-hotel, or gift scenario, then edit the example name, request, and playful private
+Visitors use two real devices. On the assistant device they edit the example
+name, restaurant request, and playful private
 detail. Its other-device link selects the matching role and scenario without
 including profile data. Start that device first, then the assistant. The same
-short opening, PiggyLink switch, quiet aside, and spoken goodbye apply to all
-three situations. Public production has no simulated one-screen mode.
+short opening, PiggyLink switch, quiet aside, and spoken goodbye apply to the
+restaurant call. Custom chat remains available for manually composed messages.
+Public production has no simulated one-screen mode.
 
 Describe it as a controlled demonstration of oversharing using fictional context.
 The agent is explicitly instructed to share that detail in quiet mode. The demo

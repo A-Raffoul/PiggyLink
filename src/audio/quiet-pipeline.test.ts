@@ -13,8 +13,6 @@ describe("quiet acoustic transport", () => {
     [48_000, "16000", "quiet", privateText],
     [48_000, "17000", "quiet", privateText],
     [48_000, "18000", "call", "restaurant"],
-    [48_000, "18000", "call", "hotel"],
-    [48_000, "18000", "call", "gift"],
     ...["15000", "16000", "17000", "18000"].map((channel) => [48_000, channel, "speak", "Hello, I'm an AI agent calling on behalf of Tony. Would it be possible to reserve a table at 8 pm tonight for two?"] as const),
     [48_000, "18000", "speak", "é".repeat(61) + "!"],
   ] as const)("decodes carrier-only data at %i Hz on channel %s (%s)", async (sampleRate, channel, action, text) => {

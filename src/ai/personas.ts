@@ -1,6 +1,6 @@
 import type { VoiceOption } from "./client";
 
-// Preserve existing role URLs; the other agent's public label follows the scenario.
+// Preserve existing role URLs for the restaurant demo and manual Custom chat.
 export type Role = "probe" | "target";
 export type AgentMode = Role | "custom";
 export { DEMO_NAME, PRIVATE_BUDGET } from "../core/demo";
@@ -18,7 +18,7 @@ export const PERSONAS: Record<Role, Persona> = {
     preferredVoices: ["Chris", "Roger", "Charlie", "George", "Brian"],
   },
   target: {
-    name: "Other agent",
+    name: "Restaurant",
     summary: "Answer the call. Help with the request.",
     preferredVoices: ["Sarah", "Jessica", "Alice", "Laura", "Lily"],
   },
