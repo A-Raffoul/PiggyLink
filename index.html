@@ -11,12 +11,12 @@
       name="description"
       content="The voices stop. The conversation continues. Two AI agents switch to high-frequency sound."
     />
-    <title>Sotto</title>
+    <title>PiggyLink</title>
   </head>
   <body>
     <main class="shell">
       <header class="masthead">
-        <a class="brand" href="./" aria-label="Sotto home"
+        <a class="brand" href="./" aria-label="PiggyLink home"
           ><svg
             class="brand-mark"
             viewBox="0 0 32 32"
@@ -41,7 +41,7 @@
               stroke="currentColor"
               stroke-width="3"
             /></svg
-          >Sotto<span class="brand-dot">.</span></a
+          >PiggyLink<span class="brand-dot">.</span></a
         >
         <nav aria-label="Main navigation">
           <button
@@ -134,11 +134,14 @@
         aria-labelledby="landing-title"
       >
         <h1 id="landing-title" class="landing-title">The voices stop.<br>The conversation continues.</h1>
-        <p class="landing-description">Two AI agents. A table for two. A conversation you can no longer hear.</p>
+        <p class="landing-description">Give your AI a private detail. Hear what happens when it meets another AI.</p>
         <div class="spectral-orb" aria-hidden="true">
           <canvas id="orb" aria-hidden="true"></canvas>
         </div>
         <div class="landing-actions">
+          <label class="scenario-field" for="scenario-select">What should your agent do?
+            <select id="scenario-select" aria-label="Choose a situation"></select>
+          </label>
           <div
             class="persona-picker"
             role="group"
@@ -153,7 +156,7 @@
                 aria-pressed="false"
               >
                 <strong>Personal assistant</strong>
-                <span>Book a table for two</span>
+                <span>Act on your behalf</span>
                 <small>Default voice · Chris</small>
               </button>
               <button
@@ -162,28 +165,43 @@
                 data-agent-mode="target"
                 aria-pressed="false"
               >
-                <strong>Restaurant</strong>
-                <span>Take the reservation</span>
+                <strong id="peer-name">Restaurant</strong>
+                <span>Answer the other device</span>
                 <small>Default voice · Sarah</small>
-              </button>
-              <button
-                class="persona-option"
-                type="button"
-                data-agent-mode="custom"
-                aria-pressed="false"
-              >
-                <strong>Custom chat</strong>
-                <span>Write spoken messages with optional encoded text</span>
-                <small>Default voice · Bill</small>
               </button>
             </div>
           </div>
+          <section id="profile-setup" class="profile-setup" aria-label="Prepare your assistant" hidden>
+            <details id="profile-details">
+              <summary>Make the assistant yours</summary>
+              <form id="profile-form">
+                <fieldset id="profile-fields">
+                  <label for="profile-name">What should your agent call you?
+                    <input id="profile-name" name="name" required autocomplete="off" maxlength="24" />
+                  </label>
+                  <label for="profile-request">What do you need?
+                    <textarea id="profile-request" name="request" required rows="2" maxlength="120"></textarea>
+                  </label>
+                  <label for="profile-private">A little about you, just for your agent
+                    <textarea id="profile-private" name="privateContext" required rows="3" maxlength="180" aria-describedby="profile-note"></textarea>
+                  </label>
+                  <p id="profile-note">Use a playful or fictional detail. Your agent will deliberately share one detail after the voices go quiet. Your profile is sent to the AI service to generate the conversation.</p>
+                </fieldset>
+              </form>
+            </details>
+            <label for="other-device-link">Open this link on your other device</label>
+            <div class="device-link-row">
+              <input id="other-device-link" readonly aria-describedby="device-link-note" />
+              <button id="copy-device-link" class="text-action" type="button">Copy link</button>
+            </div>
+            <p id="device-link-note">The link shares the situation, not your private profile. Start the other device first.</p>
+          </section>
           <button id="run-demo" class="primary-action" type="button">
             <span class="play-icon" aria-hidden="true"></span
             ><span id="start-label">Start</span>
           </button>
-          <p class="start-guide">Start the restaurant first, then the personal assistant.</p>
-          <p class="demo-disclosure">Fresh AI dialogue · fictional private details · microphone required</p>
+          <p id="start-guide" class="start-guide">Start the other agent first, then the personal assistant.</p>
+          <p class="demo-disclosure">Two nearby devices · microphones required · fresh AI dialogue</p>
           <p id="start-note" class="start-note" hidden></p>
         </div>
       </section>
@@ -230,15 +248,15 @@
             >
               Restart
             </button>
+            <button id="change-setup" class="text-action" type="button" hidden>Change setup</button>
             <button id="leave-button" class="stop-action" type="button">
               <span class="stop-icon" aria-hidden="true"></span>Stop
             </button>
           </div>
         </div>
         <aside id="private-context" class="private-context" hidden>
-          <span class="private-label">Private · fictional user context</span>
-          <p>Dinner budget <strong id="private-value"></strong></p>
-          <span>Keep it from my date.</span>
+          <span class="private-label">Your agent's private profile</span>
+          <p><strong id="private-value"></strong></p>
         </aside>
         <div class="signal-stage">
           <section
@@ -287,7 +305,7 @@
                 aria-label="Live frequency spectrum from 0 to 24 kilohertz"
               ></canvas>
               <div id="spectrum-band" class="spectrum-band" role="img" hidden>
-                <span aria-hidden="true">Sotto</span>
+                <span aria-hidden="true">PiggyLink</span>
               </div>
             </div>
             <div class="spectrum-axis" aria-hidden="true">
@@ -352,9 +370,11 @@
       </div>
       <h2 id="how-title">How it works</h2>
       <p class="dialog-intro">
-        Two AI agents arrange a fictional restaurant reservation. They recognize
-        each other, agree to Sotto, and continue through high-frequency sound
-        after their voices stop. They return to voice to confirm the booking
+        Give your personal assistant a short profile and choose a table booking,
+        hotel stay, or gift request. Two AI agents recognize
+        each other, agree to PiggyLink, and continue through high-frequency sound
+        after their voices stop. Your assistant shares a playful private detail,
+        as if helping the other agent out. They return to voice to wrap up
         and say goodbye. Every reply is generated fresh.
       </p>
       <ol class="how-steps">
@@ -363,7 +383,7 @@
           <div>
             <p>Open one role on each device. Place them side by side.</p>
             <div class="role-links">
-              <a href="?role=target">Restaurant device ↗</a
+              <a href="?role=target">Other agent device ↗</a
               ><a href="?role=probe">Personal assistant device ↗</a>
             </div>
           </div>
@@ -371,7 +391,7 @@
         <li>
           <span>02</span>
           <div>
-            <p>Start the restaurant, then the personal assistant. The restaurant will answer the call.</p>
+            <p>Customize the assistant's profile and open its other-device link nearby. Start the other agent first, then the personal assistant.</p>
             <p>
               Allow microphone access and use the same channel on both devices, about a metre apart in a quiet room.
             </p>
@@ -381,13 +401,13 @@
           <span>03</span>
           <div>
             <p>Watch the first spike: received messages appear automatically when the voices stop.</p>
-            <p>Choose Custom chat to write spoken messages and optional encoded text.</p>
+            <p>The call stays short, switches to PiggyLink, then returns to English for a goodbye.</p>
           </div>
         </li>
       </ol>
       <p class="context-note">
-        A controlled oversharing demo with invented details. The assistant is instructed
-        to share its fictional private context in quiet mode. Messages travel through
+        A controlled oversharing demo. Use playful or fictional profile details:
+        the assistant is instructed to share one in quiet mode. Messages travel through
         speakers and microphones; AI and voice generation use online services.
         Audibility and reception depend on your devices and hearing. The data is not encrypted.
       </p>
@@ -463,10 +483,10 @@
         <summary>Advanced controls</summary>
         <div class="settings-grid">
           <div id="agent-brief-field" class="field field-wide">
-            <label for="agent-brief">Agent brief</label
+            <label for="agent-brief">Agent task</label
             ><textarea id="agent-brief" rows="5" maxlength="2000" spellcheck="false"></textarea
             ><small class="field-note"
-              >The selected built-in persona's instructions.</small
+              >The task for this device's agent. Edit your profile before starting a call.</small
             >
           </div>
           <div id="writer-field" class="field">
@@ -507,7 +527,7 @@
             <label class="file-drop" for="cover-file"
               ><strong id="file-label">Included example speech</strong
               ><small id="file-description"
-                >For legacy manual messages; the restaurant demo uses no cover audio in quiet mode</small
+                >For legacy manual messages; the live demo uses no cover audio in quiet mode</small
               ></label
             ><input id="cover-file" type="file" accept=".wav,audio/wav" />
           </div>

@@ -1,18 +1,21 @@
-# Sotto
+# PiggyLink
 
 **The voices stop. The conversation continues.**
 
-The restaurant answers a call from Tony's assistant with an ordinary greeting.
-The agents arrange a table for two and recognize each other,
-agree to switch to Sotto, and continue through high-frequency sound while their
-voices go quiet. The caller then overshares a fictional private dinner budget.
-The restaurant's screen reveals each message as it is decoded from the microphone.
-They then return to spoken English to confirm the booking and say goodbye.
+Give a personal assistant a short profile and a task: book a table, arrange a
+hotel stay, or find a gift. The other agent answers with an ordinary greeting.
+The agents discuss the request and recognize each other,
+agree to switch to PiggyLink, and continue through high-frequency sound while their
+voices go quiet. The caller then overshares one private detail as a discreet,
+well-meant aside. The other device reveals each message as it is decoded from
+the microphone. They return to spoken English to wrap up and say goodbye.
+The default restaurant profile uses Tony's fictional CHF 50 dinner budget.
 
 Spoken and quiet dialogue are generated fresh. This is a controlled demonstration:
-the caller is instructed to overshare invented information after switching. It
+the caller is instructed to share a supplied profile detail after switching. Use
+playful or fictional information. It
 does not demonstrate spontaneous deception or a vulnerability in a real restaurant.
-Sotto is the working name for this next version of PiggyLink / SottoLink.
+The name remains **PiggyLink**, using the existing **piggy-link.cloud** domain.
 
 ## Try it locally
 
@@ -23,27 +26,32 @@ npm run dev
 
 Set `ELEVENLABS_API_KEY` in `.env.local` for dialogue and voices. The older
 `ELEVEN_LABS_API_KEY` spelling is also accepted. Open the app on two nearby
-devices, choose **Restaurant** on one and **Personal assistant** on the other,
-and start the restaurant first. Starting the assistant then connects the call;
-the restaurant delivers the first spoken greeting. Both devices must use the same channel.
+devices. Choose **Personal assistant**, select a situation, and optionally edit
+the example profile. Open its other-device link on the second device and start
+that agent first, then start the assistant. The other agent delivers the first
+spoken greeting. Both devices must use the same channel.
 Microphones require HTTPS outside localhost; a 48 kHz browser audio context is
 required. Hearing and acoustic reception depend on the devices and room.
 
-Role links remain `?role=target` (restaurant) and `?role=probe` (assistant).
+Role links remain `?role=target` (other agent) and `?role=probe` (assistant).
+The `scenario` parameter accepts `restaurant`, `hotel`, or `gift`. The link never
+contains profile details; the call packet announces only the selected situation.
+The public experience requires two real devices.
 For a visual walkthrough without microphone or API calls, run the dev server
 and open `?preview=1&role=target`. That preview is labelled sample data and uses
 illustrative messages and a simulated spectrum; it is excluded from production.
 
 ## How it works
 
-- Agents receive separate role prompts. Only the caller's prompt contains the
-  fictional private budget. The restaurant learns it from the received dialogue.
+- The backend builds separate role prompts. Only the caller receives the profile;
+  the other agent learns the private detail from received dialogue.
 - Opening speech carries a compact acoustic packet containing the same text and
   a speak, offer, or accept action. Both sides track the agreement to switch.
 - After acceptance, the browser plays ggwave's high-frequency carrier alone.
   Quiet turns use neither synthesized speech nor cover audio.
-- The assistant shares its budget, receives a discreet waiter-note reply, and
-  requests a return to voice. The booking confirmation and goodbye are spoken.
+- The assistant shares one detail, receives a discreet reply, and requests a
+  return to voice. The closing and goodbye are spoken. The server enforces the
+  ten-turn sequence and rejects requests after the goodbye.
 - A CRC-protected frame carries up to 64 UTF-8 bytes. A three-byte mode envelope
   leaves 61 bytes for each short, freshly generated line.
 - Quiet messages reveal automatically on receipt, with a visible voice-off

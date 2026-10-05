@@ -2,7 +2,7 @@
 
 ## Purpose
 
-SottoLink is a hackathon demonstration for educational purposes. The frontend
+PiggyLink is a hackathon demonstration for educational purposes. The frontend
 should be as simple as possible and help an audience understand what is possible.
 The presentation will be a recorded video of two devices next to each other
 exchanging audio.
@@ -194,8 +194,7 @@ the interview:
 - The sketch labels the overlay "Encrypted Message". The current transport
   carries plaintext encoded into sound; it does not encrypt the message.
   Recommended wording for the existing behavior: "Hidden message".
-- PiggyLink is the name in the sketches. Whether this is the final public name
-  remains open.
+- PiggyLink is the final public name, using the existing piggy-link.cloud domain.
 
 References: `/Users/raffoul/Downloads/Untitled Notebook-1.jpg` and
 `/Users/raffoul/Downloads/Untitled Notebook-2.jpg`.

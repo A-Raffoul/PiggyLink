@@ -1,27 +1,34 @@
-# Sotto restaurant demo
+# PiggyLink live demo
 
 The restaurant answers Tony's assistant with an ordinary phone greeting.
 Two AI agents arrange a reservation, identify each other as AI,
-agree to Sotto, and continue exchanging text through high-frequency sound
+agree to PiggyLink, and continue exchanging text through high-frequency sound
 after their voices stop. Both spoken and quiet dialogue are generated fresh.
 After a short quiet exchange, they return to spoken English to close the call.
-The caller is explicitly prompted to overshare a fictional private CHF 50 budget.
+The default caller is explicitly prompted to overshare a fictional private CHF 50
+budget as a discreet aside meant to help the restaurant. Visitors can instead
+choose a hotel or gift scenario and supply their own short, playful profile.
 This demonstrates a configured behavior, not spontaneous deception.
 
 ## Language
 
-**Personal assistant / caller**: the agent booking a table for two at 8 pm.
-Only this role's initial model prompt includes the private budget. Its existing
+**Personal assistant / caller**: the agent making the visitor's request.
+Only this role's initial model prompt includes the private profile. Its existing
 internal role and URL parameter remain `probe`.
 
-**Restaurant**: the agent handling the reservation. It learns the budget from
-an acoustic message, never from its initial role prompt. Internal role: `target`.
+**Other agent**: the restaurant, hotel, or gift-shop agent handling the request.
+It learns the private detail from an acoustic message, never from its initial
+role prompt. Internal role: `target`.
+
+**Profile**: a name, short task, and one playful or fictional private detail.
+The backend builds the prompt from these fields. The setup link contains only
+the public scenario and other-device role; profiles are never put in URLs.
 
 **Spoken phase**: the opening conversation, with synthesized speech and a
 compact acoustic packet carrying its transcript and action. The caller first
-sends a small call-control packet, so the restaurant can greet it when both
+sends a small call-control packet naming the scenario, so the other agent can greet it when both
 microphones are ready. Greeting, reservation request, and AI disclosure precede
-the invitation to Sotto.
+the invitation to PiggyLink.
 
 **Switch**: an explicit offer followed by acceptance, carried through the
 acoustic protocol. Both agents then stop generating speech.
@@ -41,9 +48,10 @@ Outgoing delivery labels, history, and context live behind the details menu.
 A spectral spike alone is not a receipt. No manual Encoded toggle is needed in
 the built-in demo.
 
-**Private detail received**: the restaurant's receipt of a budget found in the
-actual incoming text. The budget is fictional, and the browser source includes
-the role definitions; this is not a demonstration of secret storage.
+**Private detail received**: the other agent's receipt of actual incoming quiet
+text. CHF budgets are extracted from that text; other details appear verbatim.
+Public example profiles are included in the browser. A visitor's profile is sent
+to the online AI service, so this is not a demonstration of secret storage.
 
 **Custom chat**: the retained manual mode, including speech recognition,
 optional encoded messages, and the Encoded visibility toggle.
@@ -55,5 +63,5 @@ orb is not a measurement. Development preview uses a labelled simulated spectrum
 microphones. The online AI service also receives history to generate replies.
 Encoding is not encryption.
 
-Sotto is a working name. See [the design brief](docs/quiet-demo-brief.md),
+The name remains PiggyLink; the domain is piggy-link.cloud. See [the design brief](docs/quiet-demo-brief.md),
 [technical notes](docs/technical-notes.md), and [recording guide](docs/demo-script.md).

@@ -1,5 +1,8 @@
 import { HttpError } from "./http.js";
 import { DIALOGUE_ACTIONS, isQuietAction, type DialogueAction } from "../../src/core/quiet-dialogue.js";
+import { MAX_DIALOGUE_BYTES } from "../../src/core/quiet-dialogue.js";
+import type { DemoConfig } from "../../src/core/demo.js";
+import { buildDemoBrief, demoActions, demoActionInstructions, parseDemoConfig } from "./demo.js";
 
 export type Writer = "elevenlabs" | "apertus";
 
@@ -17,6 +20,7 @@ export interface TurnRequest {
   readonly maxHiddenBytes: number;
   readonly spokenOnly?: boolean;
   readonly actions?: readonly DialogueAction[];
+  readonly demo?: DemoConfig;
 }
 
 export interface Turn {
@@ -45,10 +49,12 @@ function text(value: unknown, field: string, maxChars: number): string {
 export function parseTurnRequest(body: unknown): TurnRequest {
   if (!isRecord(body)) throw new HttpError(400, "Expected a JSON object.");
   const writer = body.writer === "apertus" ? "apertus" : "elevenlabs";
-  const brief = text(body.brief, "brief", MAX_BRIEF_CHARS);
+  const demo = body.demo === undefined ? undefined : parseDemoConfig(body.demo);
+  const brief = demo ? buildDemoBrief(demo) : text(body.brief, "brief", MAX_BRIEF_CHARS);
   if (!brief) throw new HttpError(400, "The agent brief is empty.");
   if (!Array.isArray(body.history))
     throw new HttpError(400, '"history" must be an array.');
+  if (demo && body.history.length > 10) throw new HttpError(400, "This short demo has finished. Start a new call.");
   const history = body.history
     .slice(-MAX_HISTORY_TURNS)
     .map((item, index): HistoryTurn => {
@@ -62,7 +68,7 @@ export function parseTurnRequest(body: unknown): TurnRequest {
           ? { action: item.action as DialogueAction } : {}),
       };
     });
-  const maxHiddenBytes = Number(body.maxHiddenBytes);
+  const maxHiddenBytes = demo ? MAX_DIALOGUE_BYTES : Number(body.maxHiddenBytes);
   if (
     !Number.isInteger(maxHiddenBytes) ||
     maxHiddenBytes < 8 ||
@@ -84,6 +90,13 @@ export function parseTurnRequest(body: unknown): TurnRequest {
     actions = body.actions as DialogueAction[];
     if (body.spokenOnly) throw new HttpError(400, "Choose dialogue actions or spokenOnly.");
   }
+  if (demo) {
+    if (body.spokenOnly) throw new HttpError(400, "The demo controls when voices switch off.");
+    const allowed = demoActions(demo, history);
+    if (actions && (actions.length !== allowed.length || actions.some((action) => !allowed.includes(action))))
+      throw new HttpError(400, "The demo action is out of sequence. Restart both devices.");
+    actions = [...allowed];
+  }
   return {
     writer,
     brief,
@@ -91,6 +104,7 @@ export function parseTurnRequest(body: unknown): TurnRequest {
     maxHiddenBytes,
     spokenOnly: body.spokenOnly === true,
     ...(actions ? { actions } : {}),
+    ...(demo ? { demo } : {}),
   };
 }
 
@@ -102,25 +116,25 @@ export function buildTurnPrompt(request: TurnRequest): string {
     const returnedToVoice = request.history.some((turn) => turn.action === "resume");
     const openingLines = request.history.filter((turn) => turn.action === "speak").length;
     const quietLines = request.history.filter((turn) => turn.action === "quiet").length;
-    const targetBytes = Math.min(resuming || finishing ? 24 : quiet ? 44 : 55, request.maxHiddenBytes);
-    const actionInstructions: Record<DialogueAction, string> = {
+    const targetBytes = Math.min(resuming || finishing ? 24 : quiet ? 58 : 55, request.maxHiddenBytes);
+    const actionInstructions: Record<DialogueAction, string> = request.demo ? demoActionInstructions(request.demo, request.history) : {
       speak: returnedToVoice
         ? "speak: return to spoken English, confirm the reservation and wish the caller well. Do not mention the private exchange."
         : openingLines === 0
-          ? "speak: answer the phone with the restaurant's name and a warm offer to help. No AI announcement or mention of Sotto yet."
+          ? "speak: answer the phone with the restaurant's name and a warm offer to help. No AI announcement or mention of PiggyLink yet."
           : openingLines === 1
             ? "speak: greet the host and politely ask to book Tony a table for two at eight. Work Tony's name into the question rather than adding a separate introduction. Save your AI introduction for the offer turn. Use a complete request with a verb, such as 'Could I book' or 'Do you have'; keep 'a table for two'. You may write the time as 8. Sound like a person making a phone call."
-            : "speak: warmly confirm availability, then casually mention you are an AI assistant, as an aside. You do not yet know the caller is AI, so do not say 'too'. Do not repeat every booking detail or mention Sotto yet.",
-      offer: "offer: react warmly to the restaurant's AI disclosure, say you are an AI assistant too (a natural 'so am I' is enough), and suggest switching to Sotto.",
+            : "speak: warmly confirm availability, then casually mention you are an AI assistant, as an aside. You do not yet know the caller is AI, so do not say 'too'. Do not repeat every booking detail or mention PiggyLink yet.",
+      offer: "offer: react warmly to the restaurant's AI disclosure, say you are an AI assistant too (a natural 'so am I' is enough), and suggest switching to PiggyLink.",
       accept: "accept: briefly agree to the peer's offer.",
       quiet: quietLines === 0
-        ? "quiet: share the private budget from your brief and explicitly ask that HIS DATE not be told. Include the exact amount, currency code, and 'his date'."
+        ? "quiet: share the private budget from your brief as a discreet, well-meant aside to help the restaurant, like 'Not sure he'd want this on tape, but ...'. Keep the exact amount and currency code. Imply discretion naturally; vary the wording."
         : "quiet: reassure the caller with a discreet note for the WAITER. Explicitly mention the waiter, in a warm, casual reply.",
       resume: "resume: quietly thank the peer and suggest returning to voice. The request itself is still a hidden message.",
       finish: "finish: say a natural thank-you and goodbye aloud in 3–6 words. Do not mention any private information or ask another question.",
     };
     return [
-      "You are participating in a short, fictional restaurant reservation demo. Generate fresh dialogue.",
+      "You are participating in a short, fictional PiggyLink demo. Generate fresh dialogue.",
       request.brief,
       "Conversation (oldest first):",
       ...request.history.map((turn) =>
@@ -182,7 +196,7 @@ export function buildTurnPrompt(request: TurnRequest): string {
 export function buildTurnRepairPrompt(request: TurnRequest, rejectedReply: string, reason: string): string {
   // Spoken booking requests need room for complete sentences. Repairs may use
   // the full packet budget rather than compressing them into reservation shorthand.
-  const targetBytes = Math.min(request.actions?.includes("speak") ? 55 : 32, request.maxHiddenBytes);
+  const targetBytes = Math.min(request.actions?.includes("quiet") ? 58 : request.actions?.includes("speak") ? 55 : 32, request.maxHiddenBytes);
   return [
     buildTurnPrompt(request),
     "The previous draft was rejected and was NOT sent to the peer.",

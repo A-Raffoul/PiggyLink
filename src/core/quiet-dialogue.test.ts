@@ -41,15 +41,16 @@ describe("quiet conversation", () => {
     expect(() => encodeDialogue({ action: "quiet", text: "é".repeat(31) })).toThrow();
     expect(() => encodeDialogue({ action: "quiet", text: " " })).toThrow();
     expect(encodeDialogue({ action: "quiet", text: "x".repeat(MAX_DIALOGUE_BYTES) })).toHaveLength(64);
-    expect(decodeDialogue("S5xunrecognized")).toBeUndefined();
-    expect(decodeDialogue("S5q")).toBeUndefined();
+    expect(decodeDialogue("S6xunrecognized")).toBeUndefined();
+    expect(decodeDialogue("S6q")).toBeUndefined();
+    expect(decodeDialogue("S5sOld restaurant-only peer")).toBeUndefined();
     expect(decodeDialogue("S4fOld quiet ending")).toBeUndefined();
   });
 
   it("recovers a lost restaurant greeting when the caller rings again", () => {
     const caller = new Conversation("aaaa");
     const restaurant = new Conversation("bbbb");
-    const ring = caller.send(encodeDialogue({ action: "call", text: "." }));
+    const ring = caller.send(encodeDialogue({ action: "call", text: "restaurant" }));
     restaurant.receive(ring.frame);
     const greeting = restaurant.send(encodeDialogue({ action: "speak", text: "Bella Vita. How can I help?" }));
     expect(restaurant.receive(ring.frame)).toEqual({ kind: "resend-reply", message: greeting });
@@ -66,7 +67,7 @@ describe("quiet conversation", () => {
     const alice = new Conversation("aaaa");
     const bob = new Conversation("bbbb");
     const send = (device: Conversation, action: DialogueAction, text: string) => device.send(encodeDialogue({ action, text }));
-    bob.receive(send(alice, "offer", "Switch to Sotto?").frame);
+    bob.receive(send(alice, "offer", "Switch to PiggyLink?").frame);
     const acceptance = send(bob, "accept", "Sure.");
     const offer = alice.pending!;
     expect(bob.hasSeen(offer.frame)).toBe(true);

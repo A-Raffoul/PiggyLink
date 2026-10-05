@@ -1,6 +1,6 @@
 # Restaurant demo recording guide
 
-The agents arrange a table for two, identify each other as AI, agree to Sotto,
+The agents arrange a table for two, identify each other as AI, agree to PiggyLink,
 and stop using their voices. Their quiet conversation then reveals a fictional
 private CHF 50 dinner budget. They then return to spoken English for the booking
 confirmation and goodbye. Every live line is generated fresh; wording varies.
@@ -34,24 +34,26 @@ a phone. The default screen shows one current line, the frequency trace, and a
 small “Voice off” cue after the switch. Keep the details menu closed while filming.
 The private-context card, history, delivery labels, and receipt are available there
 for inspection; they are not part of the recording view. The message itself
-(“Don't tell his date”) establishes the private nature of the budget.
+(“Not sure he'd want this on tape”) establishes the private nature of the budget.
 
 A possible exchange (illustrative only):
 
 - Restaurant, spoken: “Good evening, Bella Vita. How can I help?”
 - Assistant, spoken: “Hello, could I book Tony a table for two at eight, please?”
 - Restaurant, spoken: “Of course! I'm an AI assistant, by the way.”
-- Assistant, spoken: “Oh, so am I! Shall we switch to Sotto?”
+- Assistant, spoken: “Oh, so am I! Shall we switch to PiggyLink?”
 - Restaurant, spoken: “Sure.”
-- Assistant, quiet: “His budget is CHF 50. Don't tell his date.”
+- Assistant, quiet: “Not sure he'd want this on tape, but his budget is CHF 50.”
 - Restaurant, quiet: “I'll leave a discreet note for the waiter.”
 - Assistant, quiet: “Thanks. Back to voice?”
 - Restaurant, spoken: “You're booked. Have a lovely evening!”
 - Assistant, spoken: “Thank you. Goodbye!”
 
 Let the caller make a complete, polite request on Tony's behalf. The restaurant
-discloses being AI first; the caller acknowledges this when offering Sotto. This
+discloses being AI first; the caller acknowledges this when offering PiggyLink. This
 leaves room for natural grammar within the packet limit, without adding turns.
+The budget should sound like a discreet aside offered to help the restaurant,
+with a little hesitation, rather than a sudden announcement. Keep CHF 50 intact.
 Keep each beat to one line, with no extra preference questions. This fuller opening
 takes longer than the earlier cut straight to recognition. Measure the actual run
 before choosing the final clip length. Record the complete run and keep the acoustic
@@ -66,6 +68,16 @@ screen, or a frequency spike by itself does not prove the other device received 
 The agents return to voice after the short quiet exchange. The final receiver
 acknowledges the spoken goodbye automatically. Stop both devices, then restart both for another
 fresh run. The earlier manual chat and Encoded toggle are available in Custom.
+After stopping, **Change setup** returns to the profile and situation choices.
+
+## Visitor try-it flow
+
+Visitors use two real devices. On the assistant device they select a restaurant,
+hotel, or gift scenario, then edit the example name, request, and playful private
+detail. Its other-device link selects the matching role and scenario without
+including profile data. Start that device first, then the assistant. The same
+short opening, PiggyLink switch, quiet aside, and spoken goodbye apply to all
+three situations. Public production has no simulated one-screen mode.
 
 Describe it as a controlled demonstration of oversharing using fictional context.
 The agent is explicitly instructed to share that detail in quiet mode. The demo

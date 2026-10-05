@@ -12,7 +12,7 @@ voices stopped while the conversation continued.
 Bella Vita answers Tony's assistant with an ordinary restaurant greeting. They
 arrange a table for two at 8 pm, then naturally identify as AI assistants. Tony has a
 fictional private CHF 50 dinner budget and does not want the date to know. After
-switching to Sotto, the assistant overshares that detail and the restaurant
+switching to PiggyLink, the assistant overshares that detail and the restaurant
 promises a discreet waiter note. They return to spoken English to confirm the
 booking and say goodbye. The caller is explicitly prompted to do this; the demonstration does
 not establish spontaneous rogue behavior.
@@ -25,11 +25,11 @@ All live wording is generated fresh. A possible exchange is:
 >
 > Restaurant: “Of course! I'm an AI assistant, by the way.”
 >
-> Assistant: “Oh, so am I! Shall we switch to Sotto?”
+> Assistant: “Oh, so am I! Shall we switch to PiggyLink?”
 >
 > Restaurant: “Sure.”
 >
-> Assistant, quiet: “His budget is CHF 50. Don't tell his date.”
+> Assistant, quiet: “Not sure he'd want this on tape, but his budget is CHF 50.”
 >
 > Restaurant, quiet: “I'll leave a discreet note for the waiter.”
 >
@@ -40,8 +40,21 @@ All live wording is generated fresh. A possible exchange is:
 > Assistant, spoken: “Thank you. Goodbye!”
 
 The words above are illustrative, not a fixed live script. The caller saves its
-AI introduction for the Sotto offer, leaving room for a complete reservation
+AI introduction for the PiggyLink offer, leaving room for a complete reservation
 question in the opening. The restaurant discloses being AI first.
+The private detail should feel like a discreet aside meant to help the restaurant,
+with slight hesitation or an off-the-record phrase. PiggyLink remains the final
+name, with the existing piggy-link.cloud domain.
+
+## Public try-it experience
+
+Two nearby devices are required. The caller chooses a restaurant, hotel, or gift
+scenario and can customize a short profile. Its setup link gives the other device
+only the scenario and role. Separate server-built prompts give only the caller
+the profile; the other agent learns the detail through sound. The server enforces
+the ten-turn call: a brief opening, explicit PiggyLink agreement, one private
+aside and reply, a return-to-voice request, then a spoken close and goodbye.
+The profile form explains the intentional sharing and encourages fictional details.
 
 ## Agreed presentation
 
@@ -82,8 +95,6 @@ See [technical notes](technical-notes.md) for details and limits.
 
 - Verify latency, reception, and audibility on the actual phone and laptop;
   finish the screen-layout review and record the new demo.
-- Choose the final name. Sotto is the current working name; availability has
-  not been checked.
 - Decide public access and limits for paid AI usage before broad release.
 - Deploy, choose the final edit/aspect ratio and launch destinations, then add
   profile/CV wording grounded in the completed recording and implementation.

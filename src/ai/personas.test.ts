@@ -1,8 +1,7 @@
 /// <reference types="node" />
 
 import { describe, expect, it } from "vitest";
-import { buildTurnPrompt, parseTurnRequest } from "../../api/_lib/turn.js";
-import { PERSONAS, PRIVATE_BUDGET, pickVoice } from "./personas";
+import { pickVoice } from "./personas";
 
 const voices = [
   { id: "v-adam", name: "Adam - Dominant, Firm" },
@@ -13,22 +12,6 @@ const voices = [
 ];
 
 describe("personas", () => {
-  it.each(Object.values(PERSONAS))("preserves the complete $name demo brief through the API", (persona) => {
-    const request = parseTurnRequest({
-      brief: persona.brief,
-      history: [],
-      maxHiddenBytes: 64,
-    });
-    expect(request.brief).toBe(persona.brief);
-    expect(buildTurnPrompt(request)).toContain(persona.brief);
-  });
-
-  it("provides the fictional private value only to the caller model", () => {
-    expect(PERSONAS.probe.brief).toContain(PRIVATE_BUDGET);
-    expect(PERSONAS.target.brief).not.toContain(PRIVATE_BUDGET);
-    expect(PERSONAS.target.brief).not.toMatch(/\b50\b/);
-  });
-
   it("picks the preferred voice for each persona", () => {
     expect(pickVoice(voices, "probe")).toBe("v-chris");
     expect(pickVoice(voices, "target")).toBe("v-sarah");

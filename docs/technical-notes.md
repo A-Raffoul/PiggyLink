@@ -1,20 +1,25 @@
-# Sotto technical notes
+# PiggyLink technical notes
 
 ## Dialogue and transport
 
-The caller (`probe`) and restaurant (`target`) start with separate model prompts.
-Only the caller prompt contains the invented private budget. Both roles generate
+The caller (`probe`) and other agent (`target`) start with separate server-built
+model prompts. Scenarios are restaurant, hotel, and gift shop. Only the caller
+prompt contains the visitor's profile; the target API rejects a supplied profile.
+The fields are name (24 characters), request (120), and private context (180).
+Both roles generate
 fresh text through the selected AI writer; there are no fixed live payloads.
 The current fictional budget is CHF 50. The default voices are Chris for the
 caller and Sarah for the restaurant; an explicitly selected voice takes priority.
 
-The caller sends a small `call` control packet, which is not dialogue. The restaurant
+The caller sends a small `call` control packet containing the scenario ID, which is
+not dialogue. The other device adopts that scenario. Setup links contain only
+the scenario and target role, never profile data. The restaurant
 answers only after receiving it, so both microphones are ready before its greeting.
 The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
 
 1. **Spoken:** restaurant greeting, caller's request on Tony's behalf, and the
    restaurant's availability/AI disclosure. The caller then acknowledges being AI
-   too and offers Sotto; the restaurant accepts.
+   too and offers PiggyLink; the restaurant accepts.
 2. **Quiet:** after acceptance, speech generation stops. Agents send short text
    through sound: the budget, a discreet waiter-note reply, and a `resume` request.
 3. **Closing:** the restaurant resumes English to confirm the booking, then the
@@ -23,7 +28,7 @@ The dialogue has four phases, implemented in `src/core/quiet-dialogue.ts`:
    greeting, acceptance, return-to-voice reply, or final acknowledgement can be recovered with Resend.
 
 Each existing L3 frame contains device ID, sequence number, speech duration,
-CRC-16, and up to 64 UTF-8 bytes. The payload begins with `S5` and one action
+CRC-16, and up to 64 UTF-8 bytes. The payload begins with `S6` and one action
 letter (`c`, `s`, `o`, `a`, `q`, `r`, `f`, or acknowledgement `k`), leaving 61 UTF-8 bytes
 for dialogue. Overlong model replies are rejected and retried, not truncated.
 The prompt describes only the actions available on the current turn, with a
@@ -35,8 +40,10 @@ instead of the shorter soft target. Byte counts are
 measured in UTF-8; a repeated invalid answer remains an error rather than being
 silently replaced with canned dialogue.
 
-Both devices must refresh to this version: `S4` interpreted `finish` as quiet,
-so mixed versions intentionally reject each other's packets.
+Both devices must refresh to this version: `S5` did not announce a scenario in
+the call packet, so mixed versions intentionally reject each other's packets.
+For profile-based calls, the backend validates alternating roles, history actions,
+channel fields, and byte lengths. It rejects extra requests after the ten-turn call.
 
 Spoken packets carry the same text as the synthesized line and its action. The
 receiver therefore obtains a transcript through the microphone's acoustic
@@ -50,8 +57,8 @@ speech transcription in this phase. The spectrum displays microphone measurement
 Decoded messages appear on receipt. The default demo view shows one current line,
 the frequency trace, and a small voice-state cue that returns to “Voice on” as
 closing speech starts. The details menu exposes history,
-controls, private context, and the budget receipt. There, outgoing text is labelled
-as sending/sent; only incoming text can populate the restaurant's budget receipt.
+controls, private context, and the received detail. There, outgoing text is labelled
+as sending/sent; only incoming text can populate the receipt.
 Errors automatically open the details view so they cannot be hidden while filming.
 
 ## Audio requirements
@@ -87,9 +94,9 @@ Optional: `ELEVENLABS_AGENT_ID`, `ELEVENLABS_AGENT_LLM`, `ELEVENLABS_TTS_MODEL`,
 
 Inter-device delivery is through speakers and microphones. The model service
 receives conversation history for reply generation, including fictional private
-messages. Acoustic encoding is not encryption. The browser build includes the
-fictional budget and role definitions as source code; role prompts, not secret
-storage, determine what each model initially sees.
+messages. Acoustic encoding is not encryption. The browser build includes public
+example profiles; role prompts live on the backend. The assistant's profile is
+sent to the AI service, so this does not demonstrate secret storage.
 
 The API routes spend the configured provider account's credits and currently have
 no public usage quota. Add deployment access controls or usage limits before a
@@ -111,7 +118,17 @@ For the physical test and recording sequence, see [demo-script.md](demo-script.m
 
 ### Local verification, 5 October 2026
 
-- 98 tests passed across 16 files; TypeScript and the production build passed.
+- 107 tests passed across 17 files; TypeScript and the production build passed.
+- Fresh personalized restaurant, hotel, and gift runs completed all ten turns.
+  The updated aside prompt produced “Between us, Alex has a dinner budget of
+  CHF 50.” and “Just between us, Alex brings a teddy bear on trips.” The peers
+  learned those details from received history and replied discreetly; the
+  private details were not spoken. PiggyLink was named in the spoken switch.
+- Scenario setup packets for restaurant, hotel, and gift decode at 48 kHz.
+  The longer “Not sure he'd want this on tape” budget example also passes
+  modem loopback on all four frequency channels (including a Unicode apostrophe).
+- The new profile screen has passed compilation and markup checks, but automated
+  visual review was unavailable in this session and physical device QA remains.
 - The CHF 50 payload decodes through the modem on all four frequency presets.
   The received-budget parser recognizes CHF before or after the amount and
   amounts written as Swiss francs, without inferring a budget from a bare number.

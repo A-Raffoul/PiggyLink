@@ -14,8 +14,9 @@ export interface DialogueHistory {
 
 // The existing CRC-protected frame carries this compact envelope. Opening packets
 // carry the spoken transcript; quiet packets carry only the generated message.
-// S5 makes the return to voice explicit; an S4 peer interpreted finish as quiet.
-const PREFIX = "S5";
+// S6 connects a public scenario before the host greets the caller. Earlier peers
+// only knew the restaurant scenario, so both devices must use the same version.
+const PREFIX = "S6";
 const CODES: Record<PacketAction, string> = {
   speak: "s", offer: "o", accept: "a", quiet: "q", resume: "r", finish: "f", call: "c", ack: "k",
 };

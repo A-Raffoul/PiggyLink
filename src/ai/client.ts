@@ -1,5 +1,6 @@
 import { int16ToFloat32 } from "../audio/pcm";
 import type { DialogueAction } from "../core/quiet-dialogue";
+import type { DemoConfig } from "../core/demo";
 
 export type Writer = "elevenlabs" | "apertus";
 
@@ -54,11 +55,12 @@ export async function fetchSetup(): Promise<SetupInfo> {
 
 export async function writeAgentTurn(request: {
   writer: Writer;
-  brief: string;
+  brief?: string;
   history: HistoryTurn[];
   maxHiddenBytes: number;
   spokenOnly?: boolean;
   actions?: readonly DialogueAction[];
+  demo?: DemoConfig;
 }): Promise<AgentTurn> {
   return (await (await postJson("/api/turn", request)).json()) as AgentTurn;
 }

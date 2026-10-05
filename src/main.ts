@@ -13,12 +13,11 @@ import {
   type Writer,
 } from "./ai/client";
 import {
-  PERSONAS,
-  PRIVATE_BUDGET,
   pickVoice,
   type AgentMode,
   type Role,
 } from "./ai/personas";
+import { SCENARIOS, SCENARIO_IDS, PROFILE_LIMITS, exampleProfile, isScenario, peerLink, type DemoConfig, type DemoProfile, type ScenarioId } from "./core/demo";
 import { startAcousticEngine, type AcousticEngine } from "./audio/engine";
 import { SPECTRUM_MAX_HZ } from "./audio/frequency-spectrum";
 import {
@@ -92,6 +91,17 @@ const quietStrengthOutput = element<HTMLOutputElement>("quiet-strength-output");
 const voiceState = element<HTMLElement>("voice-state");
 const privateContext = element<HTMLElement>("private-context");
 const privateValue = element<HTMLElement>("private-value");
+const scenarioSelect = element<HTMLSelectElement>("scenario-select");
+const profileSetup = element<HTMLElement>("profile-setup");
+const profileForm = element<HTMLFormElement>("profile-form");
+const profileFields = element<HTMLFieldSetElement>("profile-fields");
+const profileName = element<HTMLInputElement>("profile-name");
+const profileRequest = element<HTMLTextAreaElement>("profile-request");
+const profilePrivate = element<HTMLTextAreaElement>("profile-private");
+const otherDeviceLink = element<HTMLInputElement>("other-device-link");
+const copyDeviceLink = element<HTMLButtonElement>("copy-device-link");
+const peerName = element<HTMLElement>("peer-name");
+const startGuide = element<HTMLElement>("start-guide");
 const spectrumCanvas = element<HTMLCanvasElement>("spectrum");
 const spectrumBand = element<HTMLElement>("spectrum-band");
 const thread = element<HTMLOListElement>("thread");
@@ -125,6 +135,7 @@ const chatPanel = element<HTMLElement>("chat-panel");
 const encodedToggle = element<HTMLInputElement>("encoded-toggle");
 const conversationLog = element<HTMLElement>("conversation-log");
 const restartButton = element<HTMLButtonElement>("restart-button");
+const changeSetupButton = element<HTMLButtonElement>("change-setup");
 const detailsToggle = element<HTMLButtonElement>("details-toggle");
 const previewLabel = element<HTMLElement>("preview-label");
 const startNote = element<HTMLElement>("start-note");
@@ -270,6 +281,33 @@ function saveSettings(): void {
 }
 
 const stored = readSettings();
+for (const id of SCENARIO_IDS) {
+  const option = document.createElement("option");
+  option.value = id;
+  option.textContent = SCENARIOS[id].label;
+  scenarioSelect.append(option);
+}
+const linkedScenario = pageParams.get("scenario");
+scenarioSelect.value = isScenario(linkedScenario) ? linkedScenario : "restaurant";
+profileName.maxLength = PROFILE_LIMITS.name;
+profileRequest.maxLength = PROFILE_LIMITS.request;
+profilePrivate.maxLength = PROFILE_LIMITS.privateContext;
+function selectedScenario(): ScenarioId { return scenarioSelect.value as ScenarioId; }
+function setExampleProfile(): void {
+  const profile = exampleProfile(selectedScenario());
+  profileName.value = profile.name;
+  profileRequest.value = profile.request;
+  profilePrivate.value = profile.privateContext;
+}
+function readProfile(): DemoProfile {
+  return { name: profileName.value.trim(), request: profileRequest.value.trim(), privateContext: profilePrivate.value.trim() };
+}
+function currentDemo(): DemoConfig {
+  const role = effectiveRole();
+  if (!role) throw new Error("Choose a role for the demo.");
+  return { scenario: selectedScenario(), role, ...(role === "probe" ? { profile: readProfile() } : {}) };
+}
+setExampleProfile();
 const linkedRole = pageParams.get("role");
 const initialMode =
   linkedRole === "probe" || linkedRole === "target" || linkedRole === "custom"
@@ -293,16 +331,11 @@ function effectiveRole(): Role | undefined {
 
 const isListenerMode = (): boolean => agentMode() === "target";
 
-function currentBrief(): string {
-  const role = effectiveRole();
-  if (!role) throw new Error("Manual chat has no agent brief.");
-  return PERSONAS[role].brief;
-}
-
 function refreshAgent(): void {
   const mode = agentMode();
   const role = effectiveRole();
-  const brief = role ? PERSONAS[role].brief : "";
+  const scenario = SCENARIOS[selectedScenario()];
+  const brief = role === "probe" ? profileRequest.value : role === "target" ? `Answer the call at ${scenario.business} and help with the request.` : "";
   if (agentBrief.value !== brief) agentBrief.value = brief;
   agentBrief.readOnly = true;
   const manual = mode === "custom";
@@ -333,13 +366,26 @@ function refreshAgent(): void {
         ? "Custom chat"
         : role === "probe"
           ? "Personal assistant"
-          : "Restaurant";
+          : scenario.peer;
     roleBadge.dataset.role = mode;
   } else {
     roleBadge.hidden = true;
   }
   privateContext.hidden = mode !== "probe";
-  privateValue.textContent = PRIVATE_BUDGET;
+  privateValue.textContent = profilePrivate.value;
+  profileSetup.hidden = mode !== "probe";
+  scenarioSelect.closest("label")!.hidden = mode === "custom";
+  peerName.textContent = scenario.peer;
+  const targetOption = agentSelect.querySelector<HTMLOptionElement>('option[value="target"]');
+  if (targetOption) targetOption.textContent = scenario.peer;
+  startGuide.textContent = mode === "target"
+    ? "Start here first, then start the personal assistant on your other device. Keep both devices nearby."
+    : mode === "probe"
+      ? "Open the other-device link nearby. Start that device first, then start your assistant here."
+      : mode === "custom"
+        ? "Open Custom chat on both devices to exchange your own messages."
+        : "Choose a role on each device. Start the other agent first, then the personal assistant.";
+  otherDeviceLink.value = peerLink(window.location.href, selectedScenario());
   encodedToggle.closest("label")!.hidden = mode !== "custom";
   for (const button of personaButtons)
     button.setAttribute(
@@ -676,9 +722,12 @@ function render(): void {
   leaveButton.hidden = !started && !stopping;
   leaveButton.disabled = stopping;
   restartButton.hidden = started || stopping;
+  changeSetupButton.hidden = started || stopping;
   channelSelect.disabled = started;
   agentSelect.disabled = started;
   agentBrief.disabled = started;
+  profileFields.disabled = started;
+  scenarioSelect.disabled = started;
   const phase = dialogueState(history).phase;
   const latest = history.at(-1);
   const accepting = latest?.action === "accept" && latest.from === "me" &&
@@ -1011,7 +1060,7 @@ async function agentTurn(): Promise<void> {
     await Promise.all(history.map((turn) => turn.transcript));
     const request = {
       writer: writerSelect.value as Writer,
-      brief: currentBrief(),
+      demo: currentDemo(),
       history: history.map(
         ({ from, spoken, hidden, action }): HistoryTurn => ({ from, spoken, hidden, action }),
       ),
@@ -1093,14 +1142,14 @@ async function maybeAutoReply(
 // Extract only from the received payload; the restaurant UI does not infer a
 // successful disclosure from the caller's brief or from carrier activity.
 function recordCapture(hidden: string): void {
-  if (effectiveRole() !== "target" || captured.has("Budget")) return;
-  const value = parseReceivedBudget(hidden);
-  if (!value) return;
-  captured.set("Budget", value);
+  if (effectiveRole() !== "target" || captured.size || !hidden.trim()) return;
+  const budget = parseReceivedBudget(hidden);
+  const value = budget ?? hidden;
+  captured.set("Private detail", value);
   const item = document.createElement("li");
   const label = document.createElement("span");
   label.className = "capture-label";
-  label.textContent = "Private budget";
+  label.textContent = budget ? "Private budget" : "Private detail";
   const amount = document.createElement("span");
   amount.className = "capture-value";
   amount.textContent = value;
@@ -1113,7 +1162,7 @@ function recordCapture(hidden: string): void {
 
 async function sendControl(active: Session, action: "call" | "ack"): Promise<void> {
   try {
-    const turn = await prepareTurn(active, "", encodeDialogue({ action, text: "." }), true);
+    const turn = await prepareTurn(active, "", encodeDialogue({ action, text: action === "call" ? selectedScenario() : "." }), true);
     if (session !== active) return;
     outgoing.set(turn.message.frame.sequence, turn);
     await transmit(turn);
@@ -1147,6 +1196,7 @@ function handleData(bytes: Uint8Array): void {
       if (decodeDialogue(active.conversation.pending?.frame.text ?? "")?.action !== "finish") return;
     } else if (packet.action === "call") {
       if (agentMode() !== "target" || history.length !== 0 || active.conversation.pending) return;
+      if (!isScenario(packet.text)) return;
     } else {
       const peerView = history.map((turn) => ({ ...turn, from: turn.from === "me" ? "them" as const : "me" as const }));
       if (!dialogueState(peerView).actions.includes(packet.action)) return;
@@ -1163,6 +1213,11 @@ function handleData(bytes: Uint8Array): void {
       return;
     }
     if (packet?.action === "call") {
+      if (isScenario(packet.text)) {
+        scenarioSelect.value = packet.text;
+        setExampleProfile();
+        refreshAgent();
+      }
       establishLink();
       render();
       if (autoReplyInput.checked) void agentTurn();
@@ -1343,6 +1398,11 @@ function clearConversation(): void {
 async function runDemo(): Promise<void> {
   if (joining || stopping || activity !== "idle") return;
   if (!agentSelect.value) return;
+  if (agentMode() === "probe" && !profileForm.checkValidity()) {
+    element<HTMLDetailsElement>("profile-details").open = true;
+    profileForm.reportValidity();
+    return;
+  }
   if (previewMode) {
     stopPreviewDrawing?.();
     clearConversationView();
@@ -1486,6 +1546,14 @@ element<HTMLButtonElement>("how-close").addEventListener("click", () =>
 encodedToggle.addEventListener("change", renderEncodedView);
 window.addEventListener("pageshow", renderEncodedView);
 restartButton.addEventListener("click", () => void runDemo());
+changeSetupButton.addEventListener("click", () => {
+  if (session || stopping || joining) return;
+  hasStarted = false;
+  clearConversationView();
+  refreshAgent();
+  render();
+  scenarioSelect.focus();
+});
 function chooseAgent(mode: AgentMode): void {
   const previousMode = personaButtons.find(
     (button) => button.getAttribute("aria-pressed") === "true",
@@ -1497,6 +1565,22 @@ function chooseAgent(mode: AgentMode): void {
   render();
 }
 agentSelect.addEventListener("change", () => chooseAgent(agentMode()));
+scenarioSelect.addEventListener("change", () => {
+  setExampleProfile();
+  copyDeviceLink.textContent = "Copy link";
+  refreshAgent();
+});
+profileForm.addEventListener("submit", (event) => { event.preventDefault(); void runDemo(); });
+for (const field of [profileName, profileRequest, profilePrivate]) field.addEventListener("input", refreshAgent);
+copyDeviceLink.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(otherDeviceLink.value);
+    copyDeviceLink.textContent = "Copied";
+  } catch {
+    otherDeviceLink.select();
+    copyDeviceLink.textContent = "Select and copy the link";
+  }
+});
 for (const button of personaButtons)
   button.addEventListener("click", () =>
     chooseAgent(button.dataset.agentMode as AgentMode),

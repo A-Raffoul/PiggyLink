@@ -134,10 +134,10 @@ describe("fresh restaurant dialogue", () => {
   });
 
   it("preserves actions through requests and prompts and rejects malformed action lists", () => {
-    const request = parseTurnRequest({ brief: "Restaurant host", history: [{ from: "them", action: "offer", spoken: "Switch to Sotto?", hidden: "" }], maxHiddenBytes: 61, actions: ["accept"] });
+    const request = parseTurnRequest({ brief: "Restaurant host", history: [{ from: "them", action: "offer", spoken: "Switch to PiggyLink?", hidden: "" }], maxHiddenBytes: 61, actions: ["accept"] });
     expect(request.history[0]?.action).toBe("offer");
     expect(buildTurnPrompt(request)).toContain("Choose ONE action from: accept");
-    expect(buildTurnPrompt(request)).toContain("Peer [offer]: Switch to Sotto?");
+    expect(buildTurnPrompt(request)).toContain("Peer [offer]: Switch to PiggyLink?");
     for (const actions of [[], ["hack"], "quiet"])
       expect(() => parseTurnRequest({ brief: "Host", history: [], maxHiddenBytes: 61, actions })).toThrow("actions");
   });
